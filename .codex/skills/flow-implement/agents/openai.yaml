@@ -1,4 +1,0 @@
-interface:
-  display_name: "Flow Implement"
-  short_description: "計画に沿って実装と検証を実行"
-  default_prompt: "Use $flow-implement to implement tasks from spec/{yyyymmdd_feature}/plan.md."

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Flow Design"
-  short_description: "要件と受け入れ条件を明確化"
-  default_prompt: "Use $flow-design to clarify requirements and write spec/{yyyymmdd_feature}/design.md."

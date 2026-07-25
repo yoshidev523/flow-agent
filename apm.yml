@@ -1,0 +1,16 @@
+name: flow-agent
+version: 1.0.0
+description: 仕様駆動開発を行うエージェントを管理します
+author: Yoshiki Honda
+# Which agent platforms to deploy to.
+# Resolution order: --target flag > this field > auto-detect from filesystem.
+# Accepted values: agent-skills, antigravity, claude, codex, copilot, cursor, gemini, kiro, opencode, windsurf
+targets:
+  - claude
+  - codex
+dependencies:
+  apm: []
+  mcp: []
+includes: auto
+scripts:
+  verify-flow: "apm compile --validate --target claude,codex"

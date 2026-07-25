@@ -1,4 +1,0 @@
-interface:
-  display_name: "Flow Plan"
-  short_description: "実装タスクの詳細計画を作成"
-  default_prompt: "Use $flow-plan to create spec/{yyyymmdd_feature}/plan.md from requirements or design.md."
