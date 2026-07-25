@@ -1,0 +1,4 @@
+interface:
+  display_name: "Flow"
+  short_description: "設計から実装まで順番に進行"
+  default_prompt: "Use $flow to run design -> plan -> implement with the project flow subagents."
