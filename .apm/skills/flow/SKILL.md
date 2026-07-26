@@ -21,15 +21,93 @@ description: 本プロジェクト向け仕様駆動開発の一連フロー。f
 ## 基本方針
 
 - `design -> plan -> implement` の順番を守る。
-- 前段階の成果物が未承認または不十分な場合は、次段階へ進まない。
+- 前段階の成果物がユーザー明示承認済み、または同一 SHA-256 の有効な
+  Flow 管理の `PhaseTransitionAuthorization` を持たない場合は、次段階へ進まない。
 - 各段階でユーザー確認が必要な場合は停止し、フィードバックを待つ。
 - 依存関係があるため、3 エージェントを並列起動しない。
-- 実装まで一気に進める明示依頼があっても、`design.md` と `plan.md` の承認ゲートは維持する。
+- 実装まで一気に進める明示依頼があっても、ユーザー明示承認または
+  Flow のフェーズ移行許可によるゲートは維持する。
 - `承認状態: Approved` はユーザーの明示承認を表す。サブエージェントやメインエージェントの自己判断で `Approved` にしてはいけない。
 - ユーザーの明示承認を該当フェーズのサブエージェントが成果物へ反映したら、メインエージェントは追加確認を挟まず次フェーズのサブエージェントを起動する。
 - Design は WHAT、Plan は HOW を扱う。Design で質問済みであることを理由に、Plan の HOW 確認を省略しない。
 - 各サブエージェントは最終報告で `次に取るべきステップ` と `ユーザーに提示する文言` を明示する。メインエージェントはそれに従い、質問回答待ちと承認待ちを混同しない。
-- メインエージェントは成果物作成、成果物更新、承認反映、フィードバック反映を直接行わない。これらは必ず該当フェーズのサブエージェントに委譲する。
+- メインエージェントは phase 成果物の作成、更新、承認反映、フィードバック反映を
+  直接行わない。これらは必ず該当フェーズのサブエージェントに委譲する。
+  review artifactは対応するフェーズ reviewer orchestratorが単一 writerとして管理し、
+  Flowはフェーズ移行状態だけを管理する。
+
+## フェーズ独立の原則
+
+- `flow-design`、`flow-plan`、`flow-implement` は、それぞれ自身の入力、成果物、
+  質問、完了条件だけを扱う。他フェーズの agent、reviewer、review artifact、
+  Flow 内部状態を参照しない。
+- 各観点 reviewer は汎用 `ReviewRequest` を読み、担当観点の
+  `ReviewResult` を返すだけとする。呼び出し元、他 reviewer、集約結果、
+  ユーザー対話、次フェーズを認識しない。
+- フェーズ reviewer orchestrator は自フェーズの3 reviewerの選択・起動、
+  結果集約、review artifactだけを所有する。他phaseやユーザー対話を扱わない。
+- phase 間の接続、フェーズ reviewer orchestratorの起動、SHA-256の外側照合、
+  ユーザーへの提示、再実行、フェーズ移行許可は Flow だけが所有する。
+- leaf skill / agent の出力文言は Flow にとって提案であり、Flow 実行中は
+  そのままユーザーへ転送せず、Flow が現在状態に基づき次アクションを決める。
+- leaf skill / agent を単独利用した場合は、reviewer の有無に依存せず、
+  その skill 自身の通常の質問・承認・完了フローで動作する。
+
+## review-gated オーケストレーション
+
+### Flow が作る評価対象
+
+Design / Plan の phase agent が質問待ちを報告し、全質問に推奨案がある場合、
+Flow はユーザーへ質問を提示する前に同じ phase agent へ
+「推奨案を仮適用した評価用候補」を依頼する。これは汎用候補モードであり、
+phase agent へ reviewer 名、review 状態、次フェーズ条件を渡さない。
+
+候補に未選択項目、推奨なし、矛盾、候補化不能な `Open` が残る場合は
+review を開始せず、通常どおりユーザーへ質問する。
+
+### フェーズ reviewer orchestrator への委譲
+
+Flow は観点 reviewer を直接起動しない。
+
+- Design は `flow-design-reviewer` + `$flow-design-review`
+- Plan は `flow-plan-reviewer` + `$flow-plan-review`
+
+Flow は対象 path / SHA-256、review path、roundを持つ
+汎用 `PhaseReviewRequest` をフェーズ reviewer orchestratorへ渡す。
+フェーズ reviewer orchestratorが配下の3観点 reviewerを直接起動し、
+結果を集約してreview artifactへ追記する。
+
+Flowは返された `PhaseReviewResult` のrequest ID、対象path/SHA-256、
+必要な3 reviewer ID、個別結果、集約判定、ゲートを検証する。
+Flow自身は観点 reviewerのjob管理、個別結果の編集、review artifactの追記を行わない。
+
+フェーズ reviewer orchestratorの起動不能、子起動不能、結果消失は `Unable` とする。
+物理的な `Flow -> phase reviewer orchestrator -> 3 reviewer` の階層を維持し、
+Flowによる観点 reviewerの代理起動は行わない。
+
+### SHA-256 と状態遷移
+
+Flow はreviewer orchestrator起動前と次フェーズ移行直前に、
+`sha256sum`、`shasum -a 256`、
+`openssl dgst -sha256` の順で target 全バイトの SHA-256 を再計算する。
+小文字 64 桁 hex でない場合、最新 `Passed` の digest と異なる場合、
+3 reviewer の欠落、`NG` / `Unable`、集約またはゲート不整合がある場合は通過させない。
+Flow起動前・orchestrator追記前・フェーズ移行前の三点照合を維持する。
+
+同じ digest の有効な `Passed` は再利用し、新しい round を増やさない。
+同じ digest の `Blocked` はユーザー回答なしに再実行しない。
+過去 digest の `OK` は stale として無効にする。
+
+`Passed` なら Flow は対象 path、SHA-256、phase、根拠種別を持つ
+`PhaseTransitionAuthorization` を作り、target を書き換えず次フェーズへ進む。
+`NG` / `Unable` なら
+reviewer の根拠とユーザー判断事項を提示してそのターンを終了する。
+ユーザー回答後は同じ writer に回答と自由記述を反映させ、digest 更新後に
+全 3 reviewer を再実行する。同一ターン中の自律修正・再レビューは禁止する。
+
+`承認状態: Approved` は引き続きユーザー明示承認だけを表す。
+Approved の既存 design / plan は review artifact がなくても互換経路で通過できる。
+評価用候補単独、stale Passed、Blocked は次フェーズ根拠にならない。
 
 ## 推測ゲート
 
@@ -46,7 +124,9 @@ flow では、根拠が弱い判断を推測で確定して先へ進めてはい
 推奨案は回答候補であり、ユーザー回答前の確定事項ではない。
 すべての事項において、根拠のない推測は禁止する。
 ユーザー回答または確認可能な根拠がない内容は、些細に見えても確定事項にしない。
-`Docs-derived` / `Assumption` / `Open` が残る場合は、設計レビュー、計画レビュー、実装へ進まない。
+候補化できない `Docs-derived` / `Assumption` / `Open` が残る場合は review や
+次フェーズへ進まない。Flow が phase agent に作らせた完全な評価用候補は
+ユーザー質問前の review 対象にできるが、単独では次フェーズ根拠にならない。
 Plan から Implement へ進む前に、`plan.md` が implementer へ十分な情報を渡しているか確認する。
 `承認状態: Approved` だけでは Implement に進めない。
 
@@ -90,8 +170,10 @@ Open の確認事項がある場合、メインエージェントは承認を促
 - 参考情報（チケット、URL、既存ドキュメント、関連ファイル）
 - 希望する停止位置（design まで / plan まで / implement まで）
 
-停止位置の指定がなければ、まず `design.md` のドラフト作成まで進め、ユーザーの明示承認を待つ。
-ユーザーが「最後まで」「実装まで」などと明示した場合でも、`design.md` と `plan.md` はドラフト作成後にユーザーの明示承認を待ち、各承認ゲートを通過してから次段階へ進める。
+停止位置の指定がなければ、まず `design.md` の通常ドラフトを作る。
+推奨案が揃った質問待ちなら Flow が評価用候補を依頼して Design review まで進める。
+`Blocked` ならユーザー回答を待ち、`Passed` なら Plan へ進む。
+ユーザーが「最後まで」「実装まで」と明示した場合も各 review または明示承認ゲートを維持する。
 
 ## 実行フロー
 
@@ -125,16 +207,22 @@ Open の確認事項がある場合、メインエージェントは承認を促
 - ユーザーが会話上で明示的に内容を承認している。
 - その後 `承認状態: Approved` に更新されている。
 
-未承認の場合は、ユーザーにレビューと承認可否を確認し、次段階へ進まない。
+未承認でも同一 SHA-256 の有効な Design review `Passed` を Flow が確認し、
+Design 用 `PhaseTransitionAuthorization` を作成できれば Plan へ進む。
+review が `Blocked` の場合だけ、Flow が根拠と判断事項をユーザーへ提示して停止する。
 
 ### 2. Plan
 
-Design が承認済みの場合だけ、`flow-planner` サブエージェントを起動し、`$flow-plan` を使わせる。
+Design が明示承認済み、または Flow が有効な Design 用
+`PhaseTransitionAuthorization` を持つ場合だけ、
+`flow-planner` サブエージェントを起動し、`$flow-plan` を使わせる。
 ユーザーの明示承認により `design.md` が `Approved` になった場合、メインエージェントは追加確認を挟まず `flow-planner` を起動する。
 
 依頼内容に含めること:
 
-- 承認済み `design.md` のパス
+- 入力となる `design.md` のパス
+- Flow が事前にフェーズ移行可否を確認済みであること。reviewer 名、
+  review artifact、ゲート状態は planner へ渡さないこと
 - 成果物は同じ feature ディレクトリの `plan.md`
 - 成果物の見出しは日本語にし、承認欄は `承認状態: Pending` とすること
 - 不明点があれば質問し、ユーザーフィードバックを反映すること
@@ -177,11 +265,15 @@ Design が承認済みの場合だけ、`flow-planner` サブエージェント�
 - ユーザーが会話上で明示的に内容を承認している。
 - その後 `承認状態: Approved` に更新されている。
 
-未承認の場合は、ユーザーにレビューと承認可否を確認し、次段階へ進まない。
+未承認でも同一 SHA-256 の有効な Plan review `Passed` を Flow が確認し、
+Plan 用 `PhaseTransitionAuthorization` を作成できれば Implement へ進む。
+review が `Blocked` の場合だけ Flow がユーザー判断待ちで停止する。
 
 ### 3. Implement
 
-Plan が承認済みの場合だけ、`flow-implementer` サブエージェントを起動し、`$flow-implement` を使わせる。
+Plan が明示承認済み、または Flow が有効な Plan 用
+`PhaseTransitionAuthorization` を持つ場合だけ、
+`flow-implementer` サブエージェントを起動し、`$flow-implement` を使わせる。
 ユーザーの明示承認により `plan.md` が `Approved` になった場合、
 メインエージェントはユーザーへの追加確認を挟まず `flow-implementer` を起動する。
 ただし、起動前にメインエージェントは `実装引き継ぎチェック`、`変更ファイル詳細`、`詳細手順` を短く確認する。
@@ -189,7 +281,10 @@ Plan が `Approved` でも、実装に必要な情報が不足している場合
 
 依頼内容に含めること:
 
-- 承認済み `plan.md` のパス
+- 入力となる `plan.md` のパス
+- 未承認 plan を渡す場合は、reviewer や review artifact を含めず、
+  `status: Authorized`、対象 path、対象 SHA-256、発行 phase を持つ
+  汎用 `PhaseEntryAuthorization` を渡すこと
 - 同じ feature ディレクトリの `design.md` があれば参照すること
 - `実装引き継ぎチェック`、`変更ファイル詳細`、`詳細手順` を作業前に確認すること
 - plan が承認済みでも、引き継ぎチェックに `NG` / 未記入 / 矛盾がある場合や、関数名、input/output、エラー時の扱い、接続箇所、完了条件、検証方法が不足している場合は実装を開始しないこと
@@ -211,6 +306,10 @@ Plan が `Approved` でも、実装に必要な情報が不足している場合
 ## サブエージェント運用
 
 - 各段階のサブエージェントは 1 つずつ起動する。
+- フェーズ reviewer orchestratorはphase agentとは別枠でFlowが1つ起動する。
+- フェーズ reviewer orchestratorは配下の3観点 reviewerを直接起動し、
+  相互依存がないため並列実行してよい。
+- 観点 reviewer自身から別agentを起動させない。
 - 前段階の最終報告と成果物パスを次段階の入力として渡す。
 - 各フェーズでは、原則として 1 つのサブエージェントをフェーズ完了まで再利用する。
 - サブエージェントが質問待ち、承認待ち、またはブロックを報告した場合、メインエージェントはユーザーへ要点を伝えて待つが、そのサブエージェントは閉じない。
@@ -227,6 +326,8 @@ Plan が `Approved` でも、実装に必要な情報が不足している場合
   既存 `design.md` とユーザー最新入力を渡して反映させる。
 - `plan.md` の質問回答、修正依頼、計画承認は、Plan フェーズ中の既存 `flow-planner` に
   既存 `plan.md` とユーザー最新入力を渡して反映させる。
+- review `Blocked` 後の回答は、Flow が review の判断点とユーザー入力を対応付け、
+  対象 phase の既存 agent へ渡す。観点 reviewer へユーザー入力を直接渡さない。
 - 実装後の追加検証、環境準備、レビュー修正、タスク状態更新は、
   Implement フェーズ中の既存 `flow-implementer` に既存 `plan.md` / `implement.md` と
   ユーザー最新入力を渡して実行させる。
@@ -237,7 +338,7 @@ Plan が `Approved` でも、実装に必要な情報が不足している場合
 
 ## メインエージェントのフィードバック処理
 
-ユーザーから質問回答、承認、修正依頼、追加検証、追加実装、ブロック回答が返った場合、メインエージェントは内容を深掘りしない。
+ユーザーから質問回答、承認、修正依頼、追加検証、追加実装、ブロック回答が返った場合、メインエージェントは phase 成果物の内容を深掘りしない。
 メインエージェントが判断してよいのは以下だけとする。
 
 - 現在フェーズ: Design / Plan / Implement
@@ -247,6 +348,8 @@ Plan が `Approved` でも、実装に必要な情報が不足している場合
 
 追加質問の要否、回答内容の妥当性、成果物更新、承認反映、ブロック解除可否は、必ず該当フェーズのサブエージェントが判断する。
 メインエージェントはユーザー入力を要約しすぎず、原文に近い形でサブエージェントへ渡す。
+ただし review の request 管理、結果集約、SHA-256 照合、ゲート判定、
+`PhaseTransitionAuthorization` の発行は Flow 自身が判断する。
 
 追加入力テンプレート:
 
@@ -268,10 +371,16 @@ Plan が `Approved` でも、実装に必要な情報が不足している場合
 | 現在状態 | ユーザー入力 | メインエージェントの行動 |
 | --- | --- | --- |
 | Design 質問待ち | 回答 | 既存 `flow-designer` に追加入力する |
+| Design 推奨案あり | review 前 | 同じdesignerに評価用候補を依頼し、FlowがDesign reviewer orchestratorを起動する |
+| Design review `Blocked` | 回答 | 既存 `flow-designer` に判断点とユーザー入力を渡す |
+| Design review `Passed` | 次フェーズ開始 | Flow が移行許可を発行し、`flow-planner` を起動する |
 | Design レビュー待ち | 承認 | 既存 `flow-designer` に承認反映を依頼する |
 | Design レビュー待ち | 修正依頼 | 既存 `flow-designer` に追加入力する |
 | Design `Approved` | 次フェーズ開始 | `flow-designer` を閉じ、`flow-planner` を起動する |
 | Plan 質問待ち | 回答 | 既存 `flow-planner` に追加入力する |
+| Plan 推奨案あり | review 前 | 同じplannerに評価用候補を依頼し、FlowがPlan reviewer orchestratorを起動する |
+| Plan review `Blocked` | 回答 | 既存 `flow-planner` に判断点とユーザー入力を渡す |
+| Plan review `Passed` | 次フェーズ開始 | Flow が移行許可を発行し、`flow-implementer` を起動する |
 | Plan レビュー待ち | 承認 | 既存 `flow-planner` に承認反映を依頼する |
 | Plan レビュー待ち | 修正依頼 | 既存 `flow-planner` に追加入力する |
 | Plan `Approved` | 次フェーズ開始 | `flow-planner` を閉じ、`flow-implementer` を起動する |
