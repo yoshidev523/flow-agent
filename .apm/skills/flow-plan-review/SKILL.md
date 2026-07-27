@@ -64,8 +64,10 @@ attempt範囲、必須項目、decision IDの一意性を検査する。対象SH
 
 すべて `Complete` の場合だけ、decisionごとに集約する。
 
-- 全適用観点が `Validated` または理由つき `NotApplicable`:
+- 1件以上が `Validated` で、残りが `Validated` または理由つき `NotApplicable`:
   decisionは `Validated`
+- 全件が `NotApplicable`:
+  検証根拠がないためdecisionは `EscalationRequired`
 - 1件以上 `Rejected` かつ `Indeterminate`、観点矛盾、guardrailなし:
   decisionは `RevisionRequired`
 - `Indeterminate`、観点間の両立不能、選択肢内に妥当案なし、

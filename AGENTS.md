@@ -128,6 +128,9 @@ agentは「何を担当するか」、skillは「どう実行するか」を正�
 `$flow` が条件付き自動採用基準を確認して発行したフェーズ移行許可により
 次段階へ進みます。reviewerは推奨案と指定済み評価基準だけを検証し、
 `OutOfReviewScope`はゲートや再reviewの理由にしません。
+未承認成果物を次phaseへ渡す場合、Flowは同一SHA-256と
+`evidence: Review-validated`を持つ汎用`PhaseEntryAuthorization`へ変換し、
+次phaseはこれを入力根拠として検証します。
 `承認状態: Approved` はユーザー承認だけを
 表し、review 通過と混同しません。根拠のない推測を決定事項にせず、
 EscalationRequired、attempt 3の未収束、再試行後のIncompleteは

@@ -138,7 +138,10 @@ Flowは成功済みのComplete結果をhubへ返し、失敗reviewerを新しい
 満たさない場合はValidated済みの選択肢と根拠をユーザーへ提示し、回答を待つ。
 自動採用できる場合、Flowは対象path/SHA-256、phase、review series/attempt、
 根拠種別を持つ `PhaseTransitionAuthorization` を作り、targetを書き換えず
-次フェーズへ進む。
+次フェーズへ進む。次phaseのwriterにはreviewer identityやreview artifactを渡さず、
+transition authorizationから `status: Authorized`、target path/SHA-256、
+source phase、`evidence: Review-validated`、review series/attemptを持つ
+汎用 `PhaseEntryAuthorization` を作って渡す。
 
 ### SHA-256と状態遷移
 
@@ -271,6 +274,9 @@ Design が明示承認済み、または Flow が有効な Design 用
 依頼内容に含めること:
 
 - 入力となる `design.md` のパス
+- 未承認Designを渡す場合は、`status: Authorized`、Designのtarget path/SHA-256、
+  `source_phase: Design`、`evidence: Review-validated`、review series/attemptを持つ
+  汎用 `PhaseEntryAuthorization`
 - Flow が事前にフェーズ移行可否を確認済みであること。reviewer名、
   review artifact、review内部状態はplannerへ渡さないこと
 - 成果物は同じ feature ディレクトリの `plan.md`
