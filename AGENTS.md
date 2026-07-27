@@ -78,18 +78,24 @@ APM は自己パッケージ install を循環依存として扱うため、独�
 Flow 系の最優先原則は、各 phase と各 reviewer を独立した部品として保つことです。
 
 - `flow-design`、`flow-plan`、`flow-implement` は、自身の入力、成果物、質問、
-  完了条件だけを扱います。他 phase の agent、reviewer、review artifact、
-  Flow 内部状態を参照してはいけません。
+  完了条件だけを扱います。Flowの評価用候補モードでは、Design / Plan writerが
+  推奨案と `ProposalReviewRequest` を作り、中継された結果を同一decision内で
+  反映しますが、reviewerを直接起動せず、他phaseやFlow内部状態を参照しません。
 - Design / Plan reviewer orchestratorは各review phaseのローカルハブです。
   自フェーズの3観点 reviewerの選択・起動、結果集約、review artifactだけを
   管理し、writer、他phase、ユーザー対話、次phaseを扱ってはいけません。
-- 各観点 reviewer は、汎用 `ReviewRequest` を受けて担当観点の
-  `ReviewResult` を返す読み取り専用部品です。呼び出し元、他 reviewer、
+- 各観点 reviewer は、汎用 `PerspectiveReviewRequest` を受け、
+  指定されたdecisionだけを評価して `PerspectiveReviewResult` を返す
+  読み取り専用部品です。成果物全体の監査や新しい論点の探索を行わず、
+  呼び出し元、他 reviewer、
   集約結果、ユーザー対話、次 phase を認識してはいけません。
-- `$flow` は全体ハブとして phase 間の接続、フェーズ reviewer orchestratorの
-  起動、SHA-256の外側照合、ユーザーへの提示、再実行、フェーズ移行許可を管理します。
-- 物理的な呼び出し階層は
-  `flow -> phase reviewer orchestrator -> 3 perspective reviewers` とし、
+- `$flow` は全体ハブとして phase 間の接続、writerとreviewer orchestrator間の
+  request/result中継、SHA-256の外側照合、ユーザーへの提示、失敗分の再試行、
+  条件付き自動採用、フェーズ移行許可を管理します。
+- 物理的な呼び出し階層は、Flow配下でphase writerとreviewer orchestratorを
+  兄弟agentとし、review側は
+  `flow -> phase reviewer orchestrator -> 3 perspective reviewers` とします。
+  phase writerからreviewerを起動せず、
   Flowから観点 reviewerを直接起動してはいけません。
 - leaf skill / agent の最終報告はハブへの入力です。Flow 実行中は、
   leaf が提示した次アクションをそのままユーザーへ転送せず、
@@ -103,7 +109,7 @@ APMはagentの配置と変換を担うだけで、runtimeのネスト機能を�
 Codexではmulti-agentを利用し、Claudeで直接ネストする場合は実行環境側で
 `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=2` が必要です。
 子agentを起動できない環境では、Flowが観点 reviewerを代理起動せず、
-フェーズ reviewer orchestratorが `Unable` を返します。
+フェーズ reviewer orchestratorが `completion: Incomplete` を返します。
 
 ## 記述スタイルと命名
 
@@ -118,12 +124,17 @@ agentは「何を担当するか」、skillは「どう実行するか」を正�
 ## ワークフロー成果物
 
 `design -> plan -> implement` の順序を守ります。Design / Plan はユーザーの
-明示承認、またはフェーズ reviewer orchestratorが同じ SHA-256 に対する
-3 reviewer全件 `OK` を集約し、`$flow` が検証して発行したフェーズ移行許可により
-次段階へ進みます。
+明示承認、または同じSHA-256の推奨案検証がComplete/Validatedとなり、
+`$flow` が条件付き自動採用基準を確認して発行したフェーズ移行許可により
+次段階へ進みます。reviewerは推奨案と指定済み評価基準だけを検証し、
+`OutOfReviewScope`はゲートや再reviewの理由にしません。
+未承認成果物を次phaseへ渡す場合、Flowは同一SHA-256と
+`evidence: Review-validated`を持つ汎用`PhaseEntryAuthorization`へ変換し、
+次phaseはこれを入力根拠として検証します。
 `承認状態: Approved` はユーザー承認だけを
 表し、review 通過と混同しません。根拠のない推測を決定事項にせず、
-レビュー不能や NG は `$flow` がユーザー判断へ戻してください。
+EscalationRequired、attempt 3の未収束、再試行後のIncompleteは
+`$flow` がユーザー判断へ戻してください。
 phase agent や観点 reviewer に状態遷移を判断させてはいけません。
 既存の変更を無断で戻さず、
 実装後は `implement.md` に変更内容と検証結果を記録します。

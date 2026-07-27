@@ -26,6 +26,8 @@ description: 本プロジェクト向け仕様駆動開発支援。flow-planner 
 ユーザー入力から以下を抽出する。
 
 - 対象の `spec/{yyyymmdd_feature}/design.md` または feature ディレクトリ名
+- 未承認Designを入力にする場合は、呼び出し元が発行した
+  `PhaseEntryAuthorization`
 - 実現したい要件や変更内容
 - 制約・前提
 - 参考情報（チケット、URL、既存ドキュメント、関連ファイル）
@@ -34,6 +36,14 @@ description: 本プロジェクト向け仕様駆動開発支援。flow-planner 
 `spec/{yyyymmdd_feature}/plan.md` を作成してよい。
 ただし、要件が不足している場合は計画を確定せず質問する。
 
+未承認Designを入力にする場合、`PhaseEntryAuthorization` は
+`status: Authorized`、Designのtarget path/SHA-256、`source_phase: Design`、
+`evidence: Review-validated`、review series/attemptを含むこと。
+Design全バイトのSHA-256を `sha256sum`、`shasum -a 256`、
+`openssl dgst -sha256` の順で再計算し、authorizationと一致しない場合は
+Planを開始しない。authorizationはDesignを`Approved`またはユーザー確認済みにせず、
+同一SHA-256の内容をPlanの入力要件として扱う根拠だけを与える。
+
 ## 根拠分類と推測禁止
 
 実装方針に関わる判断は、次の根拠分類を使って扱う。
@@ -41,6 +51,7 @@ description: 本プロジェクト向け仕様駆動開発支援。flow-planner 
 | 分類 | 意味 | 扱い |
 | --- | --- | --- |
 | `Confirmed` | ユーザーの明示回答、承認済み design / plan、コードまたは実行結果で確認済み | 実装方針にできる |
+| `Review-validated` | 未承認Designと有効な`PhaseEntryAuthorization`が同一SHA-256で一致 | DesignのWHATを入力要件に使えるが、PlanのHOWを確定する根拠にはしない |
 | `Docs-derived` | 既存ドキュメント由来だが、今回ユーザーが明示承認していない | ユーザー確認なしに確定しない |
 | `Assumption` | エージェントの仮説、推奨案、便宜上の案 | 実装方針にせず質問へ回す |
 | `Open` | 判断に必要な情報が不足 | 質問へ回す |
@@ -67,8 +78,10 @@ HOW の未決事項を必ず棚卸しする。
   - design の質問回答を理由に HOW 質問を省略しない。
   - 追加質問が不要な場合でも、`確認事項` に「HOW 確認観点」と「質問不要と判断した理由」を明記する。
   - 複数の妥当な実装案があり、どれを選んでもよい状態なら質問する。
-  - 既存規約、承認済み design、または明示指示で HOW が一意に決まる場合だけ質問不要にできる。
-  - 対象の種類や大きさに関わらず、根拠が `Confirmed` でない限り質問する。
+  - 既存規約、承認済みDesign、有効な`Review-validated` Design、
+    または明示指示でHOWが一意に決まる場合だけ質問不要にできる。
+  - Plan自身のHOW判断は、`Confirmed`な根拠、または有効な
+    `Review-validated` DesignとConfirmedな既存規約から一意に導けない限り質問する。
 
 ## 計画詳細度の基準
 
@@ -114,14 +127,15 @@ implementer に任せてよいもの:
 ### 1. 入力確認
 
 1. 指定された design ファイル、feature ディレクトリ、または要件本文を確認する。
-2. `AGENTS.md` と関連ドキュメントを読み、リポジトリ規約と配置方針を把握する。
-3. 計画作成に必要な目的、スコープ、制約、受け入れ条件を抽出する。
-4. HOW の未決事項を design とは別観点で棚卸しする。
-5. 主要な HOW 判断を `Confirmed` / `Docs-derived` / `Assumption` / `Open` に分類する。
-6. 変更種別に応じて、必要な計画詳細度を決める。
-7. 実装者が迷いやすい公開名、input/output、エラー挙動、接続箇所、検証方法を棚卸しする。
-8. 不明点や `Assumption` が実装方針に影響する場合は、`plan.md` に質問を記載し、ユーザーへ回答を求める。
-9. 質問が不要な場合も、どの HOW 観点を確認し、なぜ質問不要と判断したかを `確認事項` に記載する。
+2. 未承認Designなら`PhaseEntryAuthorization`とtarget SHA-256を検証する。
+3. `AGENTS.md` と関連ドキュメントを読み、リポジトリ規約と配置方針を把握する。
+4. 計画作成に必要な目的、スコープ、制約、受け入れ条件を抽出する。
+5. HOW の未決事項を design とは別観点で棚卸しする。
+6. 主要な HOW 判断を `Confirmed` / `Docs-derived` / `Assumption` / `Open` に分類する。
+7. 変更種別に応じて、必要な計画詳細度を決める。
+8. 実装者が迷いやすい公開名、input/output、エラー挙動、接続箇所、検証方法を棚卸しする。
+9. 不明点や `Assumption` が実装方針に影響する場合は、`plan.md` に質問を記載し、ユーザーへ回答を求める。
+10. 質問が不要な場合も、どの HOW 観点を確認し、なぜ質問不要と判断したかを `確認事項` に記載する。
 
 ### 2. コードベース分析
 
@@ -177,17 +191,45 @@ implementer に任せてよいもの:
 
 ### 4.5 評価用候補モード
 
-呼び出し元から明示された場合に限り、推奨 HOW を仮適用した完全な
-評価用候補 plan を作成できる。これは実装案を比較・評価するための
-汎用出力モードである。
+Flowから明示された場合に限り、推奨HOWを仮適用した完全な評価用候補と
+`ProposalReviewRequest`をFlowへ返す。reviewerを直接起動せず、
+Flowから返される `ProposalReviewResult` を受けて同じdecisionの推奨内容を
+修正する。このskillを単独利用するときはreviewerに依存しない。
 
-- 代替案、利点、欠点、根拠、影響範囲を保持する。
-- 実行サマリ、変更ファイル詳細、タスク、詳細手順、検証計画、
-  実装引き継ぎチェックまで記述する。
-- 仮適用した内容をユーザー確認済みまたは `Confirmed` として扱わない。
-- `承認状態: Pending` を維持する。
-- 最終報告には、評価用候補であること、未確認事項、通常ならユーザーへ提示する質問を含める。
-- 呼び出し元が指定しない場合は、通常の質問・承認フローだけを実行する。
+各requestにはrequest/series ID、attempt 1〜3、`phase: Plan`、
+target path/SHA-256、scope/out of scope、必要なら承認済みDesignのpath/SHAと、
+次のdecision itemsを含める。
+
+- 安定した `decision_id`
+- ユーザーへ提示予定のHOW質問と選択肢
+- 推奨選択肢、推奨理由、利点、欠点
+- 仮採用により候補へ反映した変更点
+- reviewerが照合するDesign、既存規約、実行条件、完了・検証条件
+- attempt 2以降は前回結果と推奨変更の差分
+
+評価用候補は実行サマリ、変更ファイル詳細、タスク、詳細手順、検証計画、
+実装引き継ぎチェックまで記述し、同一SHA-256で評価できる状態にする。
+仮適用した内容をユーザー確認済みまたは `Confirmed` と扱わず、
+`承認状態: Pending`を維持し、review後に同じ候補を書き換えない。
+
+`ProposalReviewResult` は次のように扱う。
+
+- `Validated`: 自動採用条件を自己判定せず、評価用候補、未確認事項、
+  通常なら提示する質問とともにFlowへ返す
+- `RevisionRequired`: 指摘された同じdecision、既存選択肢、既存scope内だけで
+  推奨HOWを修正し、attemptを1増やして新しい候補/requestを返す
+- `EscalationRequired`: 新しい論点を作らず、必要なユーザー判断をdecision単位で
+  Flowへ返す
+- `Incomplete`: 成果物を修正せず、再試行の要否をFlowへ返す
+
+推奨修正でdecision ID、DesignのWHAT、scope、公開API、重要な運用・コスト判断が
+変わる場合は自律修正せずエスカレーションする。attempt 3で
+`RevisionRequired` の場合もエスカレーションする。reviewerの一般的な改善案や
+`OutOfReviewScope` をタスク、検証条件、引き継ぎチェックへ追加しない。
+
+最終報告は `ProposalReviewRequested / ProposalValidated /
+ProposalEscalationRequired / ProposalReviewIncomplete` のいずれかを明示し、
+Flowが結果中継、ユーザー提示、フェーズ移行を判断できる形にする。
 
 質問を作成してユーザー回答が必要になった場合、`plan.md` は
 `承認状態: Pending` のままにし、サブエージェントは質問待ちとして
