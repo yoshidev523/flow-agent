@@ -128,15 +128,43 @@ WHAT / 制約が不明な場合は、対象の種類や大きさに関わらず�
 
 ### 2.5 評価用候補モード
 
-呼び出し元から明示された場合に限り、ユーザーへ提示する質問の推奨案を
-仮適用した評価用候補を作成できる。これは設計案を比較・評価するための
-汎用出力モードである。
+Flowから明示された場合に限り、ユーザーへ提示する質問の推奨案を仮適用し、
+`ProposalReviewRequest`と評価用候補をFlowへ返す。reviewerを直接起動せず、
+Flowから返される `ProposalReviewResult` を受けて同じdecisionの推奨内容を
+修正する。このskillを単独利用するときはreviewerに依存しない。
 
-- 推奨選択肢、代替案、利点、欠点、根拠、影響範囲を保持する。
-- 仮適用した内容をユーザー確認済みまたは `Confirmed` として扱わない。
-- `承認状態: Pending` を維持する。
-- 最終報告には、評価用候補であること、未確認事項、通常ならユーザーへ提示する質問を含める。
-- 呼び出し元が指定しない場合は、通常の質問・承認フローだけを実行する。
+各requestにはrequest/series ID、attempt 1〜3、`phase: Design`、
+target path/SHA-256、scope/out of scopeと、次のdecision itemsを含める。
+
+- 安定した `decision_id`
+- ユーザーへ提示予定の質問と選択肢
+- 推奨選択肢、推奨理由、利点、欠点
+- 仮採用により候補へ反映した変更点
+- reviewerが照合する確定要件、制約、受け入れ条件
+- attempt 2以降は前回結果と推奨変更の差分
+
+評価用候補は推奨案が反映された全体を同一SHA-256で評価できる状態にするが、
+仮適用した内容をユーザー確認済みまたは `Confirmed` と扱わない。
+`承認状態: Pending`を維持し、review後に同じ候補を書き換えない。
+
+`ProposalReviewResult` は次のように扱う。
+
+- `Validated`: 自動採用条件を自己判定せず、評価用候補、未確認事項、
+  通常なら提示する質問とともにFlowへ返す
+- `RevisionRequired`: 指摘された同じdecision、既存選択肢、既存scope内だけで
+  推奨案を修正し、attemptを1増やして新しい候補/requestを返す
+- `EscalationRequired`: 新しい論点を作らず、必要なユーザー判断をdecision単位で
+  Flowへ返す
+- `Incomplete`: 成果物を修正せず、再試行の要否をFlowへ返す
+
+推奨修正でdecision ID、目的、scope、利用者、成果物、重要な価値判断が変わる場合は
+自律修正せずエスカレーションする。attempt 3で `RevisionRequired` の場合も
+エスカレーションする。reviewerの一般的な改善案や `OutOfReviewScope` を
+質問、要件、受け入れ条件へ追加しない。
+
+最終報告は `ProposalReviewRequested / ProposalValidated /
+ProposalEscalationRequired / ProposalReviewIncomplete` のいずれかを明示し、
+Flowが結果中継、ユーザー提示、フェーズ移行を判断できる形にする。
 
 ### 3. 質問ラウンドの扱い
 

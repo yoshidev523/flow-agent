@@ -1,30 +1,43 @@
 ---
 name: flow-plan-review
-description: Plan の3観点 reviewerを統括し、結果をplan-review.mdへ集約するローカルハブ。
+description: Plan の推奨HOWを3観点 reviewerへ委譲し、decision単位の妥当性をplan-review.mdへ集約するローカルハブ。
 ---
 
 # Flow Plan Review
 
 ## 目的
 
-Plan の構造・統合、実行可能性、検証可能性を3つの独立 reviewerへ委譲し、
-同一対象に対する結果を集約する。このskillはPlan review内だけを管理する
-ローカルハブであり、Plan作成、ユーザー対話、Implement開始は扱わない。
+Planが提示した推奨HOWを仮採用した場合に、指定済みのDesign、統合条件、
+実行条件、検証条件を満たすか3つの独立reviewerへ委譲する。
+Plan全体の監査や新しい論点の探索は行わない。このskillはreview内の委譲、
+結果集約、review artifactだけを管理し、候補修正、ユーザー対話、
+Implement開始、Flowの状態遷移は扱わない。
 
 ## 入力
 
-汎用 `PhaseReviewRequest` を受け取る。
+汎用 `ProposalReviewRequest` を受け取る。
 
 - `request_id`
+- `review_series_id`
+- `proposal_attempt`: 1〜3
+- `phase: Plan`
 - `target_path`
 - `target_sha256`
+- `decision_items`
+  - `decision_id`
+  - 質問と選択肢
+  - 推奨選択肢と理由
+  - 仮採用による変更点
+  - 検証するDesign、制約、完了条件
+- `scope` / `out_of_scope`
+- attempt 2以降は前回結果と変更した推奨内容
 - `review_path`
-- `review_round`
-- 必要なら承認済みdesignのpath
+- 必要なら承認済みDesignのpath/SHA-256
+- 再試行なら成功済みの同一SHA-256結果と失敗reviewer
 
-対象SHA-256は小文字64桁hexとする。開始直前に対象全バイトを
-`sha256sum`、`shasum -a 256`、`openssl dgst -sha256` の順で計算し、
-入力値と一致しなければ `Unable` とする。
+attempt範囲、必須項目、decision IDの一意性を検査する。対象SHA-256は小文字64桁hex
+とし、開始直前に対象全バイトを `sha256sum`、`shasum -a 256`、
+`openssl dgst -sha256` の順で計算する。不一致は `Incomplete` とする。
 
 ## 子reviewer
 
@@ -34,31 +47,50 @@ Plan の構造・統合、実行可能性、検証可能性を3つの独立 revi
 - `flow-plan-executability-reviewer` + `$flow-plan-review-executability`
 - `flow-plan-verifiability-reviewer` + `$flow-plan-review-verifiability`
 
-各子には一意な `ReviewRequest` を渡す。子reviewerは相互を認識せず、
-ファイルを編集しない。3件は相互依存がないため並列実行してよい。
+各子へ担当観点に必要な同一decision itemsを持つ一意な
+`PerspectiveReviewRequest`を渡す。子reviewerは相互を認識せず、ファイルを編集しない。
+3件は並列実行してよい。
 
-子agentの起動機構がない、深さ・同時実行・session上限に達した、
-起動後に結果を取得できない場合は、重複起動せず該当結果を `Unable` とする。
-親へ子agentの代理起動を要求しない。
+再試行要求では、同一target SHA-256かつrequest/series/attempt/decision IDが一致する
+`Complete`の結果だけを再利用し、失敗reviewerだけを新しいrequest IDで1回起動する。
+再利用条件が崩れた場合は部分結果を破棄する。子起動不能、結果消失、契約不一致は
+該当reviewerを失敗として返し、呼び出し階層を迂回しない。
 
-## 集約と単一writer
+## 集約
 
-このskillを使う `flow-plan-reviewer` だけが `plan-review.md` を更新する。
-structure-integration、executability、verifiabilityが過不足なく存在し、
-同一SHA-256に対して全件 `OK` の場合だけ集約 `OK`、ゲート `Passed` とする。
-1件以上 `Unable` なら集約 `Unable`、それ以外で `NG` があれば集約 `NG` とし、
-ゲートを `Blocked` にする。
+3件すべてが `Complete` でなければ `completion: Incomplete` とし、
+`outcome`を設定しない。成功した部分結果と失敗reviewer/理由は記録するが、
+部分結果から判定しない。
 
-追記直前にSHA-256を再計算し、開始時から変化していれば
-`target-changed-during-review` の `Unable` とする。
-各ラウンドにはrequest ID、対象path/SHA-256、3つの `ReviewResult`、
-集約判定、ゲート、判断点、推奨対応を追記する。過去ラウンドは編集しない。
+すべて `Complete` の場合だけ、decisionごとに集約する。
 
-同じSHA-256の最新 `Passed` は再利用し、同じSHA-256の最新 `Blocked` は
-新しいrequestなしに再実行しない。過去SHA-256の結果はstaleとする。
+- 全適用観点が `Validated` または理由つき `NotApplicable`:
+  decisionは `Validated`
+- 1件以上 `Rejected` かつ `Indeterminate`、観点矛盾、guardrailなし:
+  decisionは `RevisionRequired`
+- `Indeterminate`、観点間の両立不能、選択肢内に妥当案なし、
+  `GuardrailEscalation`のいずれか:
+  decisionは `EscalationRequired`
 
-## 出力
+全decisionが `Validated` の場合だけ全体 `outcome: Validated` とする。
+1件以上 `EscalationRequired` なら全体も同値、それ以外で
+`RevisionRequired`があれば全体も同値とする。
+`OutOfReviewScope`はreview artifactへ記録するが集約判定へ使わない。
 
-汎用 `PhaseReviewResult` として、request ID、対象path/SHA-256、
-3つの個別結果、集約判定、`Passed / Blocked`、判断点、推奨対応を返す。
-呼び出し元、ユーザー、次フェーズの動作は決定しない。
+attempt 2以降は同じdecision IDについて、前回からの継続、解消、新規を分類する。
+新規 `Rejected` は推奨変更が直接生んだ問題、または指定基準に対する重大な
+初回見落としだけ許し、遅延検出理由を必須にする。それ以外は
+`OutOfReviewScope`とする。orchestratorは子結果の結論や根拠を書き換えない。
+
+## 記録と出力
+
+このskillを使う `flow-plan-reviewer` だけが `plan-review.md` を追記する。
+追記直前にSHA-256を再計算し、開始時から変化していれば `Incomplete` とする。
+各attemptへrequest/series ID、対象path/SHA-256、decision items、3結果、
+集約、差分、guardrail、out-of-review-scope、失敗情報を記録し、過去を編集しない。
+
+汎用 `ProposalReviewResult` として、request/series ID、attempt、対象path/SHA-256、
+`completion: Complete / Incomplete`、Complete時の
+`outcome: Validated / RevisionRequired / EscalationRequired`、
+decision別結果、差分、guardrail、out-of-review-scope、失敗reviewer/理由を返す。
+候補修正、再試行、ユーザー提示、フェーズ移行を決定しない。

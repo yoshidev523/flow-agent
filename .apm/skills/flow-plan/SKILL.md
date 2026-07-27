@@ -177,17 +177,45 @@ implementer に任せてよいもの:
 
 ### 4.5 評価用候補モード
 
-呼び出し元から明示された場合に限り、推奨 HOW を仮適用した完全な
-評価用候補 plan を作成できる。これは実装案を比較・評価するための
-汎用出力モードである。
+Flowから明示された場合に限り、推奨HOWを仮適用した完全な評価用候補と
+`ProposalReviewRequest`をFlowへ返す。reviewerを直接起動せず、
+Flowから返される `ProposalReviewResult` を受けて同じdecisionの推奨内容を
+修正する。このskillを単独利用するときはreviewerに依存しない。
 
-- 代替案、利点、欠点、根拠、影響範囲を保持する。
-- 実行サマリ、変更ファイル詳細、タスク、詳細手順、検証計画、
-  実装引き継ぎチェックまで記述する。
-- 仮適用した内容をユーザー確認済みまたは `Confirmed` として扱わない。
-- `承認状態: Pending` を維持する。
-- 最終報告には、評価用候補であること、未確認事項、通常ならユーザーへ提示する質問を含める。
-- 呼び出し元が指定しない場合は、通常の質問・承認フローだけを実行する。
+各requestにはrequest/series ID、attempt 1〜3、`phase: Plan`、
+target path/SHA-256、scope/out of scope、必要なら承認済みDesignのpath/SHAと、
+次のdecision itemsを含める。
+
+- 安定した `decision_id`
+- ユーザーへ提示予定のHOW質問と選択肢
+- 推奨選択肢、推奨理由、利点、欠点
+- 仮採用により候補へ反映した変更点
+- reviewerが照合するDesign、既存規約、実行条件、完了・検証条件
+- attempt 2以降は前回結果と推奨変更の差分
+
+評価用候補は実行サマリ、変更ファイル詳細、タスク、詳細手順、検証計画、
+実装引き継ぎチェックまで記述し、同一SHA-256で評価できる状態にする。
+仮適用した内容をユーザー確認済みまたは `Confirmed` と扱わず、
+`承認状態: Pending`を維持し、review後に同じ候補を書き換えない。
+
+`ProposalReviewResult` は次のように扱う。
+
+- `Validated`: 自動採用条件を自己判定せず、評価用候補、未確認事項、
+  通常なら提示する質問とともにFlowへ返す
+- `RevisionRequired`: 指摘された同じdecision、既存選択肢、既存scope内だけで
+  推奨HOWを修正し、attemptを1増やして新しい候補/requestを返す
+- `EscalationRequired`: 新しい論点を作らず、必要なユーザー判断をdecision単位で
+  Flowへ返す
+- `Incomplete`: 成果物を修正せず、再試行の要否をFlowへ返す
+
+推奨修正でdecision ID、DesignのWHAT、scope、公開API、重要な運用・コスト判断が
+変わる場合は自律修正せずエスカレーションする。attempt 3で
+`RevisionRequired` の場合もエスカレーションする。reviewerの一般的な改善案や
+`OutOfReviewScope` をタスク、検証条件、引き継ぎチェックへ追加しない。
+
+最終報告は `ProposalReviewRequested / ProposalValidated /
+ProposalEscalationRequired / ProposalReviewIncomplete` のいずれかを明示し、
+Flowが結果中継、ユーザー提示、フェーズ移行を判断できる形にする。
 
 質問を作成してユーザー回答が必要になった場合、`plan.md` は
 `承認状態: Pending` のままにし、サブエージェントは質問待ちとして

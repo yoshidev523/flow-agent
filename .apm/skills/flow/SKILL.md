@@ -34,80 +34,123 @@ description: 本プロジェクト向け仕様駆動開発の一連フロー。f
 - メインエージェントは phase 成果物の作成、更新、承認反映、フィードバック反映を
   直接行わない。これらは必ず該当フェーズのサブエージェントに委譲する。
   review artifactは対応するフェーズ reviewer orchestratorが単一 writerとして管理し、
-  Flowはフェーズ移行状態だけを管理する。
+  Flowはrequest/result中継、外側検証、ユーザー提示、フェーズ移行状態を管理する。
 
 ## フェーズ独立の原則
 
 - `flow-design`、`flow-plan`、`flow-implement` は、それぞれ自身の入力、成果物、
-  質問、完了条件だけを扱う。他フェーズの agent、reviewer、review artifact、
-  Flow 内部状態を参照しない。
-- 各観点 reviewer は汎用 `ReviewRequest` を読み、担当観点の
-  `ReviewResult` を返すだけとする。呼び出し元、他 reviewer、集約結果、
+  質問、完了条件だけを扱う。Design / Planは汎用review request/resultを扱えるが、
+  reviewerのidentity、review artifact、他フェーズ、Flow内部状態を参照しない。
+- 各観点 reviewer は汎用 `PerspectiveReviewRequest` を読み、指定された
+  decisionを担当観点だけで評価して `PerspectiveReviewResult` を返す。
+  呼び出し元、他 reviewer、集約結果、
   ユーザー対話、次フェーズを認識しない。
 - フェーズ reviewer orchestrator は自フェーズの3 reviewerの選択・起動、
   結果集約、review artifactだけを所有する。他phaseやユーザー対話を扱わない。
-- phase 間の接続、フェーズ reviewer orchestratorの起動、SHA-256の外側照合、
-  ユーザーへの提示、再実行、フェーズ移行許可は Flow だけが所有する。
+- phase writerは推奨案、評価用候補、`ProposalReviewRequest`の作成と、
+  `ProposalReviewResult`を受けた同一decision内の推奨修正を所有する。
+- phase 間の接続、phase writerとreviewer orchestrator間の結果中継、
+  reviewer orchestratorの起動、SHA-256の外側照合、ユーザーへの提示、
+  再試行、条件付き自動採用、フェーズ移行許可は Flow だけが所有する。
 - leaf skill / agent の出力文言は Flow にとって提案であり、Flow 実行中は
   そのままユーザーへ転送せず、Flow が現在状態に基づき次アクションを決める。
 - leaf skill / agent を単独利用した場合は、reviewer の有無に依存せず、
   その skill 自身の通常の質問・承認・完了フローで動作する。
 
-## review-gated オーケストレーション
+## recommendation-gated オーケストレーション
 
-### Flow が作る評価対象
+### 推奨案を中心にした評価対象
 
-Design / Plan の phase agent が質問待ちを報告し、全質問に推奨案がある場合、
-Flow はユーザーへ質問を提示する前に同じ phase agent へ
-「推奨案を仮適用した評価用候補」を依頼する。これは汎用候補モードであり、
-phase agent へ reviewer 名、review 状態、次フェーズ条件を渡さない。
+Design / Plan のphase writerが質問待ちを報告し、全質問に推奨案がある場合、
+Flowはユーザーへ質問を提示する前に、同じphase writerへ評価用候補モードを指定する。
+phase writerは推奨案を仮適用した候補と、decision単位の
+`ProposalReviewRequest`を返す。
 
-候補に未選択項目、推奨なし、矛盾、候補化不能な `Open` が残る場合は
-review を開始せず、通常どおりユーザーへ質問する。
+Flowは次を検証する。
 
-### フェーズ reviewer orchestrator への委譲
+- request/series IDとattempt 1〜3
+- phase、target path、小文字64桁hexのtarget SHA-256
+- decision IDの一意性
+- 質問、選択肢、推奨、理由、仮採用差分
+- reviewerが照合する確定要件、制約、受け入れ条件
+- scope/out of scope
+- attempt 2以降は前回結果と推奨変更の差分
 
-Flow は観点 reviewer を直接起動しない。
+候補に推奨なし、候補化不能なOpen、request不備が残る場合はreviewを開始せず、
+通常どおりユーザーへ質問する。Flowはdecision内容や推奨を作成・修正しない。
 
-- Design は `flow-design-reviewer` + `$flow-design-review`
-- Plan は `flow-plan-reviewer` + `$flow-plan-review`
+### 兄弟reviewer orchestratorへの中継
 
-Flow は対象 path / SHA-256、review path、roundを持つ
-汎用 `PhaseReviewRequest` をフェーズ reviewer orchestratorへ渡す。
-フェーズ reviewer orchestratorが配下の3観点 reviewerを直接起動し、
-結果を集約してreview artifactへ追記する。
+Flowはphase writerから受けたrequestを、兄弟agentとして起動する対応hubへ渡す。
 
-Flowは返された `PhaseReviewResult` のrequest ID、対象path/SHA-256、
-必要な3 reviewer ID、個別結果、集約判定、ゲートを検証する。
-Flow自身は観点 reviewerのjob管理、個別結果の編集、review artifactの追記を行わない。
+- Designは `flow-design-reviewer` + `$flow-design-review`
+- Planは `flow-plan-reviewer` + `$flow-plan-review`
 
-フェーズ reviewer orchestratorの起動不能、子起動不能、結果消失は `Unable` とする。
-物理的な `Flow -> phase reviewer orchestrator -> 3 reviewer` の階層を維持し、
-Flowによる観点 reviewerの代理起動は行わない。
+hubが配下の3観点reviewerを直接起動し、`ProposalReviewResult`をreview artifactへ
+追記する。物理階層は `Flow -> phase writer` と
+`Flow -> phase reviewer orchestrator -> 3 reviewer` の兄弟構成を維持する。
+phase writerからreviewerを直接起動せず、Flowも観点reviewerを代理起動しない。
 
-### SHA-256 と状態遷移
+Flowは返されたresultのrequest/series ID、attempt、target path/SHA-256、
+必要な3 reviewer、completion、Complete時のoutcome、decision対応を検証し、
+内容を編集せず同じphase writerへ中継する。phase writerは
+`RevisionRequired`のときだけ、同じdecision、既存選択肢、既存scope内で
+推奨を修正し、attemptを1増やした新しい候補/requestを返せる。
 
-Flow はreviewer orchestrator起動前と次フェーズ移行直前に、
-`sha256sum`、`shasum -a 256`、
-`openssl dgst -sha256` の順で target 全バイトの SHA-256 を再計算する。
-小文字 64 桁 hex でない場合、最新 `Passed` の digest と異なる場合、
-3 reviewer の欠落、`NG` / `Unable`、集約またはゲート不整合がある場合は通過させない。
-Flow起動前・orchestrator追記前・フェーズ移行前の三点照合を維持する。
+次の場合は自律修正を止め、phase writerが判断点をまとめてFlowへ返す。
 
-同じ digest の有効な `Passed` は再利用し、新しい round を増やさない。
-同じ digest の `Blocked` はユーザー回答なしに再実行しない。
-過去 digest の `OK` は stale として無効にする。
+- `Indeterminate`、reviewer間の矛盾、選択肢内に妥当案なし
+- scope変更、重要な価値判断、リスク受容が必要
+- `GuardrailEscalation`
+- attempt 3でも `RevisionRequired`
 
-`Passed` なら Flow は対象 path、SHA-256、phase、根拠種別を持つ
-`PhaseTransitionAuthorization` を作り、target を書き換えず次フェーズへ進む。
-`NG` / `Unable` なら
-reviewer の根拠とユーザー判断事項を提示してそのターンを終了する。
-ユーザー回答後は同じ writer に回答と自由記述を反映させ、digest 更新後に
-全 3 reviewer を再実行する。同一ターン中の自律修正・再レビューは禁止する。
+`OutOfReviewScope`は記録だけ行い、質問、候補修正、再review、ゲート、
+外部タスク作成の理由にしない。
 
-`承認状態: Approved` は引き続きユーザー明示承認だけを表す。
-Approved の既存 design / plan は review artifact がなくても互換経路で通過できる。
-評価用候補単独、stale Passed、Blocked は次フェーズ根拠にならない。
+### Incompleteと再試行
+
+`completion: Incomplete`ではoutcomeを採用せず、部分結果をフェーズ判断に使わない。
+同一target SHA-256、series、attempt、decision setを維持できる場合だけ、
+Flowは成功済みのComplete結果をhubへ返し、失敗reviewerを新しいrequest IDで
+1回だけ再試行させる。proposal attemptは増やさない。
+
+再試行後もIncomplete、またはtargetが変化して部分結果を再利用できない場合は、
+成果物の修正を求めずユーザーへ次を提示して停止する。
+
+- 現在phaseと `ProposalReviewIncomplete`
+- 失敗reviewerと理由
+- 部分結果を移行根拠に使っていないこと
+- 成果物修正が不要であること
+- 同じ候補で再開する方法
+
+### 条件付き自動採用
+
+`ProposalReviewResult`がCompleteかつValidatedでも、Flowは次をすべて満たす場合だけ
+推奨案を条件付き自動採用できる。
+
+- Confirmedな目的、要件、制約から一意または優位に導ける
+- scope、利用者、成果物を増減しない
+- 重要な利用者価値のtrade-offを含まない
+- 破壊的操作、公開API、security、privacy、法務、継続costに新しい判断を持ち込まない
+- Designでは利用者から見える重要な仕様選択ではない
+- Planでは承認済みDesignと既存規約内の内部的かつ可逆な実装選択である
+
+満たさない場合はValidated済みの選択肢と根拠をユーザーへ提示し、回答を待つ。
+自動採用できる場合、Flowは対象path/SHA-256、phase、review series/attempt、
+根拠種別を持つ `PhaseTransitionAuthorization` を作り、targetを書き換えず
+次フェーズへ進む。
+
+### SHA-256と状態遷移
+
+Flowはhub起動前、hub追記前、次フェーズ移行直前の三点で
+`sha256sum`、`shasum -a 256`、`openssl dgst -sha256` の順に
+target全バイトのSHA-256を照合する。不一致、Incomplete、result契約不整合、
+stale resultでは移行しない。
+
+`承認状態: Approved`は引き続きユーザー明示承認だけを表す。
+Approvedの既存design/planはreviewなしでも通過できる。
+評価用候補単独、Incomplete、RevisionRequired、EscalationRequired、
+自動採用条件を満たさないValidatedは次フェーズ根拠にならない。
 
 ## 推測ゲート
 
@@ -117,16 +160,20 @@ flow では、根拠が弱い判断を推測で確定して先へ進めてはい
 | 分類 | 意味 | 扱い |
 | --- | --- | --- |
 | `Confirmed` | ユーザーの明示回答、承認済み成果物、コードまたは実行結果で確認済み | 決定事項として扱える |
+| `Review-validated` | 推奨案がComplete/Validatedとなり、Flowが条件付き自動採用基準を確認済み | Approvedとはせず、同一SHA-256の移行許可根拠にできる |
 | `Docs-derived` | 既存ドキュメント由来だが、今回ユーザーが明示承認していない | ユーザー確認なしに確定しない |
 | `Assumption` | エージェントの仮説、推奨案、便宜上の案 | 決定事項にせず質問へ回す |
 | `Open` | 判断に必要な情報が不足 | 質問へ回す |
 
 推奨案は回答候補であり、ユーザー回答前の確定事項ではない。
 すべての事項において、根拠のない推測は禁止する。
-ユーザー回答または確認可能な根拠がない内容は、些細に見えても確定事項にしない。
+ユーザー回答、確認可能な根拠、または有効な `Review-validated` がない内容は、
+些細に見えても確定事項にしない。
 候補化できない `Docs-derived` / `Assumption` / `Open` が残る場合は review や
 次フェーズへ進まない。Flow が phase agent に作らせた完全な評価用候補は
 ユーザー質問前の review 対象にできるが、単独では次フェーズ根拠にならない。
+Complete/Validatedと条件付き自動採用基準を満たした同一SHA-256だけが
+`Review-validated`として移行許可の根拠になる。
 Plan から Implement へ進む前に、`plan.md` が implementer へ十分な情報を渡しているか確認する。
 `承認状態: Approved` だけでは Implement に進めない。
 
@@ -172,7 +219,8 @@ Open の確認事項がある場合、メインエージェントは承認を促
 
 停止位置の指定がなければ、まず `design.md` の通常ドラフトを作る。
 推奨案が揃った質問待ちなら Flow が評価用候補を依頼して Design review まで進める。
-`Blocked` ならユーザー回答を待ち、`Passed` なら Plan へ進む。
+Validatedかつ条件付き自動採用可能ならPlanへ進み、それ以外のValidated、
+EscalationRequired、再試行後のIncompleteはユーザー判断を待つ。
 ユーザーが「最後まで」「実装まで」と明示した場合も各 review または明示承認ゲートを維持する。
 
 ## 実行フロー
@@ -207,9 +255,11 @@ Open の確認事項がある場合、メインエージェントは承認を促
 - ユーザーが会話上で明示的に内容を承認している。
 - その後 `承認状態: Approved` に更新されている。
 
-未承認でも同一 SHA-256 の有効な Design review `Passed` を Flow が確認し、
-Design 用 `PhaseTransitionAuthorization` を作成できれば Plan へ進む。
-review が `Blocked` の場合だけ、Flow が根拠と判断事項をユーザーへ提示して停止する。
+未承認でも同一SHA-256のComplete/ValidatedなDesign recommendation reviewを
+Flowが確認し、条件付き自動採用基準を満たして
+Design用 `PhaseTransitionAuthorization` を作成できればPlanへ進む。
+RevisionRequiredは同じdesignerへ中継し、EscalationRequired、
+自動採用できないValidated、再試行後のIncompleteはユーザーへ提示して停止する。
 
 ### 2. Plan
 
@@ -221,8 +271,8 @@ Design が明示承認済み、または Flow が有効な Design 用
 依頼内容に含めること:
 
 - 入力となる `design.md` のパス
-- Flow が事前にフェーズ移行可否を確認済みであること。reviewer 名、
-  review artifact、ゲート状態は planner へ渡さないこと
+- Flow が事前にフェーズ移行可否を確認済みであること。reviewer名、
+  review artifact、review内部状態はplannerへ渡さないこと
 - 成果物は同じ feature ディレクトリの `plan.md`
 - 成果物の見出しは日本語にし、承認欄は `承認状態: Pending` とすること
 - 不明点があれば質問し、ユーザーフィードバックを反映すること
@@ -265,9 +315,11 @@ Design が明示承認済み、または Flow が有効な Design 用
 - ユーザーが会話上で明示的に内容を承認している。
 - その後 `承認状態: Approved` に更新されている。
 
-未承認でも同一 SHA-256 の有効な Plan review `Passed` を Flow が確認し、
-Plan 用 `PhaseTransitionAuthorization` を作成できれば Implement へ進む。
-review が `Blocked` の場合だけ Flow がユーザー判断待ちで停止する。
+未承認でも同一SHA-256のComplete/ValidatedなPlan recommendation reviewを
+Flowが確認し、条件付き自動採用基準を満たして
+Plan用 `PhaseTransitionAuthorization` を作成できればImplementへ進む。
+RevisionRequiredは同じplannerへ中継し、EscalationRequired、
+自動採用できないValidated、再試行後のIncompleteはユーザーへ提示して停止する。
 
 ### 3. Implement
 
@@ -326,7 +378,7 @@ Plan が `Approved` でも、実装に必要な情報が不足している場合
   既存 `design.md` とユーザー最新入力を渡して反映させる。
 - `plan.md` の質問回答、修正依頼、計画承認は、Plan フェーズ中の既存 `flow-planner` に
   既存 `plan.md` とユーザー最新入力を渡して反映させる。
-- review `Blocked` 後の回答は、Flow が review の判断点とユーザー入力を対応付け、
+- recommendation reviewのエスカレーション後の回答は、Flowが判断点とユーザー入力を対応付け、
   対象 phase の既存 agent へ渡す。観点 reviewer へユーザー入力を直接渡さない。
 - 実装後の追加検証、環境準備、レビュー修正、タスク状態更新は、
   Implement フェーズ中の既存 `flow-implementer` に既存 `plan.md` / `implement.md` と
@@ -371,16 +423,18 @@ Plan が `Approved` でも、実装に必要な情報が不足している場合
 | 現在状態 | ユーザー入力 | メインエージェントの行動 |
 | --- | --- | --- |
 | Design 質問待ち | 回答 | 既存 `flow-designer` に追加入力する |
-| Design 推奨案あり | review 前 | 同じdesignerに評価用候補を依頼し、FlowがDesign reviewer orchestratorを起動する |
-| Design review `Blocked` | 回答 | 既存 `flow-designer` に判断点とユーザー入力を渡す |
-| Design review `Passed` | 次フェーズ開始 | Flow が移行許可を発行し、`flow-planner` を起動する |
+| Design 推奨案あり | review前 | 同じdesignerに評価用候補/requestを依頼し、Flowが兄弟Design reviewer orchestratorを起動する |
+| Design `RevisionRequired` | 結果中継 | 同じdesignerに結果を渡し、同一decision内で推奨を修正させる |
+| Design `EscalationRequired` / 再試行後`Incomplete` | ユーザー判断 | Flowが判断点または実行不能理由を提示する |
+| Design `Validated` | 採用判定 | 条件付き自動採用可能なら移行許可を発行し、不可ならユーザーへ選択肢を提示する |
 | Design レビュー待ち | 承認 | 既存 `flow-designer` に承認反映を依頼する |
 | Design レビュー待ち | 修正依頼 | 既存 `flow-designer` に追加入力する |
 | Design `Approved` | 次フェーズ開始 | `flow-designer` を閉じ、`flow-planner` を起動する |
 | Plan 質問待ち | 回答 | 既存 `flow-planner` に追加入力する |
-| Plan 推奨案あり | review 前 | 同じplannerに評価用候補を依頼し、FlowがPlan reviewer orchestratorを起動する |
-| Plan review `Blocked` | 回答 | 既存 `flow-planner` に判断点とユーザー入力を渡す |
-| Plan review `Passed` | 次フェーズ開始 | Flow が移行許可を発行し、`flow-implementer` を起動する |
+| Plan 推奨案あり | review前 | 同じplannerに評価用候補/requestを依頼し、Flowが兄弟Plan reviewer orchestratorを起動する |
+| Plan `RevisionRequired` | 結果中継 | 同じplannerに結果を渡し、同一decision内で推奨HOWを修正させる |
+| Plan `EscalationRequired` / 再試行後`Incomplete` | ユーザー判断 | Flowが判断点または実行不能理由を提示する |
+| Plan `Validated` | 採用判定 | 条件付き自動採用可能なら移行許可を発行し、不可ならユーザーへ選択肢を提示する |
 | Plan レビュー待ち | 承認 | 既存 `flow-planner` に承認反映を依頼する |
 | Plan レビュー待ち | 修正依頼 | 既存 `flow-planner` に追加入力する |
 | Plan `Approved` | 次フェーズ開始 | `flow-planner` を閉じ、`flow-implementer` を起動する |
