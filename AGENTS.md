@@ -2,22 +2,29 @@
 
 ## プロジェクト構成
 
-このリポジトリは、仕様駆動開発用のエージェントパッケージです。Flow の正本は `.apm/skills/` と `.apm/agents/` に置き、APM が Codex と Claude 向けの配置・コンパイルを担います。`design-reviewer` の Codex 定義は `.codex/agents/`、共通・外部由来のスキルは `.agents/skills/` に置きます。パッケージ設定は `apm.yml`、依存関係の固定情報は `apm.lock.yaml` で管理します。機能ごとの成果物は `spec/YYYYMMDD_feature/` に `design.md`、`plan.md`、`implement.md` として作成します。
+このリポジトリは仕様駆動開発用のエージェントパッケージです。Flowの正本は
+`.apm/skills/`と`.apm/agents/`に置き、APMがCodexとClaude向けの配置・変換を担います。
+`design-reviewer`のCodex定義は`.codex/agents/`、共通・外部由来のスキルは
+`.agents/skills/`に置きます。パッケージ設定は`apm.yml`、依存関係の固定情報は
+`apm.lock.yaml`で管理します。
+
+機能ごとの実行成果物は`spec/YYYYMMDD_feature/`に保存します。主要成果物は
+`flow-state.yml`、`design.md`、`design-review.md`、`plan.md`、
+`plan-review.md`、`implement.md`です。feedbackと観点別sourceも同じfeature配下に置きます。
 
 ## 開発・検証コマンド
 
-`verify-flow` は Flow 正本の構造だけを検証します。変更前後に設定を確認してください。
-
 ```sh
-git status --short       # 作業ツリーを確認
-sed -n '1,200p' apm.yml # パッケージ設定を確認
-apm list                 # 定義済み script を確認
-apm run verify-flow      # Flow 正本を構造検証
+git status --short
+sed -n '1,200p' apm.yml
+apm list
+apm run verify-flow
 ```
 
-APM の操作や検証コマンドを追加した場合は、`apm.yml` の `scripts` とこの文書を同時に更新します。
+APMの操作や検証commandを追加した場合は、`apm.yml`の`scripts`とこの文書を同時に
+更新します。
 
-Codex と Claude の配置は、リポジトリを汚さない一時ディレクトリで確認します。
+CodexとClaudeの配置は、リポジトリを汚さない一時directoryで確認します。
 
 ```sh
 flow_source_dir="$(pwd)"
@@ -58,87 +65,97 @@ do
   test -f "$flow_consumer_dir/.claude/agents/$agent_name.md"
 done
 ! rg -q 'model_reasoning_effort|nickname_candidates' "$flow_consumer_dir/.codex/agents"
-for agent_name in \
-  flow-design-reviewer flow-design-requirements-reviewer \
-  flow-design-user-value-reviewer flow-design-quality-risk-reviewer \
-  flow-plan-reviewer flow-plan-structure-integration-reviewer \
-  flow-plan-executability-reviewer flow-plan-verifiability-reviewer
-do
-  rg -q 'name = ' "$flow_consumer_dir/.codex/agents/$agent_name.toml"
-  rg -q 'description = ' "$flow_consumer_dir/.codex/agents/$agent_name.toml"
-  rg -q 'developer_instructions = ' "$flow_consumer_dir/.codex/agents/$agent_name.toml"
-  rg -q '^---$' "$flow_consumer_dir/.claude/agents/$agent_name.md"
-done
 ```
 
-APM は自己パッケージ install を循環依存として扱うため、独立 consumer から同じ `.apm/` 正本だけを持つ fixture を導入する。この経路で Codex agent の TOML 変換と Claude agent の Markdown 配置を確認する。失敗時は調査のため一時ディレクトリを残します。成功後の削除は利用者が明示的に行います。今回の対象は Flow の 12 skill と 11 agent だけであり、`design-reviewer`、`.agents/skills/` の Flow 外資産、配布・公開は対象外です。
+APMは自己package installを循環依存として扱うため、独立consumerから、
+同じ`.apm/`正本だけを持つfixtureを導入します。失敗時は調査用に一時directoryを残し、
+成功後の削除も利用者が明示した場合だけ行います。
 
-## フェーズ独立とハブ責務
+## Flowの責務境界
 
-Flow 系の最優先原則は、各 phase と各 reviewer を独立した部品として保つことです。
+最優先原則は、phase writer、review、状態遷移を分離することです。
 
-- `flow-design`、`flow-plan`、`flow-implement` は、自身の入力、成果物、質問、
-  完了条件だけを扱います。Flowの評価用候補モードでは、Design / Plan writerが
-  推奨案と `ProposalReviewRequest` を作り、中継された結果を同一decision内で
-  反映しますが、reviewerを直接起動せず、他phaseやFlow内部状態を参照しません。
-- Design / Plan reviewer orchestratorは各review phaseのローカルハブです。
-  自フェーズの3観点 reviewerの選択・起動、結果集約、review artifactだけを
-  管理し、writer、他phase、ユーザー対話、次phaseを扱ってはいけません。
-- 各観点 reviewer は、汎用 `PerspectiveReviewRequest` を受け、
-  指定されたdecisionだけを評価して `PerspectiveReviewResult` を返す
-  読み取り専用部品です。成果物全体の監査や新しい論点の探索を行わず、
-  呼び出し元、他 reviewer、
-  集約結果、ユーザー対話、次 phase を認識してはいけません。
-- `$flow` は全体ハブとして phase 間の接続、writerとreviewer orchestrator間の
-  request/result中継、SHA-256の外側照合、ユーザーへの提示、失敗分の再試行、
-  条件付き自動採用、フェーズ移行許可を管理します。
-- 物理的な呼び出し階層は、Flow配下でphase writerとreviewer orchestratorを
-  兄弟agentとし、review側は
-  `flow -> phase reviewer orchestrator -> 3 perspective reviewers` とします。
-  phase writerからreviewerを起動せず、
-  Flowから観点 reviewerを直接起動してはいけません。
-- leaf skill / agent の最終報告はハブへの入力です。Flow 実行中は、
-  leaf が提示した次アクションをそのままユーザーへ転送せず、
-  `$flow` が全体状態から次アクションを決めます。
-- leaf skill / agent の単独利用は維持します。単独実行時は reviewer の存在や
-  Flow 内部状態に依存せず、その部品自身の通常フローで完結させます。
-- 新しい横断機能を追加するときは、leaf に他部品の名前や状態遷移を追加する前に、
-  ハブの入出力変換で実現できないかを先に検討します。
+- Design/Plan writerは`create / revise / respond`だけを扱い、自分の入力成果物、
+  正規化済みfeedback、自分の出力成果物だけを認識します。
+- Design/Plan writerのstatusは`needs_input / ready`だけです。これはwriterとしての
+  完成度を表し、外部評価や次phase開始可否を表しません。
+- Flowだけが利用者対話、review mode、feedback正規化、retry、stale確認、
+  phase移行を管理します。
+- AIと人間のreviewは同じsource契約へ正規化し、1 cycle内では一方だけを使います。
+- phase review hubは自phaseのsource収集とaggregate artifactだけを管理します。
+- 各観点reviewerは担当観点を独立評価し、固有のsource fileだけを書きます。
+- Implement executorは渡されたPlanの内容と完全性だけを扱い、上流状態を認識しません。
+- leafの単独利用はFlow内部状態に依存せず、自身の入出力契約だけで完結させます。
 
-APMはagentの配置と変換を担うだけで、runtimeのネスト機能を有効化しません。
-Codexではmulti-agentを利用し、Claudeで直接ネストする場合は実行環境側で
-`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=2` が必要です。
-子agentを起動できない環境では、Flowが観点 reviewerを代理起動せず、
-フェーズ reviewer orchestratorが `completion: Incomplete` を返します。
+物理階層は次とします。
+
+```text
+Flow
+├── phase writer
+└── phase review hub
+    ├── perspective reviewer 1
+    ├── perspective reviewer 2
+    └── perspective reviewer 3
+```
+
+Human modeではperspective reviewerを起動せず、human source 1件をhubが集約します。
+子agentを起動できない環境ではhubが`incomplete`を返し、Flowが規定のretryまたは
+human modeへの切替を行います。
+
+## 永続契約と成果物所有
+
+phase境界の契約は次の4種類に限定します。
+
+- `phase-artifact-v1`: `design.md`と`plan.md`
+- `review-source-v1`: 観点別または人間の評価結果
+- `phase-review-v1`: hubの集約結果
+- `phase-feedback-v1`: Flowがwriterへ渡す変更または回答
+
+Flow内部状態は`flow-state-v1`として`flow-state.yml`へ保存します。
+新しい中継用request/result契約を追加する前に、既存artifactのpathとstatusで
+接続できないかを検討してください。
+
+各fileのwriterは一意にします。
+
+- Flow: `flow-state.yml`、feedback、human source
+- phase writer: 自分のphase artifact
+- perspective reviewer: 自分のsource
+- review hub: 自分のaggregate artifact
+- executor: `implement.md`
+
+Flowはreview開始ごとに一意な`review_cycle_id`を発行し、state、全source、aggregateで
+一致を必須にします。review対象のSHA-256はaggregate作成時とphase移行時に
+同一digestであることを確認します。古いcycleまたはrevisionのsource、aggregate、
+feedbackは再利用しません。
+
+Planは入力Designのpath、revision、SHA-256を保持し、Plan review開始前に現在のDesignと
+一致することを確認します。Implementの進捗は`implement-artifact-v1`のfront matterへ
+revisionと`in_progress / blocked / completed`を記録します。
+
+## 状態遷移
+
+`design -> design_review -> plan -> plan_review -> implement -> completed`の順を守ります。
+AIまたは人間のいずれか、選択されたmodeの`passed`だけを次phaseの根拠にします。
+
+AI reviewの変更要求に対する自動修正は各phaseで1回まで、実行障害の再試行も1回まで
+です。使い切った場合はhuman modeへ切り替えます。利用者判断が必要な`blocked`は
+Flowが質問し、回答をfeedbackへ正規化します。
 
 ## 記述スタイルと命名
 
-Markdown は見出し階層を崩さず、短い日本語で書きます。`SKILL.md` では YAML front matter の `name` と `description` を先頭に置きます。スキル・エージェント名は既存どおり小文字の kebab-case（例: `flow-implementer`）を使用します。仕様ディレクトリは `20260725_feature-name` のように日付＋小文字 kebab-case とします。
+Markdownは見出し階層を崩さず、短い日本語で書きます。`SKILL.md`ではYAML front
+matterの`name`と`description`を先頭に置きます。skill・agent名は小文字の
+kebab-case、仕様directoryは`20260728_feature-name`のように日付＋kebab-caseを使います。
 
-agent定義はfront matterの後を「あなたは〜です。」で始め、役割を中心に記述します。
-原則として「主な責務」と「行動ルール」を箇条書きで示し、入力スキーマ、
-SHA-256計算、判定アルゴリズム、委譲手順、成果物フォーマットなどのHOWは
-対応する `SKILL.md` に記載します。agent定義へskillの手順を重複させず、
-agentは「何を担当するか」、skillは「どう実行するか」を正本とします。
+agent定義はfront matter後を「あなたは〜です。」で始め、「主な責務」と「行動ルール」
+を記載します。schema、digest、判定algorithm、委譲手順、成果物formatなどのHOWは
+対応する`SKILL.md`に置き、agentへ重複させません。
 
-## ワークフロー成果物
+## 実装と変更管理
 
-`design -> plan -> implement` の順序を守ります。Design / Plan はユーザーの
-明示承認、または同じSHA-256の推奨案検証がComplete/Validatedとなり、
-`$flow` が条件付き自動採用基準を確認して発行したフェーズ移行許可により
-次段階へ進みます。reviewerは推奨案と指定済み評価基準だけを検証し、
-`OutOfReviewScope`はゲートや再reviewの理由にしません。
-未承認成果物を次phaseへ渡す場合、Flowは同一SHA-256と
-`evidence: Review-validated`を持つ汎用`PhaseEntryAuthorization`へ変換し、
-次phaseはこれを入力根拠として検証します。
-`承認状態: Approved` はユーザー承認だけを
-表し、review 通過と混同しません。根拠のない推測を決定事項にせず、
-EscalationRequired、attempt 3の未収束、再試行後のIncompleteは
-`$flow` がユーザー判断へ戻してください。
-phase agent や観点 reviewer に状態遷移を判断させてはいけません。
-既存の変更を無断で戻さず、
-実装後は `implement.md` に変更内容と検証結果を記録します。
+既存の変更を無断で戻しません。実装はPlanの対象範囲に限定し、Plan外の公開API、
+責務、入出力、error挙動、検証範囲の変更が必要なら停止します。実装進捗と検証結果は
+`implement.md`へ記録します。
 
-## コミットとプルリクエスト
-
-履歴には `first commit` のみで、確立済みのコミット規約はありません。命令形で対象を明確にした短い件名を使います（例: `Add flow planning guidance`）。PR には目的、変更ファイル、実施した検証または未実施理由を記載し、関連 Issue があればリンクします。ドキュメント変更ではスクリーンショットは通常不要です。
+履歴には確立済みのcommit規約がないため、命令形で対象を明確にした短い件名を使います。
+PRには目的、変更file、検証結果または未実施理由を記載し、関連Issueがあればlinkします。

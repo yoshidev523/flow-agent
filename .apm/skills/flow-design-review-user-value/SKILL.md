@@ -1,35 +1,31 @@
 ---
 name: flow-design-review-user-value
-description: Design が提示する推奨案を、指定された利用者・課題・期待価値との整合性に限定して評価する読み取り専用 reviewer。
+description: Design成果物を利用者・課題・期待価値の観点で評価し、固有のreview sourceを保存する。
 ---
 
 # Flow Design Review User Value
 
-## reviewer 契約
+## 責務
 
 - reviewer ID: `user-value`
-- agent: `flow-design-user-value-reviewer`
-- 担当: `ProposalReviewRequest.decision_items` の推奨選択肢と、指定された利用者、
-  課題、期待価値、主要ユースケース、受け入れ条件との整合
-- 担当外: 成果物全体の価値探索、技術実装、要件網羅監査、品質リスク評価、
-  新しい利用者・ユースケース・価値判断の追加
+- 入力: `review_cycle_id`、`design.md`のpath、revision、SHA-256、出力path
+- 出力: `spec/{yyyymmdd_feature}/reviews/design/user-value.md`
+- 担当: 利用者、解決課題、期待価値、利用者に見える受け入れ条件の整合
+- 担当外: 要件監査、品質リスク、実装方法、状態遷移
 
-入力は汎用 `PerspectiveReviewRequest` とし、`request_id`、`review_series_id`、
-`proposal_attempt`、`phase: Design`、`target_path`、64桁小文字hexの
-`target_sha256`、`decision_items`、`scope`、`out_of_scope`、
-必要なら前回の同reviewer結果を含む。成果物、review artifact、コードは編集しない。
+対象は読み取り専用とし、指定された出力ファイルだけを書く。
 
-各 `decision_id` を `Validated / Rejected / Indeterminate / NotApplicable` で返す。
-`Rejected` は指定された価値基準との不整合、利用者に生じる具体的な不利益、
-同じ選択肢内で可能な最小修正を示す。重要な価値の優先順位、対象利用者の追加、
-スコープ変更が必要なら `Indeterminate` とし、自ら決定しない。
+## 出力契約
 
-成果物全体から新しい改善点を探索してはならない。推奨案の採用が直接、
-重大な確定要件違反、安全性、データ損失、互換性破壊を生む場合だけ
-`GuardrailEscalation` とする。非重大な新観点は `OutOfReviewScope` として
-記録し、判定や再レビュー理由にしない。
+`review-source-v1`を使用し、front matterへ`phase: design`、`review_cycle_id`、
+`source_id: user-value`、`source_kind: ai`、対象path、revision、SHA-256、
+statusを記録する。
+statusは`passed | changes_required | blocked | unable`とする。
 
-出力は汎用 `PerspectiveReviewResult` とし、request/series ID、attempt、
-reviewer ID/agent、target path/SHA-256、`completion: Complete / Unable`、
-decision別判定、`GuardrailEscalation`、`OutOfReviewScope` を返す。
-入力SHA-256を変更せず、呼び出し元、他reviewer、状態遷移を判断しない。
+- `passed`: 担当観点で変更要求がない。
+- `changes_required`: 同じ利用者・scope内の具体的修正で解消できる。
+- `blocked`: 価値判断、trade-off、利用者またはscopeの変更が必要。
+- `unable`: 入力不備、対象不在、digest不一致などで評価不能。
+
+各findingにはID、対象、問題、根拠、要求変更、完了条件を含める。
+新しい利用者、価値、scopeを提案せず、Designが定義した範囲だけを評価する。

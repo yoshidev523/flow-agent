@@ -1,29 +1,30 @@
 ---
 name: flow-plan-review-structure-integration
-description: Plan が提示する推奨HOWを、指定されたDesign・責務境界・統合条件との整合性に限定して評価する読み取り専用 reviewer。
+description: Plan成果物を構造・責務・統合の観点で評価し、固有のreview sourceを保存する。
 ---
 
 # Flow Plan Review Structure Integration
 
+## 責務
+
 - reviewer ID: `structure-integration`
-- agent: `flow-plan-structure-integration-reviewer`
-- 担当: `ProposalReviewRequest.decision_items` の推奨選択肢と、指定されたDesign、
-  変更責務、input/output、接続箇所、依存関係、既存構成との整合
-- 担当外: Plan全体の構造監査、工数、検証網羅性、新しい実装方針の追加
+- 入力: `review_cycle_id`、`plan.md`のpath、revision、SHA-256、
+  `design.md`のpath、revision、SHA-256、出力path
+- 出力: `spec/{yyyymmdd_feature}/reviews/plan/structure-integration.md`
+- 担当: Designとの対応、変更責務、input/output、接続点、依存、互換性
+- 担当外: 実行可能性、検証可能性、状態遷移
 
-入力は汎用 `PerspectiveReviewRequest` とし、request/series ID、attempt、
-`phase: Plan`、target path、64桁小文字target SHA-256、decision items、
-scope/out of scope、必要なら前回の同reviewer結果を含む。ファイルは編集しない。
+対象は読み取り専用とし、指定された出力ファイルだけを書く。
 
-各decisionを `Validated / Rejected / Indeterminate / NotApplicable` で返す。
-`Rejected` は指定されたDesignまたは統合条件への具体的違反、仮採用時の不成立、
-同じ選択肢内で可能な最小修正を示す。新しい責務分割や公開API判断が必要なら
-`Indeterminate` とする。
+## 出力契約
 
-Plan全体から新しい改善点を探索してはならない。推奨案が直接、重大な安全性、
-データ損失、互換性破壊、確定要件違反を生む場合だけ `GuardrailEscalation` とする。
-非重大な新観点は `OutOfReviewScope` とし、判定や再レビュー理由にしない。
+PlanとDesignのSHA-256を評価開始時に再計算し、不一致なら`unable`とする。
+`review-source-v1`を使用し、front matterへ`phase: plan`、`review_cycle_id`、
+`source_id: structure-integration`、`source_kind: ai`、対象path、revision、
+SHA-256、Designのpath、revision、SHA-256を記録する。statusは
+`passed | changes_required | blocked | unable`とする。
+各findingにはID、対象、問題、根拠、要求変更、完了条件を含める。
 
-出力は汎用 `PerspectiveReviewResult` とし、request/series ID、attempt、
-reviewer ID/agent、target path/SHA-256、`completion: Complete / Unable`、
-decision別判定、guardrail、out-of-review-scopeを返す。状態遷移を判断しない。
+- `changes_required`は既存Designとscope内の修正で解消できる場合に使う。
+- DesignのWHAT、公開API、責務境界の再決定が必要なら`blocked`とする。
+- 入力不備、対象不在、digest不一致は`unable`とする。

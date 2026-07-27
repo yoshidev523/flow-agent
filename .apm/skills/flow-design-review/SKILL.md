@@ -1,97 +1,93 @@
 ---
 name: flow-design-review
-description: Design の推奨案を3観点 reviewerへ委譲し、decision単位の妥当性をdesign-review.mdへ集約するローカルハブ。
+description: DesignのAIまたは人間review sourceを集約し、design-review.mdへ保存するローカルハブ。
 ---
 
 # Flow Design Review
 
 ## 目的
 
-Designが提示した推奨案を仮採用した場合に、指定済みの要件、利用者価値、
-品質・リスク条件を満たすか3つの独立reviewerへ委譲する。
-成果物全体の監査や新しい論点の探索は行わない。このskillはreview内の委譲、
-結果集約、review artifactだけを管理し、候補修正、ユーザー対話、
-Plan開始、Flowの状態遷移は扱わない。
+指定された`design.md`を、1サイクルにつきAIまたは人間の一方のsourceで評価し、
+集約結果を`spec/{yyyymmdd_feature}/design-review.md`へ保存する。
+このskillはsource収集と集約だけを担当し、Design修正、ユーザー対話、状態遷移を行わない。
 
 ## 入力
 
-汎用 `ProposalReviewRequest` を受け取る。
-
-- `request_id`
-- `review_series_id`
-- `proposal_attempt`: 1〜3
-- `phase: Design`
+- `review_cycle_id`
 - `target_path`
+- `target_revision`
 - `target_sha256`
-- `decision_items`
-  - `decision_id`
-  - 質問と選択肢
-  - 推奨選択肢と理由
-  - 仮採用による変更点
-  - 検証する要件、制約、受け入れ条件
-- `scope` / `out_of_scope`
-- attempt 2以降は前回結果と変更した推奨内容
+- `mode: ai | human`
 - `review_path`
-- 再試行なら成功済みの同一SHA-256結果と失敗reviewer
 
-attempt範囲、必須項目、decision IDの一意性を検査する。対象SHA-256は小文字64桁hex
-とし、開始直前に対象全バイトを `sha256sum`、`shasum -a 256`、
-`openssl dgst -sha256` の順で計算する。不一致は `Incomplete` とする。
+`review_cycle_id`はFlowがreview開始ごとに発行する一意な値とする。
+開始時に対象全バイトのSHA-256を計算し、入力と一致しなければ
+`status: incomplete`の成果物を作成する。
 
-## 子reviewer
+## Source収集
 
-次の3 agentを直接起動する。
+### AI mode
 
-- `flow-design-requirements-reviewer` + `$flow-design-review-requirements`
-- `flow-design-user-value-reviewer` + `$flow-design-review-user-value`
-- `flow-design-quality-risk-reviewer` + `$flow-design-review-quality-risk`
+次の3 agentを並列起動する。
 
-各子へ担当観点に必要な同一decision itemsを持つ一意な
-`PerspectiveReviewRequest`を渡す。子reviewerは相互を認識せず、ファイルを編集しない。
-3件は並列実行してよい。
+- `flow-design-requirements-reviewer`
+- `flow-design-user-value-reviewer`
+- `flow-design-quality-risk-reviewer`
 
-再試行要求では、同一target SHA-256かつrequest/series/attempt/decision IDが一致する
-`Complete`の結果だけを再利用し、失敗reviewerだけを新しいrequest IDで1回起動する。
-再利用条件が崩れた場合は部分結果を破棄する。子起動不能、結果消失、契約不一致は
-該当reviewerを失敗として返し、呼び出し階層を迂回しない。
+各agentへ同じ`review_cycle_id`を渡し、固有の`review-source-v1`を次へ保存する。
+
+- `reviews/design/requirements.md`
+- `reviews/design/user-value.md`
+- `reviews/design/quality-risk.md`
+
+### Human mode
+
+Flowが同じ`review_cycle_id`で保存した`reviews/design/human.md`を読む。このファイルも
+`review-source-v1`を使い、`source_kind: human`とする。
+このhubは人間への質問や回答の解釈を行わない。
+
+1サイクル内でAIと人間のsourceを混在させない。`mode`と異なるsourceは集約対象外とする。
 
 ## 集約
 
-3件すべてが `Complete` でなければ `completion: Incomplete` とし、
-`outcome`を設定しない。成功した部分結果と失敗reviewer/理由は記録するが、
-部分結果から判定しない。
+sourceのcycle ID、対象path、revision、SHA-256が入力と一致することを確認する。
+固定pathに残る別cycleのsourceは存在していても欠落扱いにする。
 
-すべて `Complete` の場合だけ、decisionごとに集約する。
+- 1件でも`unable`、欠落、契約不一致がある: `incomplete`
+- 1件でも`blocked`: `blocked`
+- 1件でも`changes_required`: `changes_required`
+- 必要sourceがすべて`passed`: `passed`
 
-- 1件以上が `Validated` で、残りが `Validated` または理由つき `NotApplicable`:
-  decisionは `Validated`
-- 全件が `NotApplicable`:
-  検証根拠がないためdecisionは `EscalationRequired`
-- 1件以上 `Rejected` かつ `Indeterminate`、観点矛盾、guardrailなし:
-  decisionは `RevisionRequired`
-- `Indeterminate`、観点間の両立不能、選択肢内に妥当案なし、
-  `GuardrailEscalation`のいずれか:
-  decisionは `EscalationRequired`
+Human modeではhuman source 1件を同じ規則で写像する。
+集約直前にも対象SHA-256を再計算し、変化していれば`incomplete`とする。
 
-全decisionが `Validated` の場合だけ全体 `outcome: Validated` とする。
-1件以上 `EscalationRequired` なら全体も同値、それ以外で
-`RevisionRequired`があれば全体も同値とする。
-`OutOfReviewScope`はreview artifactへ記録するが集約判定へ使わない。
+## 出力
 
-attempt 2以降は同じdecision IDについて、前回からの継続、解消、新規を分類する。
-新規 `Rejected` は推奨変更が直接生んだ問題、または指定基準に対する重大な
-初回見落としだけ許し、遅延検出理由を必須にする。それ以外は
-`OutOfReviewScope`とする。orchestratorは子結果の結論や根拠を書き換えない。
+出力は`phase-review-v1`とする。
 
-## 記録と出力
+```yaml
+---
+schema_version: flow/phase-review-v1
+phase: design
+review_cycle_id: design-r1-20260728T000000
+target_path: spec/.../design.md
+target_revision: 1
+target_sha256: "{64 lowercase hex}"
+mode: ai
+status: passed
+source_paths:
+  - spec/.../reviews/design/requirements.md
+completed_at: 2026-07-28T00:00:00+09:00
+---
+```
 
-このskillを使う `flow-design-reviewer` だけが `design-review.md` を追記する。
-追記直前にSHA-256を再計算し、開始時から変化していれば `Incomplete` とする。
-各attemptへrequest/series ID、対象path/SHA-256、decision items、3結果、
-集約、差分、guardrail、out-of-review-scope、失敗情報を記録し、過去を編集しない。
+本文にはsource別status、finding、集約理由、失敗情報を記載する。
+過去の結果を混ぜず、常に現在の対象revisionに対する最新集約へ置き換える。
 
-汎用 `ProposalReviewResult` として、request/series ID、attempt、対象path/SHA-256、
-`completion: Complete / Incomplete`、Complete時の
-`outcome: Validated / RevisionRequired / EscalationRequired`、
-decision別結果、差分、guardrail、out-of-review-scope、失敗reviewer/理由を返す。
-候補修正、再試行、ユーザー提示、フェーズ移行を決定しない。
+## 完了条件
+
+- `design-review.md`だけを集約成果物として編集している。
+- sourceはそれぞれ固有のwriterが作成している。
+- modeに必要な全sourceを検証している。
+- statusが`passed | changes_required | blocked | incomplete`のいずれかである。
+- cycle ID、対象path、revision、SHA-256が追跡できる。
