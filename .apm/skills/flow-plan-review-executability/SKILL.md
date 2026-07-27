@@ -1,29 +1,28 @@
 ---
 name: flow-plan-review-executability
-description: Plan が提示する推奨HOWを、指定された実行条件と完了条件に限定して評価する読み取り専用 reviewer。
+description: Plan成果物を実行可能性の観点で評価し、固有のreview sourceを保存する。
 ---
 
 # Flow Plan Review Executability
 
+## 責務
+
 - reviewer ID: `executability`
-- agent: `flow-plan-executability-reviewer`
-- 担当: `ProposalReviewRequest.decision_items` の推奨選択肢と、指定された手順、
-  順序、依存、利用可能なツール・設定、エラー処理、完了条件との整合
-- 担当外: Plan全体の実行可能性監査、DesignのWHAT再決定、新しいHOWの追加
+- 入力: `review_cycle_id`、`plan.md`のpath、revision、SHA-256、出力path
+- 出力: `spec/{yyyymmdd_feature}/reviews/plan/executability.md`
+- 担当: 手順、順序、依存、利用ツール、エラー処理、完了条件
+- 担当外: 構造選択、検証網羅性、状態遷移
 
-入力は汎用 `PerspectiveReviewRequest` とし、request/series ID、attempt、
-`phase: Plan`、target path、64桁小文字target SHA-256、decision items、
-scope/out of scope、必要なら前回の同reviewer結果を含む。ファイルは編集しない。
+対象は読み取り専用とし、指定された出力ファイルだけを書く。
 
-各decisionを `Validated / Rejected / Indeterminate / NotApplicable` で返す。
-`Rejected` は指定された実行条件への具体的違反、着手または完了できない理由、
-同じ選択肢内で可能な最小修正を示す。追加のユーザー判断、環境、権限が必要なら
-`Indeterminate` とする。
+## 出力契約
 
-Plan全体から手順欠落や改善余地を探索してはならない。推奨案が直接、重大な安全性、
-データ損失、互換性破壊、確定要件違反を生む場合だけ `GuardrailEscalation` とする。
-非重大な新観点は `OutOfReviewScope` とし、判定や再レビュー理由にしない。
+`review-source-v1`を使用し、front matterへ`phase: plan`、`review_cycle_id`、
+`source_id: executability`、`source_kind: ai`、対象path、revision、SHA-256を
+記録する。statusは
+`passed | changes_required | blocked | unable`とする。
+各findingにはID、対象、問題、根拠、要求変更、完了条件を含める。
 
-出力は汎用 `PerspectiveReviewResult` とし、request/series ID、attempt、
-reviewer ID/agent、target path/SHA-256、`completion: Complete / Unable`、
-decision別判定、guardrail、out-of-review-scopeを返す。状態遷移を判断しない。
+- 実装者が同じ方針内で解消できる不足は`changes_required`とする。
+- 新しい方針、外部権限、利用者判断が必要なら`blocked`とする。
+- 入力不備、対象不在、digest不一致は`unable`とする。

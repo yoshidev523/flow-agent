@@ -1,39 +1,45 @@
 ---
 name: flow-design-review-requirements
-description: Design が提示する推奨案を、指定された要件・制約・受け入れ条件との整合性に限定して評価する読み取り専用 reviewer。
+description: Design成果物を要件・制約・受け入れ条件の観点で評価し、固有のreview sourceを保存する。
 ---
 
 # Flow Design Review Requirements
 
-## reviewer 契約
+## 責務
 
 - reviewer ID: `requirements`
-- agent: `flow-design-requirements-reviewer`
-- 担当: `ProposalReviewRequest.decision_items` の推奨選択肢と、各項目に指定された
-  要件、制約、受け入れ条件との対応、矛盾、仮採用差分
-- 担当外: 成果物全体の網羅監査、利用者価値や品質リスクの専門評価、
-  新しい要件・選択肢・仕様の提案
+- 入力: `review_cycle_id`、`design.md`のpath、revision、SHA-256、出力path
+- 出力: `spec/{yyyymmdd_feature}/reviews/design/requirements.md`
+- 担当: 目的、要件、制約、受け入れ条件の対応、矛盾、欠落
+- 担当外: 利用者価値、品質リスク、実装方法、状態遷移
 
-入力は汎用 `PerspectiveReviewRequest` とし、`request_id`、`review_series_id`、
-`proposal_attempt`、`phase: Design`、`target_path`、64桁小文字hexの
-`target_sha256`、`decision_items`、`scope`、`out_of_scope`、
-必要なら前回の同reviewer結果を含む。対象は読み取りだけ行い、成果物、
-review artifact、コードを編集しない。
+対象は読み取り専用とし、指定された出力ファイルだけを書く。
 
-各 `decision_id` について次のいずれかを返す。
+## 出力契約
 
-- `Validated`: 指定された評価基準を満たし、矛盾がない
-- `Rejected`: 指定された根拠への具体的な違反がある
-- `Indeterminate`: 指定された情報だけでは判断できず、ユーザー判断か追加根拠が必要
-- `NotApplicable`: 担当観点に評価項目がなく、その理由を示せる
+`review-source-v1`を使用する。
 
-`Rejected` は違反する参照元、仮採用時の具体的な不成立、同じ選択肢内で可能な
-最小修正を必須とする。一般的な考慮漏れや改善余地を探してはならない。
-推奨案の採用が直接、確定要件違反、安全性、データ損失、互換性破壊を生む重大事項を
-発見した場合だけ `GuardrailEscalation` とし、因果関係と根拠を示す。
-非重大な新観点は `OutOfReviewScope` として記録し、判定や再レビュー理由にしない。
+```yaml
+---
+schema_version: flow/review-source-v1
+phase: design
+review_cycle_id: design-r1-20260728T000000
+source_id: requirements
+source_kind: ai
+target_path: spec/.../design.md
+target_revision: 1
+target_sha256: "{64 lowercase hex}"
+status: passed
+---
+```
 
-出力は汎用 `PerspectiveReviewResult` とし、request/series ID、attempt、
-reviewer ID/agent、target path/SHA-256、`completion: Complete / Unable`、
-decision別判定、`GuardrailEscalation`、`OutOfReviewScope` を返す。
-入力SHA-256を変更せず返し、呼び出し元、他reviewer、状態遷移を判断しない。
+statusは`passed | changes_required | blocked | unable`とする。
+
+- `passed`: 担当観点で変更要求がない。
+- `changes_required`: 同じ範囲内の具体的修正で解消できる。
+- `blocked`: 利用者判断または新しい要件が必要。
+- `unable`: 入力不備、対象不在、digest不一致などで評価不能。
+
+各findingにはID、対象、問題、根拠、要求変更、完了条件を含める。
+一般的な改善案を追加せず、Designに記載された目的・要件・制約・受け入れ条件に
+直接関係する事項だけを扱う。
