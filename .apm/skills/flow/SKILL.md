@@ -86,6 +86,9 @@ review hubの集約結果。`review_cycle_id`、対象path、revision、SHA-256�
 passed | changes_required | blocked | incomplete
 ```
 
+`blocked`の本文にはreview hubが作成した`利用者判断`を持つ。Flowはこの文面を
+生成・要約・補足せず、そのまま利用者へ提示する。
+
 ### `phase-feedback-v1`
 
 Flowがwriterへ渡す正規化済み入力。レビュー主体を含めない。
@@ -188,7 +191,8 @@ Design writerへreview mode、source、集約結果、Flow状態を渡さない�
   `operation: revise`でwriterへ渡す。AI modeかつ自動修正が未使用ならcounterを1にして
   新revisionをAIで再reviewする。AIの自動修正を使用済みなら、修正後の新revisionを
   human modeで提示する。Human modeなら修正後の新revisionを再び人間へ提示する。
-- `blocked`: 人間へ判断を求め、回答をfeedbackへ正規化してwriterへ渡す。
+- `blocked`: `design-review.md`の`利用者判断`を変更せず提示し、回答をfeedbackへ
+  正規化してwriterへ渡す。Flow自身で背景、選択肢、推奨を生成しない。
 - `incomplete`: 同じrevisionのAI reviewを1回だけ再実行する。
   再失敗時はhuman modeへ切り替える。
 
@@ -207,6 +211,7 @@ revision、SHA-256も渡す。Plan front matterのDesign参照と現在のDesign
 一致しない場合はreviewを開始せず、Plan writerへ差し戻す。
 `passed`のPlanだけがImplementへ進める。
 移行直前にPlanのSHA-256と`plan-review.md`の対象SHA-256が一致することを確認する。
+`blocked`では`plan-review.md`の`利用者判断`をDesign reviewと同じ規則で提示する。
 
 ### 5. Implement
 
@@ -235,6 +240,7 @@ Flowは次だけを検証する。
 - review cycle ID
 - pathとrevision
 - 集約成果物が参照するsourceの存在
+- `blocked`の集約成果物に空でない`利用者判断`があること
 - review時と移行時のSHA-256一致
 - retry counter
 

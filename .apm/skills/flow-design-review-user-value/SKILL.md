@@ -29,3 +29,8 @@ statusは`passed | changes_required | blocked | unable`とする。
 
 各findingにはID、対象、問題、根拠、要求変更、完了条件を含める。
 新しい利用者、価値、scopeを提案せず、Designが定義した範囲だけを評価する。
+
+`blocked`の各findingには、review hubが利用者向け文面を作れるよう、判断材料として
+質問、今決める理由、2〜3個の選択肢と各影響、推奨と理由、短い回答形式を加える。
+各要素は簡潔にし、Designから根拠づけられない価値やscopeを追加しない。
+必ず選択肢の1つを推奨し、根拠と仮定を明記する。

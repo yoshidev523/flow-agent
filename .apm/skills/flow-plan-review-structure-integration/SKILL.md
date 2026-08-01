@@ -28,3 +28,8 @@ SHA-256、Designのpath、revision、SHA-256を記録する。statusは
 - `changes_required`は既存Designとscope内の修正で解消できる場合に使う。
 - DesignのWHAT、公開API、責務境界の再決定が必要なら`blocked`とする。
 - 入力不備、対象不在、digest不一致は`unable`とする。
+
+`blocked`の各findingには、review hubが利用者向け文面を作れるよう、判断材料として
+質問、今決める理由、2〜3個の選択肢と各影響、推奨と理由、短い回答形式を加える。
+各要素は簡潔にし、PlanとDesignから根拠づけられない方針を追加しない。
+必ず選択肢の1つを推奨し、根拠と仮定を明記する。
