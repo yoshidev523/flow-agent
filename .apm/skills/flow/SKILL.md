@@ -166,6 +166,47 @@ Human modeではFlowが人間へ対象成果物を提示し、回答を
 `reviews/{phase}/human.md`へ`review-source-v1`として保存してからhubを起動する。
 人間の結果もAIと同じ4 statusへ正規化する。
 
+### Human reviewの提示契約
+
+FlowがDesignまたはPlanをhuman modeで提示するときは、対象成果物だけでなく、
+人間確認へ切り替えた理由と確認対象を同時に提示する。
+
+提示内容は次の順とする。
+
+1. 切替理由: 利用者指定、自動修正上限、またはreview再試行上限
+2. 直前のreview cycleの対象revision、mode、status
+3. 直前の`phase-review-v1`にあるfindingまたは失敗情報
+4. 自動修正後なら、正規化feedbackと新成果物の`Feedback反映`から確認できる修正内容
+5. 現在が「既知の未解決懸念あり」か「修正後revisionが未review」か
+6. 人間が重点的に確認する項目、対象成果物のpath、回答形式
+
+Flowは`phase-review-v1`、該当feedback、対象成果物、counterだけを根拠にし、
+findingを再評価、拡張、縮小しない。自動修正後の新revisionに未解決findingが記録されて
+いない場合は、既知の問題があるためではなく修正結果が未reviewであるため人間確認を
+求める、と明記する。単に「human reviewが必要」とだけ提示してはならない。
+
+```md
+Human reviewが必要です。
+
+- 切替理由: {理由}
+- 直前のreview: revision {N} / {mode} / {status}
+- 直前の指摘または失敗:
+  - {phase-review-v1の内容}
+- revision {M}での修正:
+  - {feedbackとFeedback反映で追跡できる内容}
+- 現在の状態: {既知の未解決懸念あり | 修正後revisionが未review}
+- 確認してほしい点:
+  - {review対象}
+- 成果物: {path}
+
+問題なければ`passed`、変更が必要なら
+`changes_required: {変更内容}`と回答してください。
+```
+
+利用者指定で最初からhuman modeの場合など、直前のAI reviewや自動修正が存在しない項目は
+`該当なし`と明記する。review再試行上限による切替では、findingの代わりにaggregateの
+失敗情報と、成果物内容の評価が未完了であることを提示する。
+
 ## 実行フロー
 
 ### 1. Design
@@ -190,7 +231,8 @@ Design writerへreview mode、source、集約結果、Flow状態を渡さない�
 - `changes_required`: findingsを`design-feedback.md`へ変換し、必ず
   `operation: revise`でwriterへ渡す。AI modeかつ自動修正が未使用ならcounterを1にして
   新revisionをAIで再reviewする。AIの自動修正を使用済みなら、修正後の新revisionを
-  human modeで提示する。Human modeなら修正後の新revisionを再び人間へ提示する。
+  「Human reviewの提示契約」に従ってhuman modeで提示する。Human modeなら修正後の
+  新revisionを同じ契約で再び人間へ提示する。
 - `blocked`: `design-review.md`の`利用者判断`を変更せず提示し、回答をfeedbackへ
   正規化してwriterへ渡す。Flow自身で背景、選択肢、推奨を生成しない。
 - `incomplete`: 同じrevisionのAI reviewを1回だけ再実行する。
@@ -206,7 +248,8 @@ Design writerへreview mode、source、集約結果、Flow状態を渡さない�
 
 ### 4. Plan review
 
-Design reviewと同じ規則をPlanへ適用する。review hubへPlanが参照するDesignのpath、
+Design reviewと同じ規則と「Human reviewの提示契約」をPlanへ適用する。
+review hubへPlanが参照するDesignのpath、
 revision、SHA-256も渡す。Plan front matterのDesign参照と現在のDesign全バイトが
 一致しない場合はreviewを開始せず、Plan writerへ差し戻す。
 `passed`のPlanだけがImplementへ進める。
