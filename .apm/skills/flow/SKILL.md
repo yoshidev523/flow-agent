@@ -1,9 +1,17 @@
 ---
 name: flow
-description: spec配下の永続成果物を介してDesign、Review、Plan、Implementを接続する状態遷移ハブ。
+description: 利用者が`$flow`（Claudeでは`/flow`）を明示した場合だけ、spec配下の永続成果物を介してDesign、Review、Plan、Implementを接続する状態遷移ハブ。通常の設計・レビュー・計画・実装依頼から暗黙に起動しない。
+disable-model-invocation: true
+user-invocable: true
 ---
 
 # Flow
+
+## 起動条件
+
+利用者による`$flow`（Claudeでは`/flow`）の明示呼び出しでのみ実行する。
+ホストの明示呼び出し判定を前提とし、単に設計、レビュー、計画、実装を
+依頼された場合は起動しない。
 
 ## 目的
 
