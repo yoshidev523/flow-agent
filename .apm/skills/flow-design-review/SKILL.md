@@ -52,6 +52,9 @@ Flowが同じ`review_cycle_id`で保存した`reviews/design/human.md`を読む�
 
 sourceのcycle ID、対象path、revision、SHA-256が入力と一致することを確認する。
 固定pathに残る別cycleのsourceは存在していても欠落扱いにする。
+各sourceのfindingが`classification: gate | scope_candidate`を持ち、sourceのstatusが
+`gate`だけから決定されていることも確認する。`scope_candidate`だけを理由に
+`changes_required`または`blocked`としているsourceは契約不一致とする。
 
 - 1件でも`unable`、欠落、契約不一致がある: `incomplete`
 - 1件でも`blocked`: `blocked`
@@ -61,18 +64,27 @@ sourceのcycle ID、対象path、revision、SHA-256が入力と一致するこ�
 Human modeではhuman source 1件を同じ規則で写像する。
 集約直前にも対象SHA-256を再計算し、変化していれば`incomplete`とする。
 
+`scope_candidate`はstatus集約から除外し、source間で意味が同じ候補を重複排除して
+本文の`## 追加スコープ候補`へまとめる。各候補はID、提案、根拠、今回含める影響、
+推奨処理を持ち、推奨処理は原則として別タスクまたはscope外とする。候補が存在しても
+`status: passed`にできる。
+
 ### 利用者判断の集約
 
 statusが`blocked`なら、hubがsourceの判断材料を重複排除し、本文の
 `## 利用者判断`へ利用者にそのまま提示できる完成文を作る。
 
 - 人間の判断が必要なfindingだけを含め、自動修正可能なfindingは含めない。
+- `scope_candidate`を含めない。
 - 独立した判断は優先度順に最大3件とする。
 - 各判断は質問、背景、2〜3個の選択肢と影響、推奨と理由、回答形式を持つ。
 - 背景、各選択肢の影響、推奨理由はそれぞれ1文で簡潔に書く。
 - sourceの意味を変えず、根拠のない条件や数値を追加しない。
 - 必ず選択肢の1つを推奨し、sourceに基づく理由と仮定を1文で示す。
 - finding全文や内部の集約過程を利用者向け文面へ転載しない。
+- reviewerが既存の別選択肢を推奨した場合も、利用者の回答として確定せず再判断を求める。
+- 既存選択肢がすべて不適切な場合は、reviewerが作った案を新しい回答として追加せず、
+  writerによる選択肢再作成が必要であることを示す。
 
 ```md
 ## 利用者判断
@@ -107,7 +119,7 @@ completed_at: 2026-07-28T00:00:00+09:00
 ---
 ```
 
-本文にはsource別status、finding、集約理由、失敗情報を記載する。
+本文にはsource別status、`gate` finding、`追加スコープ候補`、集約理由、失敗情報を記載する。
 `blocked`では加えて上記形式の`利用者判断`を記載する。
 過去の結果を混ぜず、常に現在の対象revisionに対する最新集約へ置き換える。
 

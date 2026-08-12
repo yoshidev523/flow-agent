@@ -85,6 +85,23 @@ AIの観点別結果または人間の結果。Flowがreview開始時に発行�
 passed | changes_required | blocked | unable
 ```
 
+本文のfindingは`classification: gate | scope_candidate`を持つ。
+
+- `gate`: 採用済み判断の誤り、推奨の前提不成立、現在の要件・制約・受け入れ条件を
+  満たせない不足、実装・検証不能、重大なsecurity、privacy、データ損失、互換性破壊など、
+  現在のscopeを成立させるために解消が必要な指摘。
+- `scope_candidate`: 現在のscopeの成立には不要な追加機能、新しい利用者や価値、
+  将来拡張、任意のrefactoring、品質水準や検証範囲の追加。
+
+各findingは関係する確認事項を`decision_refs`で参照する。直接対応する確認事項が
+なければ空とする。sourceのstatusは`gate`だけから決定し、`scope_candidate`だけなら
+`passed`とする。reviewerは既存の別選択肢を推奨できるが、利用者に代わって回答を
+変更しない。既存選択肢で解決できなければ、必要条件を`gate`へ記録してwriterへ
+選択肢の再作成を要求し、新しい回答を確定しない。
+
+`gate`は対象、問題、根拠、要求変更、完了条件を持つ。`scope_candidate`は提案、根拠、
+今回含める影響、推奨処理を持ち、推奨処理は原則として別タスクまたはscope外とする。
+
 ### `phase-review-v1`
 
 review hubの集約結果。`review_cycle_id`、対象path、revision、SHA-256、mode、source paths、
@@ -96,6 +113,7 @@ passed | changes_required | blocked | incomplete
 
 `blocked`の本文にはreview hubが作成した`利用者判断`を持つ。Flowはこの文面を
 生成・要約・補足せず、そのまま利用者へ提示する。
+本文にはstatusへ影響しない`追加スコープ候補`を持てる。
 
 ### `phase-feedback-v1`
 
@@ -220,7 +238,9 @@ Human reviewが必要です。
 ### 1. Design
 
 1. `flow-designer`へ`operation: create`、要求、`design.md`のpathを渡す。
-2. `status: needs_input`なら質問を利用者へ提示する。
+2. `status: needs_input`ならwriterが記載した質問、3個の選択肢、推奨、推奨理由、前提を
+   意味を変えず利用者へ提示する。推奨を選ぶ場合は「推奨を採用」、別案なら質問IDと
+   選択肢、選択肢外なら具体的な回答を求める。Flow自身で選択肢や推奨を生成しない。
 3. 回答を`design-feedback.md`へ`kind: answer`として保存し、
    `operation: respond`で同じwriterへ渡す。
 4. `status: ready`ならDesign reviewへ進む。
@@ -235,16 +255,23 @@ Design writerへreview mode、source、集約結果、Flow状態を渡さない�
 4. `design-review.md`のcycle ID、対象path、revision、SHA-256を検証する。
 5. statusに従って処理する。
 
-- `passed`: 移行直前にDesignのSHA-256を再計算する。一致すればPlanへ進む。
+- `passed`: `追加スコープ候補`がなければ、移行直前にDesignのSHA-256を再計算する。
+  一致すればPlanへ進む。候補があれば「追加スコープ候補の処理」に従う。
 - `changes_required`: findingsを`design-feedback.md`へ変換し、必ず
   `operation: revise`でwriterへ渡す。AI modeかつ自動修正が未使用ならcounterを1にして
   新revisionをAIで再reviewする。AIの自動修正を使用済みなら、修正後の新revisionを
   「Human reviewの提示契約」に従ってhuman modeで提示する。Human modeなら修正後の
-  新revisionを同じ契約で再び人間へ提示する。
+  新revisionを同じ契約で再び人間へ提示する。writerが選択肢を再作成して
+  `status: needs_input`を返した場合はreviewせず、Designの質問処理へ戻る。
 - `blocked`: `design-review.md`の`利用者判断`を変更せず提示し、回答をfeedbackへ
-  正規化してwriterへ渡す。Flow自身で背景、選択肢、推奨を生成しない。
+  正規化してwriterへ渡す。Flow自身で背景、選択肢、推奨を生成しない。writerが
+  `status: needs_input`なら質問を提示し、`ready`なら新しいcycleでreviewする。
 - `incomplete`: 同じrevisionのAI reviewを1回だけ再実行する。
   再失敗時はhuman modeへ切り替える。
+
+自動修正後の再reviewは、直前の`gate`の解消、修正による現在の要件と採用済み判断への
+回帰、修正で生じた重大なsecurity、privacy、データ損失、互換性破壊だけを判定対象とする。
+それ以外に見つかった改善は`scope_candidate`とし、新しい必須修正へ昇格させない。
 
 ### 3. Plan
 
@@ -264,6 +291,31 @@ revision、SHA-256も渡す。Plan front matterのDesign参照と現在のDesign
 移行直前にPlanのSHA-256と`plan-review.md`の対象SHA-256が一致することを確認する。
 `blocked`では`plan-review.md`の`利用者判断`をDesign reviewと同じ規則で提示する。
 
+### 4.1 追加スコープ候補の処理
+
+review hubが`passed`とともに`追加スコープ候補`を返した場合、Flowは候補を変更せず
+まとめて利用者へ提示する。候補はhuman reviewへの切替理由にせず、自動修正counterも
+消費しない。提示中は`state: waiting_for_input`、`next_action: ask_user`とする。
+
+- 推奨回答は、全候補を本タスクのscope外として現在の`passed`を維持することとする。
+- 利用者がscope外を選んだ場合は、対象SHA-256を確認して次phaseへ進む。
+- Design reviewで候補の採用を選んだ場合は、選択された候補だけを
+  `design-feedback.md`へ`kind: change`として正規化し、Designを改訂して再reviewする。
+- Plan reviewでDesignを変えない候補の採用を選んだ場合は、選択された候補だけを
+  `plan-feedback.md`へ`kind: change`として正規化し、Planを改訂して再reviewする。
+- Plan reviewでDesignのWHAT、公開API、責務境界、scopeの変更が必要な候補は、
+  現Flowを逆戻りさせず別タスクとして扱うよう案内する。
+
+```md
+レビューはpassedです。
+
+現在のタスクの成立には不要ですが、次の追加スコープ候補があります。
+- {候補ID}: {提案と今回含める影響}
+
+推奨は、すべて本タスクのスコープ外とすることです。
+このまま進める場合は「スコープ外」、本タスクへ含める場合は候補IDを回答してください。
+```
+
 ### 5. Implement
 
 `flow-implementer`へ`plan.md`と`implement.md`のpathを渡す。
@@ -278,6 +330,7 @@ Implementのrevisionとstatusを検証する。statusが`completed`ならFlowも
 FlowはAI findings、人間の変更要求、writer質問への回答を同じ項目形式へ変換する。
 
 - AI sourceのIDや主体情報をfeedbackへコピーしない。
+- `scope_candidate`は利用者が本タスクへの採用を選んだ項目だけをfeedbackへ変換する。
 - 要求変更の意味を拡張・縮小しない。
 - `blocked`への人間回答は`kind: answer`とする。
 - 対象revisionが変わった古いfeedbackは再利用しない。

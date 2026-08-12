@@ -27,9 +27,22 @@ statusは`passed | changes_required | blocked | unable`とする。
 - `blocked`: 価値判断、trade-off、利用者またはscopeの変更が必要。
 - `unable`: 入力不備、対象不在、digest不一致などで評価不能。
 
-各findingにはID、対象、問題、根拠、要求変更、完了条件を含める。
-新しい利用者、価値、scopeを提案せず、Designが定義した範囲だけを評価する。
+最初に`確認事項`の採用済み回答、推奨理由、前提を担当観点から検証し、その後に
+現在のscopeの成立性を確認する。各findingにはID、
+`classification: gate | scope_candidate`、関係する確認事項の`decision_refs`を含める。
+`gate`には対象、問題、根拠、要求変更、完了条件を、`scope_candidate`には提案、根拠、
+今回含める影響、推奨処理を含める。
 
+- `gate`: 採用済み判断または前提の誤り、現在の利用者・解決課題・期待価値・
+  受け入れ条件の不整合。statusは`gate`だけから決定する。
+- `scope_candidate`: 新しい利用者、価値、use case、scopeなど、現在のDesignの成立には
+  不要な提案。statusへ影響させず、要求変更や自動修正の対象にしない。
+
+既存の別選択肢を推奨できるが、利用者の回答を変更しない。既存選択肢がすべて不適切なら
+`changes_required`とし、満たすべき条件を`gate`として記録してwriterへ選択肢の再作成を
+要求する。reviewer自身が新しい選択肢や回答を確定しない。
+
+利用者による採用済み回答の変更が必要なfindingは`blocked`とする。
 `blocked`の各findingには、review hubが利用者向け文面を作れるよう、判断材料として
 質問、今決める理由、2〜3個の選択肢と各影響、推奨と理由、短い回答形式を加える。
 各要素は簡潔にし、Designから根拠づけられない価値やscopeを追加しない。
