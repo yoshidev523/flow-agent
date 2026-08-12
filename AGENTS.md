@@ -84,6 +84,11 @@ APMは自己package installを循環依存として扱うため、独立consumer
 - AIと人間のreviewは同じsource契約へ正規化し、1 cycle内では一方だけを使います。
 - phase review hubは自phaseのsource収集とaggregate artifactだけを管理します。
 - 各観点reviewerは担当観点を独立評価し、固有のsource fileだけを書きます。
+- reviewはwriterが提示し利用者が採用した推奨判断と、現在のscopeの成立性を優先して
+  評価します。成立に必須な指摘だけをgateとし、周辺改善は追加scope候補へ分離します。
+- 追加scope候補はreview status、自動修正、human review切替へ影響させません。
+- reviewerは既存の別選択肢を推奨できますが、利用者の回答変更や選択肢外の回答確定は
+  行いません。
 - Implement executorは渡されたPlanの内容と完全性だけを扱い、上流状態を認識しません。
 - leafの単独利用はFlow内部状態に依存せず、自身の入出力契約だけで完結させます。
 
@@ -110,6 +115,10 @@ phase境界の契約は次の4種類に限定します。
 - `review-source-v1`: 観点別または人間の評価結果
 - `phase-review-v1`: hubの集約結果
 - `phase-feedback-v1`: Flowがwriterへ渡す変更または回答
+
+`review-source-v1`のfindingは、現在のscopeの成立に必須な`gate`と、成立には不要な
+`scope_candidate`へ分類します。sourceとaggregateのstatusは`gate`だけから決定し、
+`scope_candidate`は利用者が採用した場合だけfeedbackへ変換します。
 
 Flow内部状態は`flow-state-v1`として`flow-state.yml`へ保存します。
 新しい中継用request/result契約を追加する前に、既存artifactのpathとstatusで
