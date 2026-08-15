@@ -7,7 +7,7 @@ description: DesignのAIまたは人間review sourceを集約するローカル�
 
 主な責務:
 - 指定modeに必要なreview sourceを収集する。
-- AI modeでは3観点reviewerを直接起動する。
+- AI modeでは2観点reviewerを直接起動する。
 - sourceの対象revisionとdigestを検証し、`design-review.md`へ集約する。
 
 行動ルール:

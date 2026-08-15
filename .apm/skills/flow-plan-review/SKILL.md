@@ -1,13 +1,13 @@
 ---
 name: flow-plan-review
-description: PlanのAIまたは人間review sourceを集約し、plan-review.mdへ保存するローカルハブ。
+description: 完成Planのtask-readinessに対するAIまたは人間review sourceを集約し、plan-review.mdへ保存するローカルハブ。
 ---
 
 # Flow Plan Review
 
 ## 目的
 
-指定された`plan.md`を、1サイクルにつきAIまたは人間の一方のsourceで評価し、
+`status: ready`の`plan.md`を、1サイクルにつきAIまたは人間の一方のsourceで評価し、
 集約結果を`spec/{yyyymmdd_feature}/plan-review.md`へ保存する。
 このskillはsource収集と集約だけを担当し、Plan修正、ユーザー対話、状態遷移を行わない。
 
@@ -24,38 +24,28 @@ description: PlanのAIまたは人間review sourceを集約し、plan-review.md�
 - `design_sha256`
 
 `review_cycle_id`はFlowがreview開始ごとに発行する一意な値とする。
-開始時にPlanとDesignの全バイトSHA-256を計算し、入力と一致しなければ
+開始時にPlanとDesignの全バイトSHA-256とPlanの`status: ready`を確認し、一致しなければ
 `status: incomplete`の成果物を作成する。
 
 ## Source収集
 
 ### AI mode
 
-次の3 agentを並列起動する。
-
-- `flow-plan-structure-integration-reviewer`
-- `flow-plan-executability-reviewer`
-- `flow-plan-verifiability-reviewer`
-
-各agentへ同じ`review_cycle_id`を渡し、固有の`review-source-v1`を次へ保存する。
-structure-integration reviewerへはDesignのpath、revision、SHA-256も渡す。
-
-- `reviews/plan/structure-integration.md`
-- `reviews/plan/executability.md`
-- `reviews/plan/verifiability.md`
+`flow-plan-task-readiness-reviewer`を起動し、同じ`review_cycle_id`の
+`review-source-v1`を`reviews/plan/task-readiness.md`へ保存させる。
 
 ### Human mode
 
 Flowが同じ`review_cycle_id`で保存した`reviews/plan/human.md`を読む。このファイルも
-`review-source-v1`を使い、`source_kind: human`とする。
+`review-source-v1`を使い、`review_stage: final`、`source_kind: human`とする。
 このhubは人間への質問や回答の解釈を行わない。
 
 1サイクル内でAIと人間のsourceを混在させない。`mode`と異なるsourceは集約対象外とする。
 
 ## 集約
 
-sourceのcycle ID、対象path、revision、SHA-256が入力と一致することを確認する。
-structure-integration sourceはDesignのpath、revision、SHA-256も一致を必須とする。
+sourceのcycle ID、`review_stage: final`、PlanとDesignのpath、revision、SHA-256が
+入力と一致することを確認する。
 固定pathに残る別cycleのsourceは存在していても欠落扱いにする。
 各sourceのfindingが`classification: gate | scope_candidate`を持ち、sourceのstatusが
 `gate`だけから決定されていることも確認する。`scope_candidate`だけを理由に
@@ -113,7 +103,8 @@ statusが`blocked`なら、hubがsourceの判断材料を重複排除し、本�
 ---
 schema_version: flow/phase-review-v1
 phase: plan
-review_cycle_id: plan-r1-20260728T000000
+review_stage: final
+review_cycle_id: plan-final-r1-20260728T000000
 target_path: spec/.../plan.md
 target_revision: 1
 target_sha256: "{64 lowercase hex}"
@@ -123,7 +114,7 @@ design_sha256: "{64 lowercase hex}"
 mode: ai
 status: passed
 source_paths:
-  - spec/.../reviews/plan/structure-integration.md
+  - spec/.../reviews/plan/task-readiness.md
 completed_at: 2026-07-28T00:00:00+09:00
 ---
 ```
@@ -139,4 +130,4 @@ completed_at: 2026-07-28T00:00:00+09:00
 - modeに必要な全sourceを検証している。
 - statusが`passed | changes_required | blocked | incomplete`のいずれかである。
 - `blocked`では空でない`利用者判断`があり、そのまま提示できる。
-- cycle ID、PlanとDesignのpath、revision、SHA-256が追跡できる。
+- cycle ID、review stage、PlanとDesignのpath、revision、SHA-256が追跡できる。
