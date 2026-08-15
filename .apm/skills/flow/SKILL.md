@@ -15,10 +15,13 @@ user-invocable: true
 
 ## 目的
 
-要求から実装までを次の順で進める。
+要求から実装までを次の順で進める。Planに質問がある場合だけ、利用者へ提示する前に
+decision reviewを行う。
 
 ```text
-design -> design_review -> plan -> plan_review -> implement -> completed
+design -> design_review -> plan
+plan(needs_input) -> plan_decision_review -> plan
+plan(ready) -> plan_review -> implement -> completed
 ```
 
 Flowはphase間の唯一の状態遷移責任者である。各writerとreview hubは自分の成果物だけを
@@ -36,18 +39,19 @@ spec/{yyyymmdd_feature}/
 ├── design-review.md
 ├── plan.md
 ├── plan-feedback.md
+├── plan-decision-review.md
 ├── plan-review.md
 ├── implement.md
 └── reviews/
     ├── design/
     │   ├── requirements.md
-    │   ├── user-value.md
     │   ├── quality-risk.md
     │   └── human.md
+    ├── plan-decision/
+    │   ├── decision-quality.md
+    │   └── human.md
     └── plan/
-        ├── structure-integration.md
-        ├── executability.md
-        ├── verifiability.md
+        ├── task-readiness.md
         └── human.md
 ```
 
@@ -62,7 +66,7 @@ spec/{yyyymmdd_feature}/
 | `plan.md` | Plan writer |
 | `implement.md` | Implement executor |
 | 観点別source | 対応する観点reviewer |
-| `design-review.md`、`plan-review.md` | 対応するreview hub |
+| `design-review.md`、`plan-decision-review.md`、`plan-review.md` | 対応するreview hub |
 
 複数のwriterが同じファイルを編集してはならない。
 
@@ -85,11 +89,15 @@ AIの観点別結果または人間の結果。Flowがreview開始時に発行�
 passed | changes_required | blocked | unable
 ```
 
+Planのsourceは`review_stage: decision | final`も持つ。`decision`は未回答の質問・
+選択肢・推奨だけを対象とし、`final`は回答反映後のタスク引き継ぎだけを対象とする。
+
 本文のfindingは`classification: gate | scope_candidate`を持つ。
 
 - `gate`: 採用済み判断の誤り、推奨の前提不成立、現在の要件・制約・受け入れ条件を
-  満たせない不足、実装・検証不能、重大なsecurity、privacy、データ損失、互換性破壊など、
-  現在のscopeを成立させるために解消が必要な指摘。
+  満たせない不足、実装・検証不能、必須制約と矛盾する、または受容判断が未解決な
+  security、privacy、データ損失、互換性riskなど、現在のscopeを成立させるために
+  解消が必要な指摘。
 - `scope_candidate`: 現在のscopeの成立には不要な追加機能、新しい利用者や価値、
   将来拡張、任意のrefactoring、品質水準や検証範囲の追加。
 
@@ -101,6 +109,8 @@ passed | changes_required | blocked | unable
 
 `gate`は対象、問題、根拠、要求変更、完了条件を持つ。`scope_candidate`は提案、根拠、
 今回含める影響、推奨処理を持ち、推奨処理は原則として別タスクまたはscope外とする。
+riskの存在や別案の方が安全であることだけでは`gate`にしない。trade-off、残存risk、
+成立前提、受容判断が記録され、必須制約と矛盾しなければ`passed`にできる。
 
 ### `phase-review-v1`
 
@@ -110,6 +120,10 @@ review hubの集約結果。`review_cycle_id`、対象path、revision、SHA-256�
 ```text
 passed | changes_required | blocked | incomplete
 ```
+
+Planの集約結果はsourceと同じ`review_stage`を持つ。`decision`の`passed`は質問を利用者へ
+提示できることだけを表し、Implementへの移行根拠にはしない。`final`の`passed`だけが
+Implementへの移行根拠になる。
 
 `blocked`の本文にはreview hubが作成した`利用者判断`を持つ。Flowはこの文面を
 生成・要約・補足せず、そのまま利用者へ提示する。
@@ -155,26 +169,30 @@ review_mode:
   plan: ai
 automatic_revision:
   design: 0
-  plan: 0
+  plan_decision: 0
+  plan_final: 0
 review_retry:
   design: 0
-  plan: 0
+  plan_decision: 0
+  plan_final: 0
 review_cycle:
   design:
-  plan:
+  plan_decision:
+  plan_final:
 artifacts:
   design: spec/.../design.md
   design_review: spec/.../design-review.md
   plan: spec/.../plan.md
+  plan_decision_review: spec/.../plan-decision-review.md
   plan_review: spec/.../plan-review.md
   implement: spec/.../implement.md
 ```
 
-- `phase`: `design | design_review | plan | plan_review | implement | completed`
+- `phase`: `design | design_review | plan | plan_decision_review | plan_review | implement | completed`
 - `state`: `running | waiting_for_input | blocked | completed`
 - `next_action`: `invoke_writer | ask_user | invoke_review | invoke_next_phase | stop`
 
-`review_cycle`にはphaseごとの最新`review_cycle_id`、対象revision、SHA-256を記録する。
+`review_cycle`にはreview stageごとの最新`review_cycle_id`、対象revision、SHA-256を記録する。
 成果物の内容やreview statusを複製せず、path、mode、cycle、retry counter、
 次actionだけを持つ。
 再開時は`flow-state.yml`と参照成果物を読み、会話中のagent状態に依存しない。
@@ -187,10 +205,15 @@ artifacts:
 - 1回のreview cycleではAIとhumanを混在させない。
 - Flowはreview開始ごとに一意な`review_cycle_id`を発行する。
 - 同じ`review_cycle_id`に属するsourceと集約結果だけを有効とする。
+- `review_mode.plan`はPlan decision reviewと最終Plan reviewの両方へ適用する。
 
-Human modeではFlowが人間へ対象成果物を提示し、回答を
-`reviews/{phase}/human.md`へ`review-source-v1`として保存してからhubを起動する。
+Human modeではFlowが人間へ対象成果物を提示し、回答を対応するreview source directoryの
+`human.md`へ`review-source-v1`として保存してからhubを起動する。
 人間の結果もAIと同じ4 statusへ正規化する。
+
+Plan decision reviewのhuman modeでは、未回答の質問、選択肢、影響、推奨、前提が
+利用者へ提示可能かを確認し、この時点では質問への回答を求めない。`passed`の集約後に
+あらためてPlan writerの質問への回答を求める。
 
 ### Human reviewの提示契約
 
@@ -270,7 +293,8 @@ Design writerへreview mode、source、集約結果、Flow状態を渡さない�
   再失敗時はhuman modeへ切り替える。
 
 自動修正後の再reviewは、直前の`gate`の解消、修正による現在の要件と採用済み判断への
-回帰、修正で生じた重大なsecurity、privacy、データ損失、互換性破壊だけを判定対象とする。
+回帰、修正で生じ、必須制約と矛盾する、または受容判断が未解決な重大なsecurity、
+privacy、データ損失、互換性riskだけを判定対象とする。
 それ以外に見つかった改善は`scope_candidate`とし、新しい必須修正へ昇格させない。
 
 ### 3. Plan
@@ -278,18 +302,63 @@ Design writerへreview mode、source、集約結果、Flow状態を渡さない�
 1. `flow-planner`へ`operation: create`、`design.md`、DesignのrevisionとSHA-256、
    `plan.md`のpathを渡す。
 2. Design reviewのpath、mode、結果は渡さない。
-3. `status: needs_input`ならDesignと同じ回答処理を`plan-feedback.md`で行う。
-4. `status: ready`ならPlan reviewへ進む。
+3. Plan front matterのDesign参照と現在のDesign全バイトが一致することを確認する。
+4. `status: needs_input`ならPlan decision reviewへ進む。
+5. `status: ready`なら最終Plan reviewへ進む。
 
-### 4. Plan review
+### 3.1 Plan decision review
 
-Design reviewと同じ規則と「Human reviewの提示契約」をPlanへ適用する。
-review hubへPlanが参照するDesignのpath、
-revision、SHA-256も渡す。Plan front matterのDesign参照と現在のDesign全バイトが
-一致しない場合はreviewを開始せず、Plan writerへ差し戻す。
-`passed`のPlanだけがImplementへ進める。
-移行直前にPlanのSHA-256と`plan-review.md`の対象SHA-256が一致することを確認する。
-`blocked`では`plan-review.md`の`利用者判断`をDesign reviewと同じ規則で提示する。
+1. `plan.md`のrevisionと全バイトSHA-256を取得する。
+2. `plan-decision`用の一意な`review_cycle_id`を発行し、対象revision、SHA-256とともに
+   `flow-state.yml`へ保存する。
+3. 選択modeで`flow-plan-decision-reviewer`を起動する。
+4. `plan-decision-review.md`のcycle ID、`review_stage: decision`、PlanとDesignの
+   path、revision、SHA-256を検証する。
+5. statusに従って処理する。
+
+- `passed`: 対象SHA-256が変わっていないことを確認し、writerが記載した未回答の質問、
+  3個の選択肢、影響、推奨、推奨理由、前提を意味を変えず利用者へ提示する。回答を
+  `plan-feedback.md`へ`kind: answer`として保存し、`operation: respond`でplannerへ渡す。
+  新しい未回答質問があれば新しいdecision review cycleへ進み、`ready`なら最終Plan
+  reviewへ進む。
+- `changes_required`: findingsを`plan-feedback.md`へ変換し、`operation: revise`で
+  plannerへ渡す。修正後が`ready`なら最終Plan reviewへ進む。`needs_input`で、AI modeかつ
+  `plan_decision`の自動修正が未使用ならcounterを1にして新revisionをAIで再reviewする。
+  使用済みならhuman modeへ切り替え、Human modeなら修正後を再び人間へ提示する。
+- `blocked`: `plan-decision-review.md`の`利用者判断`を変更せず提示し、回答をfeedbackへ
+  正規化してplannerへ渡す。修正後が`needs_input`なら新しいdecision review cycleへ、
+  `ready`なら最終Plan reviewへ進む。DesignのWHATまたはscope変更が必要なら現在のFlowを
+  逆戻りさせず、別タスクとして扱うよう案内する。
+- `incomplete`: 同じrevisionのAI reviewを1回だけ再実行し、再失敗時はhuman modeへ
+  切り替える。
+
+decision reviewは未回答の確認事項だけを対象とする。詳細タスク、実装手順、検証計画の
+不足をfindingへ含めず、追加スコープ候補を生成しない。
+
+### 4. 最終Plan review
+
+1. `status: ready`、Plan front matterのDesign参照、現在のDesign全バイトを検証する。
+2. `plan-final`用の一意な`review_cycle_id`を発行し、対象revision、SHA-256とともに
+   `flow-state.yml`へ保存する。
+3. 選択modeで`flow-plan-reviewer`を起動する。
+4. `plan-review.md`のcycle ID、`review_stage: final`、PlanとDesignのpath、revision、
+   SHA-256を検証する。
+5. statusに従って処理する。
+
+- `passed`: `追加スコープ候補`がなければ移行直前にPlanのSHA-256を再計算し、
+  一致すればImplementへ進む。候補があれば「追加スコープ候補の処理」に従う。
+- `changes_required`: findingsを`plan-feedback.md`へ変換し、`operation: revise`で
+  plannerへ渡す。AI modeかつ`plan_final`の自動修正が未使用ならcounterを1にする。
+  修正後が`needs_input`ならPlan decision reviewへ、`ready`なら最終Plan reviewへ進む。
+  自動修正を使用済みなら「Human reviewの提示契約」に従う。
+- `blocked`: `plan-review.md`の`利用者判断`を変更せず提示し、回答をfeedbackへ正規化して
+  plannerへ渡す。修正後が`needs_input`ならPlan decision reviewへ、`ready`なら新しい
+  最終review cycleへ進む。
+- `incomplete`: 同じrevisionのAI reviewを1回だけ再実行し、再失敗時はhuman modeへ
+  切り替える。
+
+最終reviewは質問の推奨を再評価せず、採用回答がPlanのタスクへ反映されていることだけを
+確認する。詳細HOWの最適性やtest caseの網羅性を新しいgateにしない。
 
 ### 4.1 追加スコープ候補の処理
 
@@ -301,9 +370,9 @@ review hubが`passed`とともに`追加スコープ候補`を返した場合、
 - 利用者がscope外を選んだ場合は、対象SHA-256を確認して次phaseへ進む。
 - Design reviewで候補の採用を選んだ場合は、選択された候補だけを
   `design-feedback.md`へ`kind: change`として正規化し、Designを改訂して再reviewする。
-- Plan reviewでDesignを変えない候補の採用を選んだ場合は、選択された候補だけを
+- 最終Plan reviewでDesignを変えない候補の採用を選んだ場合は、選択された候補だけを
   `plan-feedback.md`へ`kind: change`として正規化し、Planを改訂して再reviewする。
-- Plan reviewでDesignのWHAT、公開API、責務境界、scopeの変更が必要な候補は、
+- 最終Plan reviewでDesignのWHAT、公開API、責務境界、scopeの変更が必要な候補は、
   現Flowを逆戻りさせず別タスクとして扱うよう案内する。
 
 ```md
@@ -355,10 +424,11 @@ review内容を再評価したり、観点別結論を書き換えたりしな�
 ```text
 Flow
 ├── phase writer
-└── phase review hub
+├── decision review hub (Plan needs_input only)
+│   └── decision-quality reviewer
+└── final review hub
     ├── perspective reviewer 1
-    ├── perspective reviewer 2
-    └── perspective reviewer 3
+    └── perspective reviewer 2 (Design only)
 ```
 
 Human modeではperspective reviewerを起動せず、human source 1件をhubへ渡す。
@@ -370,7 +440,8 @@ phase writerとreview hubは兄弟とし、相互に起動しない。
 - writerは自分のphase artifactとfeedbackだけを受け取っている。
 - review sourceは選択modeのものだけを集約している。
 - review sourceとaggregateのcycle IDがFlowの最新cycleと一致している。
-- AIまたはhumanの`passed`と同一SHA-256を次phaseの根拠にしている。
-- 自動修正とreview再試行は各phaseで最大1回である。
+- Plan decision reviewの`passed`と同一SHA-256だけを質問提示の根拠にしている。
+- Designと最終Planの`passed`と同一SHA-256だけを次phaseの根拠にしている。
+- 自動修正とreview再試行は各review stageで最大1回である。
 - 状態と再開情報が`spec/`配下に残っている。
 - 各成果物のwriterが一意である。

@@ -10,7 +10,8 @@
 
 機能ごとの実行成果物は`spec/YYYYMMDD_feature/`に保存します。主要成果物は
 `flow-state.yml`、`design.md`、`design-review.md`、`plan.md`、
-`plan-review.md`、`implement.md`です。feedbackと観点別sourceも同じfeature配下に置きます。
+`plan-decision-review.md`、`plan-review.md`、`implement.md`です。feedbackと観点別sourceも
+同じfeature配下に置きます。
 
 ## 開発・検証コマンド
 
@@ -47,9 +48,9 @@ flow_consumer_dir="$flow_verify_root/consumer"
 for skill_name in \
   flow flow-design flow-plan flow-implement \
   flow-design-review flow-design-review-requirements \
-  flow-design-review-user-value flow-design-review-quality-risk \
-  flow-plan-review flow-plan-review-structure-integration \
-  flow-plan-review-executability flow-plan-review-verifiability
+  flow-design-review-quality-risk \
+  flow-plan-decision-review flow-plan-review-decision-quality \
+  flow-plan-review flow-plan-review-task-readiness
 do
   test -f "$flow_consumer_dir/.agents/skills/$skill_name/SKILL.md"
   test -f "$flow_consumer_dir/.claude/skills/$skill_name/SKILL.md"
@@ -57,12 +58,30 @@ done
 for agent_name in \
   flow-designer flow-planner flow-implementer \
   flow-design-reviewer flow-design-requirements-reviewer \
-  flow-design-user-value-reviewer flow-design-quality-risk-reviewer \
-  flow-plan-reviewer flow-plan-structure-integration-reviewer \
-  flow-plan-executability-reviewer flow-plan-verifiability-reviewer
+  flow-design-quality-risk-reviewer \
+  flow-plan-decision-reviewer flow-plan-decision-quality-reviewer \
+  flow-plan-reviewer flow-plan-task-readiness-reviewer
 do
   test -f "$flow_consumer_dir/.codex/agents/$agent_name.toml"
   test -f "$flow_consumer_dir/.claude/agents/$agent_name.md"
+done
+test ! -e "$flow_consumer_dir/.agents/skills/flow-design-review-user-value"
+test ! -e "$flow_consumer_dir/.claude/skills/flow-design-review-user-value"
+test ! -e "$flow_consumer_dir/.codex/agents/flow-design-user-value-reviewer.toml"
+test ! -e "$flow_consumer_dir/.claude/agents/flow-design-user-value-reviewer.md"
+for removed_skill in \
+  flow-plan-review-structure-integration \
+  flow-plan-review-executability flow-plan-review-verifiability
+do
+  test ! -e "$flow_consumer_dir/.agents/skills/$removed_skill"
+  test ! -e "$flow_consumer_dir/.claude/skills/$removed_skill"
+done
+for removed_agent in \
+  flow-plan-structure-integration-reviewer \
+  flow-plan-executability-reviewer flow-plan-verifiability-reviewer
+do
+  test ! -e "$flow_consumer_dir/.codex/agents/$removed_agent.toml"
+  test ! -e "$flow_consumer_dir/.claude/agents/$removed_agent.md"
 done
 ! rg -q 'model_reasoning_effort|nickname_candidates' "$flow_consumer_dir/.codex/agents"
 ```
@@ -84,8 +103,9 @@ APMは自己package installを循環依存として扱うため、独立consumer
 - AIと人間のreviewは同じsource契約へ正規化し、1 cycle内では一方だけを使います。
 - phase review hubは自phaseのsource収集とaggregate artifactだけを管理します。
 - 各観点reviewerは担当観点を独立評価し、固有のsource fileだけを書きます。
-- reviewはwriterが提示し利用者が採用した推奨判断と、現在のscopeの成立性を優先して
-  評価します。成立に必須な指摘だけをgateとし、周辺改善は追加scope候補へ分離します。
+- Plan decision reviewは利用者へ提示する前の質問、選択肢、影響、推奨、前提だけを
+  評価します。最終reviewは採用済み判断の反映と現在のscopeの成立性を評価します。
+  成立に必須な指摘だけをgateとし、周辺改善は追加scope候補へ分離します。
 - 追加scope候補はreview status、自動修正、human review切替へ影響させません。
 - reviewerは既存の別選択肢を推奨できますが、利用者の回答変更や選択肢外の回答確定は
   行いません。
@@ -97,10 +117,11 @@ APMは自己package installを循環依存として扱うため、独立consumer
 ```text
 Flow
 ├── phase writer
-└── phase review hub
+├── decision review hub (Plan needs_input only)
+│   └── decision-quality reviewer
+└── final review hub
     ├── perspective reviewer 1
-    ├── perspective reviewer 2
-    └── perspective reviewer 3
+    └── perspective reviewer 2 (Design only)
 ```
 
 Human modeではperspective reviewerを起動せず、human source 1件をhubが集約します。
@@ -137,18 +158,21 @@ Flowはreview開始ごとに一意な`review_cycle_id`を発行し、state、全
 同一digestであることを確認します。古いcycleまたはrevisionのsource、aggregate、
 feedbackは再利用しません。
 
-Planは入力Designのpath、revision、SHA-256を保持し、Plan review開始前に現在のDesignと
-一致することを確認します。Implementの進捗は`implement-artifact-v1`のfront matterへ
-revisionと`in_progress / blocked / completed`を記録します。
+Planは入力Designのpath、revision、SHA-256を保持し、Plan decision reviewと最終reviewの
+開始前に現在のDesignと一致することを確認します。Implementの進捗は
+`implement-artifact-v1`のfront matterへrevisionと
+`in_progress / blocked / completed`を記録します。
 
 ## 状態遷移
 
-`design -> design_review -> plan -> plan_review -> implement -> completed`の順を守ります。
-AIまたは人間のいずれか、選択されたmodeの`passed`だけを次phaseの根拠にします。
+`design -> design_review -> plan`の後、未回答質問があれば
+`plan_decision_review -> plan`を経て、`plan_review -> implement -> completed`へ進みます。
+decision reviewの`passed`は質問提示の根拠、最終reviewの`passed`はImplement開始の根拠と
+します。
 
-AI reviewの変更要求に対する自動修正は各phaseで1回まで、実行障害の再試行も1回まで
-です。使い切った場合はhuman modeへ切り替えます。利用者判断が必要な`blocked`は
-Flowが質問し、回答をfeedbackへ正規化します。
+AI reviewの変更要求に対する自動修正はDesign、Plan decision、Plan finalの各stageで
+1回まで、実行障害の再試行も各stageで1回までです。使い切った場合はhuman modeへ
+切り替えます。利用者判断が必要な`blocked`はFlowが質問し、回答をfeedbackへ正規化します。
 
 ## 記述スタイルと命名
 

@@ -17,9 +17,9 @@ description: Designまたは要求と正規化済みfeedbackからPlan成果物�
 
 | operation | 用途 | 必須入力 |
 | --- | --- | --- |
-| `create` | 初版作成 | `design.md`または要求、`target_path` |
-| `revise` | 変更要求の反映 | `target_path`、`feedback_path` |
-| `respond` | 回答の反映 | `target_path`、`feedback_path` |
+| `create` | 初版または質問案の作成 | `design.md`または要求、`target_path` |
+| `revise` | review変更要求の反映 | `target_path`、`feedback_path` |
+| `respond` | 利用者回答の反映と詳細化 | `target_path`、`feedback_path` |
 
 `create`でDesignが指定された場合は、その内容をPlanの入力要件として扱う。
 外部の状態や別成果物を入力要件の採否判断に使用しない。
@@ -53,7 +53,7 @@ inputs:
 
 ## 状態
 
-- `needs_input`: 実装方針に影響するHOWの回答が不足している。
+- `needs_input`: 利用者が決める必要のあるHOWの回答が不足している。
 - `ready`: 実装者が追加判断なしで着手できる。
 
 状態はwriterとしての完成度だけを表す。`ready`は後続工程の開始可否を表さない。
@@ -61,16 +61,25 @@ inputs:
 ## ワークフロー
 
 1. `AGENTS.md`、入力Designまたは要求、関連コード、テスト、設定を読む。
-2. 対象ファイル、責務、公開名、input/output、エラー挙動、接続点、順序、検証方法を
-   必要な範囲で決める。
-3. 重要事項を`Confirmed / Docs-derived / Assumption / Open`に分類する。
-4. 既存規約と入力から一意に決まらず、実装品質や保守性へ影響するHOWだけを質問し、
-   `needs_input`にする。各質問には現在のDesignとscope内の選択肢を3個、推奨を1個、
-   推奨理由と前提を含める。
-5. `revise`と`respond`ではfeedbackの全項目を`applied / unresolved`で記録する。
-6. Openな重要判断がなく、実装引き継ぎチェックがすべて`OK`または理由付き
+2. 重要事項を`Confirmed / Docs-derived / Assumption / Open`に分類する。
+3. 公開契約、責務境界、互換性、外部依存・権限・継続cost、不可逆な挙動、
+   利用者が受容するtrade-offのうち、利用者が決める必要のあるHOWだけを質問する。
+4. 各質問には現在のDesignとscope内で採用可能かつ実質的に異なる選択肢を3個、
+   主な影響、推奨を1個、推奨理由と前提を含める。確認可能な根拠のない影響や条件を
+   作らない。
+5. `create`で未回答の質問があれば、決定済み部分だけを記載して`needs_input`にする。
+   未決事項に依存する詳細手順やタスクを確定しない。質問がなければ詳細計画を完成する。
+6. `revise`ではdecision reviewまたは最終reviewの全feedback項目を
+   `applied / unresolved`で記録する。質問を修正した結果、回答が必要なら
+   `needs_input`を維持する。
+7. `respond`では回答を確認事項へ記録し、採用判断に基づいて対象ファイル、責務、
+   input/output、エラー挙動、接続点、順序、完了条件、検証方法を詳細化する。
+8. Openな重要判断がなく、実装引き継ぎチェックがすべて`OK`または理由付き
    `該当なし`なら`ready`にする。
-7. 対象ファイル以外は編集しない。
+9. 対象ファイル以外は編集しない。
+
+内部関数名、内部変数名、import順、軽微な構造調整、個別test caseなど、Designと
+公開契約を変えずwriterまたは実装者が既存規約から決められる事項は質問しない。
 
 ## plan.md構成
 
@@ -129,6 +138,10 @@ inputs:
 選択肢外の回答を受け取った場合は、その意味を勝手に既存選択肢へ写像しない。
 実装方針として明確なら回答として記録し、不明確、Design変更、scope変更を伴うなら
 質問を更新して`needs_input`を維持する。
+
+`needs_input`の成果物は質問・選択肢・推奨のreview対象であり、詳細計画としての
+完全性を表さない。回答後も質問、選択肢、推奨、前提を残し、最終reviewerが採用判断の
+反映を追跡できるようにする。
 
 ## 完了条件
 

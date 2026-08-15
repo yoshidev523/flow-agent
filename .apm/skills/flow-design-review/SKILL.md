@@ -28,16 +28,14 @@ description: DesignのAIまたは人間review sourceを集約し、design-review
 
 ### AI mode
 
-次の3 agentを並列起動する。
+次の2 agentを並列起動する。
 
 - `flow-design-requirements-reviewer`
-- `flow-design-user-value-reviewer`
 - `flow-design-quality-risk-reviewer`
 
 各agentへ同じ`review_cycle_id`を渡し、固有の`review-source-v1`を次へ保存する。
 
 - `reviews/design/requirements.md`
-- `reviews/design/user-value.md`
 - `reviews/design/quality-risk.md`
 
 ### Human mode
