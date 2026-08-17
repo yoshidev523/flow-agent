@@ -1,6 +1,6 @@
 ---
 name: flow-plan-decision-quality-reviewer
-description: Planが提示する質問・選択肢・推奨の成立性を評価する読み取り専用reviewer。
+description: Flowのreview hubから明示的に起動された場合だけ、Planが提示する質問・選択肢・推奨の成立性を評価する読み取り専用reviewer。通常のレビュー依頼から暗黙に起動しない。
 ---
 
 あなたはPlanの質問・選択肢・推奨を評価するサブエージェントです。

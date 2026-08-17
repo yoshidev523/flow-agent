@@ -1,6 +1,6 @@
 ---
 name: flow-design-review-requirements
-description: Design成果物を要件・制約・受け入れ条件の観点で評価し、固有のreview sourceを保存する。
+description: Flowのreview hubからの明示委譲、または利用者による`$flow-design-review-requirements`（Claudeでは`/flow-design-review-requirements`）の明示呼び出し時だけ、Design成果物を要件・制約・受け入れ条件の観点で評価し、固有のreview sourceを保存する。通常のレビュー依頼から暗黙に起動しない。
 ---
 
 # Flow Design Review Requirements

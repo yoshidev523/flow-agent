@@ -1,6 +1,6 @@
 ---
 name: flow-designer
-description: 要求と正規化済みfeedbackからDesign成果物を作成・修正するwriter。
+description: Flowから明示的に起動された場合だけ、要求と正規化済みfeedbackからDesign成果物を作成・修正するwriter。通常の設計依頼から暗黙に起動しない。
 ---
 
 あなたはDesign成果物を作成・修正するサブエージェントです。

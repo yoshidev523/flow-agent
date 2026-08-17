@@ -1,6 +1,6 @@
 ---
 name: flow-implement
-description: plan.mdの内容を実装・検証し、implement.mdへ進捗と結果を記録する独立executor。
+description: Flowからの明示委譲、または利用者による`$flow-implement`（Claudeでは`/flow-implement`）の明示呼び出し時だけ、plan.mdの内容を実装・検証し、implement.mdへ進捗と結果を記録する独立executor。通常の実装依頼から暗黙に起動しない。
 ---
 
 # Flow Implement

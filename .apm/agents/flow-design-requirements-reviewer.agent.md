@@ -1,6 +1,6 @@
 ---
 name: flow-design-requirements-reviewer
-description: Designを要件・制約・受け入れ条件の観点で評価する読み取り専用reviewer。
+description: Flowのreview hubから明示的に起動された場合だけ、Designを要件・制約・受け入れ条件の観点で評価する読み取り専用reviewer。通常のレビュー依頼から暗黙に起動しない。
 ---
 
 あなたはDesignの要件整合を評価するサブエージェントです。

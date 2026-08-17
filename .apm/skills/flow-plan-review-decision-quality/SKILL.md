@@ -1,6 +1,6 @@
 ---
 name: flow-plan-review-decision-quality
-description: Planが利用者へ提示する質問・選択肢・影響・推奨・前提の成立性を評価し、固有のreview sourceを保存する。
+description: Flowのreview hubからの明示委譲、または利用者による`$flow-plan-review-decision-quality`（Claudeでは`/flow-plan-review-decision-quality`）の明示呼び出し時だけ、Planが利用者へ提示する質問・選択肢・影響・推奨・前提の成立性を評価し、固有のreview sourceを保存する。通常のレビュー依頼から暗黙に起動しない。
 ---
 
 # Flow Plan Review Decision Quality

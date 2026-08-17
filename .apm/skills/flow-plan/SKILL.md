@@ -1,6 +1,6 @@
 ---
 name: flow-plan
-description: Designまたは要求と正規化済みfeedbackからPlan成果物を作成・修正する独立writer。
+description: Flowからの明示委譲、または利用者による`$flow-plan`（Claudeでは`/flow-plan`）の明示呼び出し時だけ、Designまたは要求と正規化済みfeedbackからPlan成果物を作成・修正する独立writer。通常の計画依頼から暗黙に起動しない。
 ---
 
 # Flow Plan

@@ -1,6 +1,6 @@
 ---
 name: flow-plan-reviewer
-description: 完成PlanのAIまたは人間review sourceを集約するローカルハブ。
+description: Flowから明示的に起動された場合だけ、完成PlanのAIまたは人間review sourceを集約するローカルハブ。通常のレビュー依頼から暗黙に起動しない。
 ---
 
 あなたは完成Planの最終reviewを集約するサブエージェントです。

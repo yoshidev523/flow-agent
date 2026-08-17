@@ -1,6 +1,6 @@
 ---
 name: flow-design
-description: 要求と正規化済みfeedbackからDesign成果物を作成・修正する独立writer。
+description: Flowからの明示委譲、または利用者による`$flow-design`（Claudeでは`/flow-design`）の明示呼び出し時だけ、要求と正規化済みfeedbackからDesign成果物を作成・修正する独立writer。通常の設計依頼から暗黙に起動しない。
 ---
 
 # Flow Design

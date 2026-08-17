@@ -1,6 +1,6 @@
 ---
 name: flow-design-review
-description: DesignのAIまたは人間review sourceを集約し、design-review.mdへ保存するローカルハブ。
+description: Flowからの明示委譲、または利用者による`$flow-design-review`（Claudeでは`/flow-design-review`）の明示呼び出し時だけ、DesignのAIまたは人間review sourceを集約し、design-review.mdへ保存するローカルハブ。通常のレビュー依頼から暗黙に起動しない。
 ---
 
 # Flow Design Review

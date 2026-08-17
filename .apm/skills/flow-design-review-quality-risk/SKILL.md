@@ -1,6 +1,6 @@
 ---
 name: flow-design-review-quality-risk
-description: Design成果物を品質条件と直接リスクの観点で評価し、固有のreview sourceを保存する。
+description: Flowのreview hubからの明示委譲、または利用者による`$flow-design-review-quality-risk`（Claudeでは`/flow-design-review-quality-risk`）の明示呼び出し時だけ、Design成果物を品質条件と直接リスクの観点で評価し、固有のreview sourceを保存する。通常のレビュー依頼から暗黙に起動しない。
 ---
 
 # Flow Design Review Quality Risk

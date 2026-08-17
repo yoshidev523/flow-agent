@@ -1,6 +1,6 @@
 ---
 name: flow-plan-review
-description: 完成Planのtask-readinessに対するAIまたは人間review sourceを集約し、plan-review.mdへ保存するローカルハブ。
+description: Flowからの明示委譲、または利用者による`$flow-plan-review`（Claudeでは`/flow-plan-review`）の明示呼び出し時だけ、完成Planのtask-readinessに対するAIまたは人間review sourceを集約し、plan-review.mdへ保存するローカルハブ。通常のレビュー依頼から暗黙に起動しない。
 ---
 
 # Flow Plan Review

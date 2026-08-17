@@ -1,6 +1,6 @@
 ---
 name: flow-plan-decision-review
-description: Planが利用者へ提示する質問・選択肢・推奨のreview sourceを集約し、plan-decision-review.mdへ保存するローカルハブ。
+description: Flowからの明示委譲、または利用者による`$flow-plan-decision-review`（Claudeでは`/flow-plan-decision-review`）の明示呼び出し時だけ、Planが利用者へ提示する質問・選択肢・推奨のreview sourceを集約し、plan-decision-review.mdへ保存するローカルハブ。通常のレビュー依頼から暗黙に起動しない。
 ---
 
 # Flow Plan Decision Review

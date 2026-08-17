@@ -1,6 +1,6 @@
 ---
 name: flow-plan-review-task-readiness
-description: 完成PlanをDesignと採用判断から実装へ引き継げるタスクになっているかの観点で評価し、固有のreview sourceを保存する。
+description: Flowのreview hubからの明示委譲、または利用者による`$flow-plan-review-task-readiness`（Claudeでは`/flow-plan-review-task-readiness`）の明示呼び出し時だけ、完成PlanをDesignと採用判断から実装へ引き継げるタスクになっているかを評価し、固有のreview sourceを保存する。通常のレビュー依頼から暗黙に起動しない。
 ---
 
 # Flow Plan Review Task Readiness

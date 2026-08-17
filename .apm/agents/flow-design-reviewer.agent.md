@@ -1,6 +1,6 @@
 ---
 name: flow-design-reviewer
-description: DesignのAIまたは人間review sourceを集約するローカルハブ。
+description: Flowから明示的に起動された場合だけ、DesignのAIまたは人間review sourceを集約するローカルハブ。通常のレビュー依頼から暗黙に起動しない。
 ---
 
 あなたはDesign reviewを集約するサブエージェントです。

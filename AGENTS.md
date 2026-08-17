@@ -53,6 +53,9 @@ for skill_name in \
   flow-plan-review flow-plan-review-task-readiness
 do
   test -f "$flow_consumer_dir/.agents/skills/$skill_name/SKILL.md"
+  test -f "$flow_consumer_dir/.agents/skills/$skill_name/agents/openai.yaml"
+  rg -q 'allow_implicit_invocation: false' \
+    "$flow_consumer_dir/.agents/skills/$skill_name/agents/openai.yaml"
   test -f "$flow_consumer_dir/.claude/skills/$skill_name/SKILL.md"
 done
 for agent_name in \
