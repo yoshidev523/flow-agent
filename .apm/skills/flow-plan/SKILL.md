@@ -24,8 +24,10 @@ description: Flowからの明示委譲、または利用者による`$flow-plan`
 `create`でDesignが指定された場合は、その内容をPlanの入力要件として扱う。
 外部の状態や別成果物を入力要件の採否判断に使用しない。
 
-`feedback_path`は`phase-feedback-v1`でなければならない。対象pathとrevisionが現在の
-`plan.md`に一致しない場合は編集せず、入力不整合として報告する。
+`feedback_path`は`phase-feedback-v1`で、`phase: plan`、対象pathとrevisionが現在の
+`plan.md`、front matterの`operation`が呼出operationに一致しなければならない。
+`revise`は`kind: change`、`respond`は`kind: answer`のitemだけを受理する。1件でも
+一致しない場合は編集せず、入力不整合として報告する。
 出所メタデータは判断材料にせず、変更指示、回答、根拠、完了条件だけを読む。
 
 ## 出力
@@ -50,6 +52,17 @@ inputs:
 ```
 
 `revision`は内容を更新するたびに1増やす。初版は1とする。
+
+### 出力契約の厳格適用
+
+- `status`はfront matterの1箇所だけに置き、値は`needs_input | ready`のいずれかにする。
+- `承認状態`、`approval`、`Pending`、`Approved`、`Draft`など、成果物全体について別の
+  ライフサイクル状態fieldやsectionをfront matterまたは本文へ追加しない。review待ちを
+  Plan自身の状態として表現しない。確認事項ごとの`状態: open | resolved`は含まない。
+- `create`では既存templateや過去成果物に旧形式があっても踏襲しない。
+- `revise / respond`で既存成果物のschemaまたはstatusが契約外なら編集せず、
+  入力不整合として報告する。旧形式を現在の値へ推測変換しない。
+- 最終報告のstatusは、保存後に読み直したfront matterのstatusと完全一致させる。
 
 ## 状態
 
@@ -76,7 +89,8 @@ inputs:
    input/output、エラー挙動、接続点、順序、完了条件、検証方法を詳細化する。
 8. Openな重要判断がなく、実装引き継ぎチェックがすべて`OK`または理由付き
    `該当なし`なら`ready`にする。
-9. 対象ファイル以外は編集しない。
+9. 保存後にfront matterと禁止された並行ライフサイクル状態がないことを自己検証する。
+10. 対象ファイル以外は編集しない。
 
 内部関数名、内部変数名、import順、軽微な構造調整、個別test caseなど、Designと
 公開契約を変えずwriterまたは実装者が既存規約から決められる事項は質問しない。
@@ -149,6 +163,7 @@ inputs:
 - 入力Designのpath、revision、SHA-256がfront matterに記録されている。
 - front matterが`phase-artifact-v1`に適合している。
 - statusが`needs_input`または`ready`である。
+- statusと並行する成果物全体の承認・進捗状態を追加していない。
 - `ready`ではOpenな重要判断がなく、実装引き継ぎチェックが完了している。
 - `revise / respond`では全feedback項目の処理結果が追跡できる。
 - 最終報告に成果物path、revision、status、未解決事項を含める。

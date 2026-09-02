@@ -13,7 +13,9 @@ description: Flowのreview hubからの明示委譲、または利用者によ�
 - 担当: 目的、要件、制約、受け入れ条件の対応、矛盾、欠落
 - 担当外: 利用者価値、品質リスク、実装方法、状態遷移
 
-対象は読み取り専用とし、指定された出力ファイルだけを書く。
+対象は読み取り専用とし、指定された出力ファイルだけを書く。対象が
+`phase-artifact-v1`、`artifact: design`、`status: ready`に完全一致しない場合は、
+本文から状態を推測せず`unable`とする。
 
 ## 出力契約
 
@@ -34,6 +36,8 @@ status: passed
 ```
 
 statusは`passed | changes_required | blocked | unable`とする。
+これ以外のstatus、旧schema、並行する状態fieldを出力せず、完了報告前に保存したsourceを
+読み直して契約を検証する。
 
 - `passed`: 担当観点で変更要求がない。
 - `changes_required`: 同じ範囲内の具体的修正で解消できる。

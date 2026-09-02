@@ -24,8 +24,10 @@ description: Flowからの明示委譲、または利用者による`$flow-plan-
 - `design_sha256`
 
 `review_cycle_id`はFlowがreview開始ごとに発行する一意な値とする。
-開始時にPlanとDesignの全バイトSHA-256とPlanの`status: ready`を確認し、一致しなければ
-`status: incomplete`の成果物を作成する。
+開始時にPlanが`phase-artifact-v1`、`artifact: plan`、`status: ready`であること、
+Designが`phase-artifact-v1`、`artifact: design`、`status: ready`であることと、両成果物の
+全バイトSHA-256を確認する。一致しなければ`status: incomplete`の成果物を作成する。
+旧schema、契約外status、本文の承認・完了表現を読み替えず、対象成果物を修復しない。
 
 ## Source収集
 
@@ -131,3 +133,4 @@ completed_at: 2026-07-28T00:00:00+09:00
 - statusが`passed | changes_required | blocked | incomplete`のいずれかである。
 - `blocked`では空でない`利用者判断`があり、そのまま提示できる。
 - cycle ID、review stage、PlanとDesignのpath、revision、SHA-256が追跡できる。
+- 出力を読み直し、schema、必須field、statusが`phase-review-v1`に適合している。

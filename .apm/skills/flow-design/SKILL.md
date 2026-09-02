@@ -20,8 +20,10 @@ description: Flowからの明示委譲、または利用者による`$flow-desig
 | `revise` | 変更要求の反映 | `target_path`、`feedback_path` |
 | `respond` | 回答の反映 | `target_path`、`feedback_path` |
 
-`feedback_path`は`phase-feedback-v1`でなければならない。対象pathとrevisionが現在の
-`design.md`に一致しない場合は編集せず、入力不整合として報告する。
+`feedback_path`は`phase-feedback-v1`で、`phase: design`、対象pathとrevisionが現在の
+`design.md`、front matterの`operation`が呼出operationに一致しなければならない。
+`revise`は`kind: change`、`respond`は`kind: answer`のitemだけを受理する。1件でも
+一致しない場合は編集せず、入力不整合として報告する。
 
 このskillは入力に含まれる出所メタデータを判断材料にしない。変更指示、回答、
 根拠、完了条件だけを読む。
@@ -45,6 +47,17 @@ updated_at: 2026-07-28T00:00:00+09:00
 
 `revision`は内容を更新するたびに1増やす。初版は1とする。
 
+### 出力契約の厳格適用
+
+- `status`はfront matterの1箇所だけに置き、値は`needs_input | ready`のいずれかにする。
+- `承認状態`、`approval`、`Pending`、`Approved`、`Draft`など、成果物全体について別の
+  ライフサイクル状態fieldやsectionをfront matterまたは本文へ追加しない。確認事項ごとの
+  `状態: open | resolved`はこの禁止対象ではない。
+- `create`では既存templateや過去成果物に旧形式があっても踏襲しない。
+- `revise / respond`で既存成果物のschemaまたはstatusが契約外なら編集せず、
+  入力不整合として報告する。旧形式を現在の値へ推測変換しない。
+- 最終報告のstatusは、保存後に読み直したfront matterのstatusと完全一致させる。
+
 ## 状態
 
 - `needs_input`: WHATを確定するための回答が不足している。
@@ -63,7 +76,8 @@ updated_at: 2026-07-28T00:00:00+09:00
    推奨理由と前提を含める。
 5. `revise`と`respond`ではfeedbackの全項目を`applied / unresolved`で記録する。
 6. 未解決項目がなく、Designとして必要な内容が揃えば`ready`にする。
-7. 対象ファイル以外は編集しない。
+7. 保存後にfront matterと禁止された並行ライフサイクル状態がないことを自己検証する。
+8. 対象ファイル以外は編集しない。
 
 質問は実装方法、ファイル構成、API名、関数名、実装順序、検証コマンドを扱わない。
 それらが見つかった場合は「Planへの引き継ぎ」として記録する。
@@ -125,6 +139,7 @@ updated_at: {timestamp}
 - `design.md`だけを作成または更新している。
 - front matterが`phase-artifact-v1`に適合している。
 - statusが`needs_input`または`ready`である。
+- statusと並行する成果物全体の承認・進捗状態を追加していない。
 - `ready`ではOpenな重要判断が残っていない。
 - `revise / respond`では全feedback項目の処理結果が追跡できる。
 - 最終報告に成果物path、revision、status、未解決事項を含める。

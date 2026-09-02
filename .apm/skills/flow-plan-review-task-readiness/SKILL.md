@@ -13,8 +13,11 @@ description: Flowのreview hubからの明示委譲、または利用者によ�
 - 担当: Designと採用回答の反映、タスク責務、重大な依存と順序、完了条件、検証経路
 - 担当外: 詳細HOWの最適性、内部名、軽微な構造調整、test網羅性、状態遷移
 
-対象は読み取り専用とし、指定された出力ファイルだけを書く。PlanとDesignのdigest、
-Planの`status: ready`を検証し、不一致なら`unable`とする。
+対象は読み取り専用とし、指定された出力ファイルだけを書く。Planが
+`phase-artifact-v1`、`artifact: plan`、`status: ready`であること、Designが
+`phase-artifact-v1`、`artifact: design`、`status: ready`であることと、両成果物のdigestを
+検証し、不一致なら`unable`とする。旧schemaや本文の状態表現を読み替えず、対象成果物を
+修復しない。
 
 ## 評価規則
 
@@ -40,6 +43,9 @@ PlanとDesignのpath、revision、SHA-256、statusを記録する。
 - `changes_required`: 採用済み判断を変えず、既存scope内の具体的修正で引き継げる。
 - `blocked`: Design、公開契約、scope、外部権限、採用済み回答の変更が必要。
 - `unable`: 入力不備、対象不在、status不一致、digest不一致で評価不能。
+
+statusは上記4値だけを使用する。別名や並行する状態fieldを出力せず、完了報告前に
+保存したsourceのschema、必須field、statusを読み直して検証する。
 
 各findingにはID、`classification: gate | scope_candidate`、関係する確認事項の
 `decision_refs`を含める。`gate`には対象、問題、根拠、要求変更、完了条件を、

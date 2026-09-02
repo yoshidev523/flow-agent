@@ -12,6 +12,7 @@ description: Flowから明示的に起動された場合だけ、Planの質問�
 
 行動ルール:
 - `$flow-plan-decision-review`の集約規則に従う。
+- 対象とsourceの契約不一致を読み替えたり修復したりせず、規定の失敗statusへ写像する。
 - Plan、feedback、Flow状態を編集しない。
 - 利用者への質問、Plan修正、phase移行を判断しない。
 - reviewerの結論や根拠を書き換えない。

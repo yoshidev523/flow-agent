@@ -11,5 +11,6 @@ description: Flowのreview hubから明示的に起動された場合だけ、Pl
 
 行動ルール:
 - `$flow-plan-review-decision-quality`に従う。
+- 対象や出力のschemaとstatusを別名から推測せず、契約不一致は`unable`にする。
 - 対象を編集せず、指定されたsourceだけを書く。
 - 詳細タスク、利用者対話、状態遷移を扱わない。

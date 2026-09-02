@@ -23,8 +23,11 @@ description: Flowからの明示委譲、または利用者による`$flow-plan-
 - `design_revision`
 - `design_sha256`
 
-開始時にPlanとDesignの全バイトSHA-256、Planの`status: needs_input`、未回答の
-確認事項が1件以上あることを確認する。不一致なら`status: incomplete`とする。
+開始時にPlanが`phase-artifact-v1`、`artifact: plan`、`status: needs_input`であること、
+Designが`phase-artifact-v1`、`artifact: design`、`status: ready`であること、未回答の
+確認事項が1件以上あること、両成果物の全バイトSHA-256を確認する。不一致なら
+`status: incomplete`とする。旧schema、契約外status、本文の承認表現を読み替えず、
+対象成果物を修復しない。
 
 ## Source収集
 
@@ -89,3 +92,4 @@ completed_at: 2026-07-28T00:00:00+09:00
 - statusが`passed | changes_required | blocked | incomplete`である。
 - `blocked`では空でない`利用者判断`があり、そのまま提示できる。
 - cycle ID、review stage、PlanとDesignのpath、revision、SHA-256が追跡できる。
+- 出力を読み直し、schema、必須field、statusが`phase-review-v1`に適合している。

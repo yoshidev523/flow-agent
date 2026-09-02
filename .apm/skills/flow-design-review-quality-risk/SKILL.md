@@ -13,7 +13,9 @@ description: Flowのreview hubからの明示委譲、または利用者によ�
 - 担当: 非機能条件、失敗時挙動、データ保護、互換性、運用上の直接リスク
 - 担当外: 要件・利用者価値の再決定、実装方法、状態遷移
 
-対象は読み取り専用とし、指定された出力ファイルだけを書く。
+対象は読み取り専用とし、指定された出力ファイルだけを書く。対象が
+`phase-artifact-v1`、`artifact: design`、`status: ready`に完全一致しない場合は、
+本文から状態を推測せず`unable`とする。
 
 このreviewの目的はriskをゼロにすることではない。採用した判断に伴うtrade-off、
 残存risk、成立前提、受容判断が追跡でき、未解決の利用者判断が残っていないことを
@@ -25,6 +27,8 @@ description: Flowのreview hubからの明示委譲、または利用者によ�
 `source_id: quality-risk`、`source_kind: ai`、対象path、revision、SHA-256、
 statusを記録する。
 statusは`passed | changes_required | blocked | unable`とする。
+これ以外のstatus、旧schema、並行する状態fieldを出力せず、完了報告前に保存したsourceを
+読み直して契約を検証する。
 
 - `passed`: 未解決の必須判断や記載不足がない。明示的に受容された残存riskがあってもよい。
 - `changes_required`: 採用済み判断を変えず、既存scope内の具体的な記載修正で解消できる。
