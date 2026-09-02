@@ -51,10 +51,13 @@ reviewの`passed`、本文の完了表現を`ready`の代わりにしない。sc
 5. 指定された検証を実行し、コマンド、結果、未実施理由を記録する。
 6. 全タスクと必要な検証が完了したら`completed`にする。
 7. 完了報告前にPlan参照と`implement.md`のschema、revision、statusを読み直す。
-8. `completed`にできた場合は、Planの対象ファイルと`implement.md`のうち、
-   この実装で生じた変更だけをstageし、コミットする。件名は
+8. `completed`にできた場合は、Planの対象ファイルと`implement.md`に対して
+   `git check-ignore --no-index`を実行し、`.gitignore`の対象かを確認する。
+9. `.gitignore`対象はstageやコミットに含めず、`git add -f`などで
+   強制追加しない。対象外のファイルのうち、この実装で生じた変更だけを
+   stageし、コミットする。件名は
    `[flow-implement] {Planを要約した短い命令形}`とする。
-9. 開始前からあった変更やPlan外の変更はコミットに含めない。
+10. 開始前からあった変更やPlan外の変更はコミットに含めない。
    対象変更を安全に分離できない場合、またはコミットに失敗した場合は
    `blocked`とし、理由を`implement.md`に記録する。
 
@@ -102,6 +105,7 @@ Planのpath、revision、SHA-256が現在のPlanと一致しない場合は実�
 - statusと並行する成果物全体の承認・進捗状態を追加していない。
 - 必要な検証が成功、または未実施理由が記録されている。
 - 作業後の`git status --short`を確認している。
+- `.gitignore`対象を強制追加したり、コミットに含めたりしていない。
 - `completed`の場合は実装変更が`[flow-implement] `プレフィックス付きの
   件名でコミットされている。
 - pushとPR作成は明示依頼がある場合だけ行う。
