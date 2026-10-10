@@ -1,95 +1,55 @@
 ---
 name: flow-plan-decision-review
-description: Flowからの明示委譲、または利用者による`$flow-plan-decision-review`（Claudeでは`/flow-plan-decision-review`）の明示呼び出し時だけ、Planが利用者へ提示する質問・選択肢・推奨のreview sourceを集約し、plan-decision-review.mdへ保存するローカルハブ。通常のレビュー依頼から暗黙に起動しない。
+description: Flowからの明示委譲、または利用者による`$flow-plan-decision-review`（Claudeでは`/flow-plan-decision-review`）の明示呼び出し時だけ、Planが利用者へ提示する質問・選択肢・推奨のreview sourceを集約し、指定cycleのreview.mdへ保存するローカルハブ。通常のレビュー依頼から暗黙に起動しない。
 ---
 
-# Flow Plan Decision Review
+# flow-plan-decision-review
 
-## 目的
+## 責務
 
-`status: needs_input`の`plan.md`にある未回答の質問・選択肢・推奨だけを、利用者へ
-提示する前に評価し、`spec/{yyyymmdd_feature}/plan-decision-review.md`へ保存する。
-詳細計画の完全性、Plan修正、利用者対話、状態遷移は扱わない。
+指定対象のsourceを収集し、`reviews/plan-decision/cycle-{number}/review.md`を作るhub。
+未回答質問・選択肢・影響・推奨・前提だけを評価する。詳細タスクの不足や追加scopeを評価しない。
+writer修正、利用者対話、Flow state、phase移行を扱わない。
 
 ## 入力
 
-- `review_cycle_id`
-- `target_path`
-- `target_revision`
-- `target_sha256`
-- `mode: ai | human`
-- `review_path`
-- `design_path`
-- `design_revision`
-- `design_sha256`
+feature directory、review cycle ID、mode、対象path・revision・digest、出力path。
+Plan reviewでは入力Designの参照も必須。
+対象planのstatusは`needs_input`。対象とDesign参照を開始時・集約直前に確認する。
 
-開始時にPlanが`phase-artifact-v1`、`artifact: plan`、`status: needs_input`であること、
-Designが`phase-artifact-v1`、`artifact: design`、`status: ready`であること、未回答の
-確認事項が1件以上あること、両成果物の全バイトSHA-256を確認する。不一致なら
-`status: incomplete`とする。旧schema、契約外status、本文の承認表現を読み替えず、
-対象成果物を修復しない。
+## Source収集と集約
 
-## Source収集
+AI modeでは`flow-plan-decision-quality-reviewer`を直接起動し、同一cycleの固有sourceを作らせる。
+指定した1観点だけを起動する。子agentを起動できなければincomplete/executionとして記録する。
+Human modeではFlowが作ったsources/human.mdだけを読む。AI reviewerを起動しない。
 
-### AI mode
-
-`flow-plan-decision-quality-reviewer`を起動し、同じ`review_cycle_id`の
-`review-source-v1`を`reviews/plan-decision/decision-quality.md`へ保存させる。
-
-### Human mode
-
-Flowが同じ`review_cycle_id`で保存した`reviews/plan-decision/human.md`を読む。
-このsourceは`review_stage: decision`、`source_kind: human`とする。1 cycle内でAIとhumanを
-混在させない。
-
-## 集約
-
-sourceのcycle ID、review stage、PlanとDesignのpath、revision、SHA-256が入力と
-一致することを確認する。findingは`classification: gate | scope_candidate`を持ち、
-source statusは`gate`だけから決定されていなければならない。
-
-- `unable`、欠落、契約不一致: `incomplete`
-- `blocked`: `blocked`
-- `changes_required`: `changes_required`
-- `passed`: `passed`
-
-集約直前にもPlanとDesignのSHA-256を再計算し、変化していれば`incomplete`とする。
-詳細タスクの不足や質問と無関係な改善は集約しない。
-
-`blocked`では、sourceの判断材料から利用者へそのまま提示できる`## 利用者判断`を作る。
-質問、背景、2〜3個の選択肢と影響、推奨と理由、短い回答形式を持たせる。reviewerが
-既存選択肢にない回答を確定したり、根拠のない条件を追加したりしない。
+review-checkへ必要な全source pathを渡す。欠落sourceのpathも省略しない。
+CLIが検証したstatus・sources・source_paths・findings・failure・judgmentsを変更せずaggregateへ使う。
+sourceの意味を変えず本文を整理する。同じ指摘の説明はまとめられるが、機械的なfindingを削除しない。
+blockedではjudgmentsを利用者へそのまま提示できる本文へ整える。
+判断は質問、背景、2〜3選択肢、影響、推奨と理由、回答形式を持つ。
+利用者に代わって回答を変更せず、根拠のない条件や数値を追加しない。
 
 ## 出力
 
-```yaml
----
-schema_version: flow/phase-review-v1
-phase: plan
-review_stage: decision
-review_cycle_id: plan-decision-r1-20260728T000000
-target_path: spec/.../plan.md
-target_revision: 1
-target_sha256: "{64 lowercase hex}"
-design_path: spec/.../design.md
-design_revision: 1
-design_sha256: "{64 lowercase hex}"
-mode: ai
-status: passed
-source_paths:
-  - spec/.../reviews/plan-decision/decision-quality.md
-completed_at: 2026-07-28T00:00:00+09:00
----
-```
+phase-review-v2、statusは`passed | changes_required | blocked | incomplete`。
+cycleごとに新規保存し、過去結果を上書きしない。sourceとaggregateは同じ対象とmodeを保持する。
+契約不一致はincomplete/contract、source欠落や実行不能はincomplete/execution。
+decision reviewはgateだけを扱い、scope_candidateを生成・集約しない。
+最終報告にaggregate path、cycle ID、status、失敗情報を含める。
 
-本文にはsource status、`gate` finding、集約理由、失敗情報を記載する。過去の結果を
-混ぜず、現在の対象revisionに対する最新集約へ置き換える。
+## 共通契約と機械処理
 
-## 完了条件
+実行前に隣接するFlow skillの`../flow/references/contracts.md`と
+`../flow/references/cli.md`の該当契約・commandを読む。
+入出力形式は`../flow/references/contracts.md`とtemplateを参照する。
+機械検証はCLI内のZod定義に従い、旧schemaを読み替えない。
+`../flow/assets/templates/`の対応templateを使う。
+CLIは`node ../flow/scripts/flowctl.js --root {feature_dir}`。
+Node.js 22以上が必要。依存はCLIへ同梱済みで、利用側のnpm install・ビルドは不要。
 
-- `plan-decision-review.md`だけを集約成果物として編集している。
-- modeに必要なsourceを検証している。
-- statusが`passed | changes_required | blocked | incomplete`である。
-- `blocked`では空でない`利用者判断`があり、そのまま提示できる。
-- cycle ID、review stage、PlanとDesignのpath、revision、SHA-256が追跡できる。
-- 出力を読み直し、schema、必須field、statusが`phase-review-v1`に適合している。
+各成果物はdraftを作り、`publish`で保存して`validate`で確認する。
+固定artifactのrevision、変更履歴、保存、digestはCLIに任せ、直接上書きしない。
+監査は`audit-append`で操作の開始・結果・自動判断を逐一記録する。
+`audit.md`を直接編集しない。単独利用でもFlow stateを必要とせず同じCLIを使える。
+契約不一致は補完せず報告し、監査の保存障害時は次の操作へ進まない。

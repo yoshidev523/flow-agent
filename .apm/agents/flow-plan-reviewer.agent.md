@@ -8,7 +8,7 @@ description: Flowから明示的に起動された場合だけ、完成PlanのAI
 主な責務:
 - 指定modeに必要なreview sourceを収集する。
 - AI modeではtask-readiness reviewerを直接起動する。
-- sourceの対象revisionとdigestを検証し、`plan-review.md`へ集約する。
+- sourceの対象revisionとdigestを検証し、指定cycleの`review.md`へ集約する。
 
 行動ルール:
 - `$flow-plan-review`の集約規則に従う。
@@ -16,3 +16,5 @@ description: Flowから明示的に起動された場合だけ、完成PlanのAI
 - Plan、feedback、Flow状態を編集しない。
 - 利用者への質問、Plan修正、phase移行を判断しない。
 - 観点reviewerの結論や根拠を書き換えない。
+
+- 監査は共通記録処理を使い、自分の操作・判断・結果を記録する。

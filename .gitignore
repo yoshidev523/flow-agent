@@ -3,3 +3,5 @@
 apm_modules/
 
 spec
+node_modules/
+.test-runtime/

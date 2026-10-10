@@ -8,10 +8,14 @@
 `.agents/skills/`に置きます。パッケージ設定は`apm.yml`、依存関係の固定情報は
 `apm.lock.yaml`で管理します。
 
-機能ごとの実行成果物は`spec/YYYYMMDD_feature/`に保存します。主要成果物は
-`flow-state.yml`、`design.md`、`design-review.md`、`plan.md`、
-`plan-decision-review.md`、`plan-review.md`、`implement.md`です。feedbackと観点別sourceも
-同じfeature配下に置きます。
+機能ごとの実行成果物は`spec/YYYYMMDD_feature/`へ保存します。
+Flow 4.0.0では`flow-state.yml`、追記型の`audit.md`、固定pathの
+`artifacts/design.md`、`artifacts/plan.md`、`artifacts/implement.md`を使います。
+固定成果物はrevisionと変更履歴を更新し、revision別fileは作りません。
+レビューは`reviews/{design,plan-decision,plan-final}/cycle-0001/`へsourceとreview.md、
+feedbackは`feedback/{design,plan}/feedback-0001.md`へ保存します。
+配布用CLI、Markdown契約、テンプレートは`.apm/skills/flow/`に同梱します。
+TypeScriptとZod定義の正本はrepositoryの`src/`に置きます。
 
 ## 開発・検証コマンド
 
@@ -20,7 +24,22 @@ git status --short
 sed -n '1,200p' apm.yml
 apm list
 apm run verify-flow
+apm run build-flow
+apm run check-flow-dist
+apm run test-flow
+apm run verify-flow-deployment
 ```
+
+実行にはNode.js 22以上だけを必要とします。利用側のnpm install・ビルドは不要です。
+`verify-flow-deployment`は下記の配置検証を自動化し、CLI・Markdown契約・templateの同梱も確認します。
+
+```sh
+node .apm/skills/flow/scripts/flowctl.js --root spec/YYYYMMDD_feature validate artifacts/design.md
+```
+
+開発時は`npm ci`で依存を導入します。TypeScriptは`src/`、Zod契約は`src/contracts/`が正本です。
+`apm run build-flow`で型チェックと単一JavaScriptの生成を行います。
+`apm run check-flow-dist`で配布物と正本の一致を確認します。
 
 APMの操作や検証commandを追加した場合は、`apm.yml`の`scripts`とこの文書を同時に
 更新します。
@@ -135,22 +154,23 @@ human modeへの切替を行います。
 
 phase境界の契約は次の4種類に限定します。
 
-- `phase-artifact-v1`: `design.md`と`plan.md`
-- `review-source-v1`: 観点別または人間の評価結果
-- `phase-review-v1`: hubの集約結果
-- `phase-feedback-v1`: Flowがwriterへ渡す変更または回答
+- `phase-artifact-v2`: `design.md`と`plan.md`
+- `review-source-v2`: 観点別または人間の評価結果
+- `phase-review-v2`: hubの集約結果
+- `phase-feedback-v2`: Flowがwriterへ渡す変更または回答
 
-`review-source-v1`のfindingは、現在のscopeの成立に必須な`gate`と、成立には不要な
+`review-source-v2`のfindingは、現在のscopeの成立に必須な`gate`と、成立には不要な
 `scope_candidate`へ分類します。sourceとaggregateのstatusは`gate`だけから決定し、
 `scope_candidate`は利用者が採用した場合だけfeedbackへ変換します。
 
-Flow内部状態は`flow-state-v1`として`flow-state.yml`へ保存します。
+Flow内部状態は`flow-state-v2`として`flow-state.yml`へ保存します。
 新しい中継用request/result契約を追加する前に、既存artifactのpathとstatusで
 接続できないかを検討してください。
 
 各fileのwriterは一意にします。
 
 - Flow: `flow-state.yml`、feedback、human source
+- 共通CLI: ownerに代わる保存と、排他的な`audit.md`追記。直接編集しません。
 - phase writer: 自分のphase artifact
 - perspective reviewer: 自分のsource
 - review hub: 自分のaggregate artifact
@@ -163,7 +183,7 @@ feedbackは再利用しません。
 
 Planは入力Designのpath、revision、SHA-256を保持し、Plan decision reviewと最終reviewの
 開始前に現在のDesignと一致することを確認します。Implementの進捗は
-`implement-artifact-v1`のfront matterへrevisionと
+`implement-artifact-v2`のfront matterへrevisionと
 `in_progress / blocked / completed`を記録します。
 
 ## 状態遷移
@@ -195,3 +215,17 @@ agent定義はfront matter後を「あなたは〜です。」で始め、「主
 
 履歴には確立済みのcommit規約がないため、命令形で対象を明確にした短い件名を使います。
 PRには目的、変更file、検証結果または未実施理由を記載し、関連Issueがあればlinkします。
+
+## Flow 4.0.0 の機械処理
+
+HOWは`.apm/skills/flow/references/`、schemaの正本は`src/contracts/`のZod定義です。
+実行処理はTypeScriptで実装し、依存を含む`scripts/flowctl.js`をFlow skillへ同梱します。
+成果物・監査の契約は`references/contracts.md`へ記載し、Zod定義と同時に更新します。
+JSON Schemaの生成・配布は行いません。
+保存にはpublish、状態更新にはtransition、監査にはaudit-appendを使います。
+旧契約は読み替えず、同じrequest IDの再送は重複実行しません。
+変更履歴は各固定artifactへ、行動・判断・利用者対話はaudit.mdへ残します。
+各agentは自分のイベントを共通記録処理へ渡し、監査を直接編集しません。
+監査/保存の中断はresume-checkで検出し、外部操作を自動で再実行しません。
+Planの質問への回答待ちはplan_decision_reviewに置き、planには置きません。
+検証追加時はapm.ymlのscriptと本書を同時に更新します。

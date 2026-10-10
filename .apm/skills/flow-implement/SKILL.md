@@ -5,107 +5,56 @@ description: Flowからの明示委譲、または利用者による`$flow-imple
 
 # Flow Implement
 
-## 目的
+## 責務
 
-指定された`plan.md`を実装し、検証結果を
-`spec/{yyyymmdd_feature}/implement.md`へ記録する。
-このskillは与えられたPlanの内容と完全性だけを扱い、Planが渡された経路や上流状態を
-検査しない。
+指定Planだけを実装・検証し、固定path `artifacts/implement.md`へ進捗を残す独立executor。
+Planが渡された経路、review、Flow stateを扱わない。
 
 ## 入力
 
-- `plan_path`
-- `target_path`: `spec/{yyyymmdd_feature}/implement.md`
-- 実行対象タスク。省略時は未完了の全タスク。
+Planのpath・revision・digest、target path、feature directory、監査用run ID・invocation ID。
+単独利用でも同じ契約を使う。
 
-開始前にPlanの`schema_version: flow/phase-artifact-v1`、`artifact: plan`、正の`revision`、
-`status: ready`、Design入力時の`inputs`にあるpath、revision、SHA-256、対象ファイル、
-手順、完了条件、検証方法、実装引き継ぎチェックを確認する。不足や矛盾がある場合は
-実装せず、`implement.md`へブロック理由を記録する。
+## 出力と状態
 
-Planの`status`はfront matterの値だけを使用する。`承認状態: Pending`、`Approved`、
-reviewの`passed`、本文の完了表現を`ready`の代わりにしない。schemaまたはstatusが
-契約外なら、Planを修復・移行せず`blocked`として記録する。
+`implement-artifact-v2`、artifact implement、statusは`in_progress | blocked | completed`。
+- in_progress: 未完了の実装・検証がある。
+- blocked: 現在のPlanでは継続できない。blockerを必須とする。
+- completed: Planの全タスク、必須検証、実装commitを完了した終端状態。
 
-## 出力
+## 手順
 
-- 実装変更: Planで指定されたファイル。
-- 進捗記録: `spec/{yyyymmdd_feature}/implement.md`。
-- schema: `implement-artifact-v1`
+1. git status、AGENTS.md、Plan、関連fileを確認する。
+2. Planのschema、ready、対象file、責務、手順、完了条件、検証方法を確認する。
+   内容不足や契約不一致なら実装せず、渡されたPlan参照と停止理由をblocked成果物へ残す。
+   参照自体が欠落・不正で契約を作れない場合は推測せず、監査と最終報告へ停止理由を残す。
+3. 再開時はimplementのPlan参照と現在のPlanが一致することを確認する。
+4. タスクの依存順に実装し、監査へ操作開始・結果・裁量判断を逐一記録する。
+5. checkpointsでtasks、verifications、blockerを更新し、publishする。
+6. Plan外の公開API、責務、入出力、error、範囲、検証条件の変更が必要ならblockedで停止する。
+7. 検証のcommand、結果、未実施理由を記録する。必須検証の未実施・失敗をcompletedにしない。
+8. 全タスクと必須検証の完了後、Plan対象fileとimplementにgit check-ignore --no-indexを実行する。
+   ignore対象を強制追加しない。既存変更・Plan外変更を含めず、今回の実装変更だけをcommitする。
+   件名は`[flow-implement] {短い命令形}`。
+9. commit成功後にcommit SHAを記録しcompletedをpublishする。分離・commitに失敗したらblocked。
+   commit済み内容が確定後のimplement.md自身のdigestを含む必要はない。
+10. 保存したfront matterとgit statusを確認して報告する。
 
-`implement.md`は次の状態を使う。
+既存規約への軽微な調整はPlanの意味を変えない範囲で判断でき、その理由を監査へ残す。
+completedは再開しない。push・PR作成は明示依頼時だけ。
 
-- `in_progress`
-- `blocked`
-- `completed`
+## 共通契約と機械処理
 
-これ以外の成果物全体の状態や、`承認状態`などの並行するライフサイクル状態fieldを
-追加しない。`タスク進捗`に記録する個別タスクの状態はこの禁止対象ではない。
+実行前に隣接するFlow skillの`../flow/references/contracts.md`と
+`../flow/references/cli.md`の該当契約・commandを読む。
+入出力形式は`../flow/references/contracts.md`とtemplateを参照する。
+機械検証はCLI内のZod定義に従い、旧schemaを読み替えない。
+`../flow/assets/templates/`の対応templateを使う。
+CLIは`node ../flow/scripts/flowctl.js --root {feature_dir}`。
+Node.js 22以上が必要。依存はCLIへ同梱済みで、利用側のnpm install・ビルドは不要。
 
-## ワークフロー
-
-1. `git status --short`、`AGENTS.md`、Plan、関連コードを確認する。
-2. `implement.md`を作成または読み、未完了タスクを特定する。
-3. Planの依存順に実装し、各タスクの状態と変更ファイルを記録する。
-4. Plan外の公開API、責務、入出力、エラー挙動、範囲変更が必要なら停止する。
-5. 指定された検証を実行し、コマンド、結果、未実施理由を記録する。
-6. 全タスクと必要な検証が完了したら`completed`にする。
-7. 完了報告前にPlan参照と`implement.md`のschema、revision、statusを読み直す。
-8. `completed`にできた場合は、Planの対象ファイルと`implement.md`に対して
-   `git check-ignore --no-index`を実行し、`.gitignore`の対象かを確認する。
-9. `.gitignore`対象はstageやコミットに含めず、`git add -f`などで
-   強制追加しない。対象外のファイルのうち、この実装で生じた変更だけを
-   stageし、コミットする。件名は
-   `[flow-implement] {Planを要約した短い命令形}`とする。
-10. 開始前からあった変更やPlan外の変更はコミットに含めない。
-   対象変更を安全に分離できない場合、またはコミットに失敗した場合は
-   `blocked`とし、理由を`implement.md`に記録する。
-
-内部変数名、import順、軽微な整形、明白なtypo、既存規約への小さな合わせ込みは、
-Planの意味を変えない範囲で実装裁量とする。
-
-## implement.md構成
-
-```md
----
-schema_version: flow/implement-artifact-v1
-artifact: implement
-revision: 1
-status: in_progress
-plan_path: spec/{yyyymmdd_feature}/plan.md
-plan_revision: 1
-plan_sha256: "{64 lowercase hex}"
-updated_at: {timestamp}
----
-
-# 実装記録: {feature}
-
-## メタデータ
-- 日付:
-- 計画:
-
-## タスク進捗
-## 変更サマリ
-## 変更履歴
-## 検証ログ
-## 補足・計画との差分
-## 未完了事項
-```
-
-初版の`revision`は1とし、進捗、状態、検証結果を更新するたびに1増やす。
-Planのpath、revision、SHA-256が現在のPlanと一致しない場合は実装を開始・再開しない。
-
-## 完了条件
-
-- Planの対象タスクが完了している。
-- Plan外の判断を無断で実装していない。
-- 変更ファイルと検証結果が`implement.md`に記録されている。
-- front matterが`implement-artifact-v1`に適合し、statusが
-  `in_progress | blocked | completed`のいずれかである。
-- statusと並行する成果物全体の承認・進捗状態を追加していない。
-- 必要な検証が成功、または未実施理由が記録されている。
-- 作業後の`git status --short`を確認している。
-- `.gitignore`対象を強制追加したり、コミットに含めたりしていない。
-- `completed`の場合は実装変更が`[flow-implement] `プレフィックス付きの
-  件名でコミットされている。
-- pushとPR作成は明示依頼がある場合だけ行う。
+各成果物はdraftを作り、`publish`で保存して`validate`で確認する。
+固定artifactのrevision、変更履歴、保存、digestはCLIに任せ、直接上書きしない。
+監査は`audit-append`で操作の開始・結果・自動判断を逐一記録する。
+`audit.md`を直接編集しない。単独利用でもFlow stateを必要とせず同じCLIを使える。
+契約不一致は補完せず報告し、監査の保存障害時は次の操作へ進まない。
