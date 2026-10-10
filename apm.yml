@@ -1,5 +1,5 @@
 name: flow-agent
-version: 3.0.0
+version: 4.0.0
 description: 仕様駆動開発を行うエージェントを管理します
 author: Yoshiki Honda
 # Which agent platforms to deploy to.
@@ -14,3 +14,7 @@ dependencies:
 includes: auto
 scripts:
   verify-flow: "apm compile --validate --target claude,codex"
+  build-flow: "npm run build"
+  check-flow-dist: "npm run check:dist"
+  test-flow: "npm test"
+  verify-flow-deployment: "sh tests/verify_deployment.sh"
