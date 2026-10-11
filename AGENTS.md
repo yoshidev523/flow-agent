@@ -9,13 +9,14 @@
 `apm.lock.yaml`で管理します。
 
 機能ごとの実行成果物は`spec/YYYYMMDD_feature/`へ保存します。
-Flow 4.0.0では`flow-state.yml`、追記型の`audit.md`、固定pathの
+Flow 4.1.0では`flow-state.yml`、追記型の`audit.md`、固定pathの
 `artifacts/design.md`、`artifacts/plan.md`、`artifacts/implement.md`を使います。
 固定成果物はrevisionと変更履歴を更新し、revision別fileは作りません。
 レビューは`reviews/{design,plan-decision,plan-final}/cycle-0001/`へsourceとreview.md、
 feedbackは`feedback/{design,plan}/feedback-0001.md`へ保存します。
 配布用CLI、Markdown契約、テンプレートは`.apm/skills/flow/`に同梱します。
 TypeScriptとZod定義の正本はrepositoryの`src/`に置きます。
+独立同期skillには同じCLI・契約・templateを同梱し、build/check-flow-distで正本との一致を確認します。
 
 ## 開発・検証コマンド
 
@@ -30,7 +31,7 @@ apm run test-flow
 apm run verify-flow-deployment
 ```
 
-実行にはNode.js 22以上だけを必要とします。利用側のnpm install・ビルドは不要です。
+通常の実行にはNode.js 22以上だけを必要とします。チェックポイント操作にはGitも必要です。利用側のnpm install・ビルドは不要です。
 `verify-flow-deployment`は下記の配置検証を自動化し、CLI・Markdown契約・templateの同梱も確認します。
 
 ```sh
@@ -65,7 +66,7 @@ flow_consumer_dir="$flow_verify_root/consumer"
 )
 
 for skill_name in \
-  flow flow-design flow-plan flow-implement \
+  flow flow-artifact-sync flow-design flow-plan flow-implement \
   flow-design-review flow-design-review-requirements \
   flow-design-review-quality-risk \
   flow-plan-decision-review flow-plan-review-decision-quality \
@@ -122,6 +123,11 @@ APMは自己package installを循環依存として扱うため、独立consumer
   完成度を表し、外部評価や次phase開始可否を表しません。
 - Flowだけが利用者対話、review mode、feedback正規化、retry、stale確認、
   phase移行を管理します。
+- 再計画に伴う成果物同期は独立した`flow-artifact-sync`が複数成果物の更新ownerとして実行します。
+  同期全体は既存のactionイベントで監査し、保存の自動イベントを重複記録しません。
+  どのphaseでも利用でき、他スキルやFlow stateを必要としません。同期はstateを変更せず、
+  更新後の旧state・reviewは再利用しません。実装記録の更新は完了証拠を無効にします。
+  Flowは人間承認付きreplanningから同期後の参照を登録し、必要な再reviewを実行します。
 - AIと人間のreviewは同じsource契約へ正規化し、1 cycle内では一方だけを使います。
 - phase review hubは自phaseのsource収集とaggregate artifactだけを管理します。
 - 各観点reviewerは担当観点を独立評価し、固有のsource fileだけを書きます。
@@ -170,6 +176,7 @@ Flow内部状態は`flow-state-v2`として`flow-state.yml`へ保存します。
 各fileのwriterは一意にします。
 
 - Flow: `flow-state.yml`、feedback、human source
+- 同期skill: 明示された同期中のDesign・Plan・Implementと同期用feedback（通常writerと同時実行しない）
 - 共通CLI: ownerに代わる保存と、排他的な`audit.md`追記。直接編集しません。
 - phase writer: 自分のphase artifact
 - perspective reviewer: 自分のsource
@@ -187,6 +194,9 @@ Planは入力Designのpath、revision、SHA-256を保持し、Plan decision revi
 `in_progress / blocked / completed`を記録します。
 
 ## 状態遷移
+
+人間が戻り先と修正範囲を承認した場合だけreplanning経由でDesign/Planへ戻ります。
+checkpointで変更前を保存し、同期後の旧承認を無効化します。cycleとretry上限は保持します。
 
 `design -> design_review -> plan`の後、未回答質問があれば
 `plan_decision_review -> plan`を経て、`plan_review -> implement -> completed`へ進みます。
@@ -216,7 +226,7 @@ agent定義はfront matter後を「あなたは〜です。」で始め、「主
 履歴には確立済みのcommit規約がないため、命令形で対象を明確にした短い件名を使います。
 PRには目的、変更file、検証結果または未実施理由を記載し、関連Issueがあればlinkします。
 
-## Flow 4.0.0 の機械処理
+## Flow 4.1.0 の機械処理
 
 HOWは`.apm/skills/flow/references/`、schemaの正本は`src/contracts/`のZod定義です。
 実行処理はTypeScriptで実装し、依存を含む`scripts/flowctl.js`をFlow skillへ同梱します。
@@ -226,6 +236,8 @@ JSON Schemaの生成・配布は行いません。
 旧契約は読み替えず、同じrequest IDの再送は重複実行しません。
 変更履歴は各固定artifactへ、行動・判断・利用者対話はaudit.mdへ残します。
 各agentは自分のイベントを共通記録処理へ渡し、監査を直接編集しません。
+完了後でも同じタスクに関係する対話・調査・判断訂正を監査へ追記します。
+checkpointは専用Git commitとlocal tagで保存し、復帰用branch作成とFlowの再開を分けます。
 監査/保存の中断はresume-checkで検出し、外部操作を自動で再実行しません。
 Planの質問への回答待ちはplan_decision_reviewに置き、planには置きません。
 検証追加時はapm.ymlのscriptと本書を同時に更新します。

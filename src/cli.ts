@@ -3,11 +3,16 @@ import { Store } from "./persistence/store.js";
 import { load, object, equal, utf8 } from "./format.js";
 import { FlowError, requireCondition as check } from "./errors.js";
 import type { Stage } from "./validation/guards.js";
-const help = `flowctl 4.0.0 — Flow persistence and contract guards\nUsage: node flowctl.js --root FEATURE COMMAND [OPTIONS]\nCommands: init, publish, transition, audit-append, review-check --request FILE|-\n          validate PATH [--references]\n          resume-check [--recover]\nOptions: --version, --help\n`;
+import {
+  createCheckpoint,
+  recoverCheckpoint,
+  restoreCheckpoint,
+} from "./checkpoints.js";
+const help = `flowctl 4.1.0 — Flow persistence and contract guards\nUsage: node flowctl.js --root FEATURE COMMAND [OPTIONS]\nCommands: init, publish, transition, audit-append, review-check --request FILE|-\n          validate PATH [--references]\n          resume-check [--recover]\n          checkpoint-create, checkpoint-recover, checkpoint-restore --request FILE|-\nOptions: --version, --help\n`;
 async function main(argv = process.argv.slice(2)): Promise<number> {
   try {
     if (argv.includes("--version")) {
-      console.log("flowctl 4.0.0");
+      console.log("flowctl 4.1.0");
       return 0;
     }
     if (argv.includes("--help") || argv.includes("-h")) {
@@ -55,6 +60,9 @@ async function main(argv = process.argv.slice(2)): Promise<number> {
           "transition",
           "audit-append",
           "review-check",
+          "checkpoint-create",
+          "checkpoint-recover",
+          "checkpoint-restore",
         ].includes(command ?? ""),
         "Unknown command",
       );
@@ -65,6 +73,12 @@ async function main(argv = process.argv.slice(2)): Promise<number> {
       const request = object(
         load(utf8(fs.readFileSync(argv[1] === "-" ? 0 : argv[1]))),
       );
+      if (command === "checkpoint-create")
+        return createCheckpoint(store, request);
+      if (command === "checkpoint-recover")
+        return recoverCheckpoint(store, request);
+      if (command === "checkpoint-restore")
+        return restoreCheckpoint(store, request);
       if (command === "init") return store.initialize(request);
       if (command === "publish") return store.publish(request);
       if (command === "transition") return store.transition(request);

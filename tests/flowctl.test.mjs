@@ -1422,3 +1422,751 @@ for (const invalid of ["malformed", "contract_failure"])
         assert.equal(x.store.state().counters.design.execution_retry, 0);
       },
     );
+
+fixture(
+  "isolated sync skill updates Design and Plan without Flow state or sibling skills",
+  (x, t) => {
+    const design = x.writer("design");
+    x.pub("artifacts/plan.md", x.artifact("plan", "ready", [design]));
+    fs.unlinkSync(x.store.path("flow-state.yml"));
+    const isolated = fs.mkdtempSync(
+      path.join(os.tmpdir(), "flow-sync-isolated-"),
+    );
+    t.after(() => fs.rmSync(isolated, { recursive: true, force: true }));
+    fs.cpSync(
+      path.resolve(".apm/skills/flow-artifact-sync"),
+      path.join(isolated, "sync"),
+      { recursive: true },
+    );
+    const cli = path.join(isolated, "sync/scripts/flowctl.js");
+    const call = (command, request) => {
+      const result = spawnSync(
+        process.execPath,
+        [cli, "--root", x.root, command, "--request", "-"],
+        {
+          input: JSON.stringify(request),
+          encoding: "utf8",
+          cwd: isolated,
+        },
+      );
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      return JSON.parse(result.stdout).result;
+    };
+    const started = call("audit-append", {
+      event_key: "sync-start",
+      event_type: "action.started",
+      actor: "flow-artifact-sync",
+      run_id: "sync-run",
+      invocation_id: null,
+      occurred_at: f.now(),
+      caused_by: [],
+      data: {
+        action: "artifact-sync:sync-001",
+        detail: "合意した制約変更を反映する",
+      },
+    });
+    for (const artifact of ["design", "plan"]) {
+      const old = x.store.document(`artifacts/${artifact}.md`)[2];
+      const [feedback] = x.pub(
+        `feedback/${artifact}/next`,
+        {
+          schema_version: "flow/phase-feedback-v2",
+          revision: 1,
+          phase: artifact,
+          target: old,
+          operation: "revise",
+          created_at: f.now(),
+          items: [
+            {
+              id: "F-sync",
+              kind: "change",
+              target: "制約",
+              instruction: "変更を反映",
+              evidence: "合意済み変更",
+              completion: "更新される",
+            },
+          ],
+        },
+        "phase-feedback",
+      );
+      const inputs =
+        artifact === "plan"
+          ? [x.store.document("artifacts/design.md")[2], feedback]
+          : [feedback];
+      const meta = x.artifact(artifact, "ready", inputs, "revise", "sync-001");
+      meta.producer = "flow-artifact-sync";
+      meta.feedback_results = [
+        { id: "F-sync", result: "applied", location: "制約" },
+      ];
+      const request = {
+        request_id: `sync-${artifact}`,
+        run_id: "sync-run",
+        target_path: old.path,
+        expected_revision: old.revision,
+        expected_sha256: old.sha256,
+        document: f.render(meta, body(artifact)),
+        change: "制約変更を同期",
+        reason: "合意済み変更",
+        sections: ["制約"],
+        references: [feedback.path],
+      };
+      const result = call("publish", request);
+      assert.equal(result.artifact.revision, 2);
+      assert.deepEqual(call("publish", request), result);
+      const validation = spawnSync(
+        process.execPath,
+        [cli, "--root", x.root, "validate", old.path, "--references"],
+        { encoding: "utf8", cwd: isolated },
+      );
+      assert.equal(validation.status, 0, validation.stdout + validation.stderr);
+    }
+    call("audit-append", {
+      event_key: "sync-result",
+      event_type: "action.completed",
+      actor: "flow-artifact-sync",
+      run_id: "sync-run",
+      invocation_id: null,
+      occurred_at: f.now(),
+      caused_by: [started.event_id],
+      data: {
+        action: "artifact-sync:sync-001",
+        result: "反映完了",
+        evidence: ["artifacts/design.md", "artifacts/plan.md"],
+      },
+    });
+    assert.equal(fs.existsSync(x.store.path("flow-state.yml")), false);
+    assert.equal(
+      x.store.events()[1].filter((e) => e.event_key === "sync-result").length,
+      1,
+    );
+  },
+);
+
+fixture(
+  "sync invalidates completed implementation without reopening completed Flow",
+  (x) => {
+    x.writer("design");
+    x.review("design");
+    x.tr("advance");
+    const plan = x.writer("plan");
+    x.review("plan_final");
+    x.tr("advance");
+    const invocation = randomUUID();
+    x.tr("start_invocation", {
+      invocation_id: invocation,
+      component: "flow-implement",
+      operation: "execute",
+      inputs: [plan],
+    });
+    const [old] = x.pub(
+      "artifacts/implement.md",
+      x.implement(plan, "completed", invocation),
+    );
+    x.tr("finish_invocation", { invocation_id: invocation, outputs: [old] });
+    x.tr("advance");
+    const state = fs.readFileSync(x.store.path("flow-state.yml"), "utf8");
+    assert.throws(() => x.pub(old.path, x.implement(plan)), /terminal/);
+    const meta = x.implement(plan, "blocked", "sync-001");
+    meta.producer = "flow-artifact-sync";
+    meta.blocker = "Planの変更により再検証が必要";
+    assert.throws(() => x.pub(old.path, meta), /invalidate/);
+    meta.commit = null;
+    meta.tasks.forEach((t) => (t.status = "pending"));
+    meta.verifications.forEach((v) => (v.status = "not_run"));
+    const [updated] = x.pub(old.path, meta);
+    assert.equal(updated.revision, 2);
+    assert.equal(
+      fs.readFileSync(x.store.path("flow-state.yml"), "utf8"),
+      state,
+    );
+    assert.throws(
+      () => x.store.resumeCheck(),
+      /digest|stale|changed|mismatch/i,
+    );
+    assert.ok(x.store.document(old.path)[1].includes("revision 1"));
+  },
+);
+
+fixture("sync rejects concurrent invocation and initial artifacts", (x) => {
+  const meta = x.artifact("design");
+  meta.producer = "flow-artifact-sync";
+  assert.throws(() => x.pub("artifacts/design.md", meta), /existing artifacts/);
+  const design = x.writer("design");
+  x.tr("start_review", { stage: "design" });
+  x.tr("start_invocation", {
+    invocation_id: "active-001",
+    component: "flow-design-review",
+    operation: "review",
+    inputs: [design],
+  });
+  assert.throws(() => x.pub("artifacts/design.md", meta), /active invocation/);
+});
+
+for (const phase of [
+  "design",
+  "design_review",
+  "plan",
+  "plan_decision_review",
+  "plan_review",
+  "implement",
+]) {
+  fixture(`sync publication is independent of phase ${phase}`, (x) => {
+    const design = x.writer("design");
+    if (phase === "design_review") x.tr("start_review", { stage: "design" });
+    else if (phase !== "design") {
+      x.review("design");
+      x.tr("advance");
+      x.writer(
+        "plan",
+        phase === "plan_decision_review" ? "needs_input" : "ready",
+      );
+      if (phase === "plan_decision_review")
+        x.tr("start_review", { stage: "plan_decision" });
+      if (phase === "plan_review")
+        x.tr("start_review", { stage: "plan_final" });
+      if (phase === "implement") {
+        x.review("plan_final");
+        x.tr("advance");
+      }
+    }
+    assert.equal(x.store.state().phase, phase);
+    const snapshot = fs.readFileSync(x.store.path("flow-state.yml"), "utf8");
+    const feedback = x.feedback("design", "revise", ["制約"]);
+    const meta = x.artifact(
+      "design",
+      "ready",
+      [feedback],
+      "revise",
+      "sync-001",
+    );
+    meta.producer = "flow-artifact-sync";
+    meta.feedback_results = [
+      { id: "F-001", result: "applied", location: "制約" },
+    ];
+    const [updated] = x.pub(design.path, meta);
+    assert.equal(updated.revision, 2);
+    assert.equal(
+      fs.readFileSync(x.store.path("flow-state.yml"), "utf8"),
+      snapshot,
+    );
+    assert.throws(
+      () => x.store.resumeCheck(),
+      /digest|stale|changed|mismatch/i,
+    );
+  });
+}
+
+function checkpointRepository(x, t) {
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), "flow-checkpoint-repo-"));
+  t.after(() => fs.rmSync(repo, { recursive: true, force: true }));
+  const feature = path.join(repo, "spec", "feature");
+  fs.mkdirSync(path.dirname(feature), { recursive: true });
+  fs.renameSync(x.root, feature);
+  x.root = feature;
+  x.store = new f.Store(feature);
+  const run = (...args) => {
+    const result = spawnSync("git", args, { cwd: repo, encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+    return result.stdout.trim();
+  };
+  run("init", "-q");
+  run("config", "user.name", "Flow Test");
+  run("config", "user.email", "flow@example.invalid");
+  fs.writeFileSync(path.join(repo, "app.js"), "initial\n");
+  fs.writeFileSync(path.join(repo, "other.txt"), "original\n");
+  run("add", "app.js", "other.txt");
+  run("commit", "-qm", "Initial repository");
+  return { repo, run };
+}
+function createFixtureCheckpoint(x, id = "before-replan") {
+  return f.createCheckpoint(x.store, {
+    request_id: id,
+    checkpoint_id: id,
+    reason: "変更前を保存",
+    paths: ["app.js"],
+    decision_event_ids: [],
+  });
+}
+function approveFixtureReplan(
+  x,
+  phase = "plan",
+  checkpointId = "before-replan",
+) {
+  createFixtureCheckpoint(x, checkpointId);
+  const checkpoint = x.store
+    .events()[1]
+    .find((e) => e.event_key === checkpointId + ":checkpoint-completed");
+  const prompt = x.event("interaction.presented", {
+    interaction_id: "replan-" + checkpointId,
+    kind: "replan",
+    target: x.store.state().artifacts[phase],
+    question_ids: ["R-001"],
+    text: "前提を訂正するため、指定範囲で再計画しますか。",
+  });
+  x.tr("request_replan", {
+    prompt_event_id: prompt.event_id,
+    target_phase: phase,
+    scope: "記録の成立条件と関連Planを訂正",
+    reason: "前提の誤り",
+    checkpoint_event_id: checkpoint.event_id,
+  });
+  const response = x.event(
+    "interaction.received",
+    {
+      interaction_id: prompt.data.interaction_id,
+      prompt_event_id: prompt.event_id,
+      text: "提示した範囲で承認します",
+    },
+    randomUUID(),
+    "human",
+  );
+  x.tr("begin_replan", {
+    response_event_id: response.event_id,
+    approval: "approve",
+  });
+  return response;
+}
+function synchronizeFixtureArtifact(x, artifact) {
+  const current = x.store.document(`artifacts/${artifact}.md`)[2];
+  const feedback = x.feedback(artifact, "revise", ["制約"]);
+  const inputs =
+    artifact === "plan"
+      ? [x.store.document("artifacts/design.md")[2], feedback]
+      : [feedback];
+  const meta = x.artifact(artifact, "ready", inputs, "revise", "sync-replan");
+  meta.producer = "flow-artifact-sync";
+  meta.feedback_results = [
+    { id: "F-001", result: "applied", location: "制約" },
+  ];
+  return x.pub(current.path, meta)[0];
+}
+
+fixture(
+  "checkpoint snapshots selected work without changing HEAD, index or unrelated files",
+  (x, t) => {
+    x.writer("design");
+    const { repo, run } = checkpointRepository(x, t);
+    fs.writeFileSync(path.join(repo, "app.js"), "updated\n");
+    fs.writeFileSync(path.join(repo, "other.txt"), "unrelated staged change\n");
+    run("add", "other.txt");
+    const head = run("rev-parse", "HEAD"),
+      index = run("diff", "--cached"),
+      request = {
+        request_id: "cp-001",
+        checkpoint_id: "cp-001",
+        reason: "Design区切り",
+        paths: ["app.js"],
+        decision_event_ids: [],
+      };
+    const checkpoint = f.createCheckpoint(x.store, request);
+    assert.equal(run("rev-parse", "HEAD"), head);
+    assert.equal(run("diff", "--cached"), index);
+    assert.equal(run("show", checkpoint.commit + ":app.js"), "updated");
+    assert.equal(run("show", checkpoint.commit + ":other.txt"), "original");
+    assert.equal(
+      run("show", checkpoint.commit + ":spec/feature/flow-state.yml"),
+      fs.readFileSync(x.store.path("flow-state.yml"), "utf8").trim(),
+    );
+    assert.equal(
+      run("ls-tree", "-r", "--name-only", checkpoint.commit).includes(
+        ".flowctl.lock",
+      ),
+      false,
+    );
+    assert.ok(
+      run("show", checkpoint.commit + ":spec/feature/audit.md").includes(
+        checkpoint.audit_event_id,
+      ),
+    );
+    assert.deepEqual(f.createCheckpoint(x.store, request), checkpoint);
+    assert.throws(
+      () => f.createCheckpoint(x.store, { ...request, reason: "変更" }),
+      /reused/,
+    );
+    assert.throws(
+      () =>
+        f.createCheckpoint(x.store, {
+          ...request,
+          request_id: "escape",
+          checkpoint_id: "escape",
+          paths: ["../outside"],
+        }),
+      /Invalid checkpoint path/,
+    );
+    const restored = f.restoreCheckpoint(x.store, {
+      request_id: "restore-001",
+      checkpoint_id: "cp-001",
+      branch: "replan-copy",
+    });
+    assert.equal(run("rev-parse", "HEAD"), head);
+    assert.equal(run("rev-parse", "refs/heads/replan-copy"), checkpoint.commit);
+    assert.deepEqual(
+      f.restoreCheckpoint(x.store, {
+        request_id: "restore-001",
+        checkpoint_id: "cp-001",
+        branch: "replan-copy",
+      }),
+      restored,
+    );
+  },
+);
+
+fixture(
+  "completed Flow accepts related audit without changing its state",
+  (x) => {
+    x.writer("design");
+    x.review("design");
+    x.tr("advance");
+    const plan = x.writer("plan");
+    x.review("plan_final");
+    x.tr("advance");
+    const invocation = randomUUID();
+    x.tr("start_invocation", {
+      invocation_id: invocation,
+      component: "flow-implement",
+      operation: "execute",
+      inputs: [plan],
+    });
+    const [implement] = x.pub(
+      "artifacts/implement.md",
+      x.implement(plan, "completed", invocation),
+    );
+    x.tr("finish_invocation", {
+      invocation_id: invocation,
+      outputs: [implement],
+    });
+    x.tr("advance");
+    const before = fs.readFileSync(x.store.path("flow-state.yml"), "utf8");
+    x.event(
+      "interaction.received",
+      {
+        interaction_id: "after-completion",
+        prompt_event_id: null,
+        text: "選定理由を再確認したい",
+      },
+      "after-completion",
+      "human",
+    );
+    x.event("decision.made", {
+      decision: "説明を訂正",
+      rule_id: "evidence",
+      reason: "根拠を再確認",
+      evidence: ["artifacts/design.md"],
+      assumptions: [],
+    });
+    assert.equal(
+      fs.readFileSync(x.store.path("flow-state.yml"), "utf8"),
+      before,
+    );
+    assert.equal(x.store.resumeCheck().state.state, "completed");
+  },
+);
+
+fixture(
+  "human approved Design replan after completion invalidates reviews and requires fresh verification",
+  (x, t) => {
+    x.writer("design");
+    x.review("design");
+    x.tr("advance");
+    const plan = x.writer("plan");
+    x.review("plan_final");
+    x.tr("advance");
+    const invocation = randomUUID();
+    x.tr("start_invocation", {
+      invocation_id: invocation,
+      component: "flow-implement",
+      operation: "execute",
+      inputs: [plan],
+    });
+    const [implement] = x.pub(
+      "artifacts/implement.md",
+      x.implement(plan, "completed", invocation),
+    );
+    x.tr("finish_invocation", {
+      invocation_id: invocation,
+      outputs: [implement],
+    });
+    x.tr("advance");
+    checkpointRepository(x, t);
+    const counters = structuredClone(x.store.state().counters),
+      cycles = structuredClone(x.store.state().cycle_counters);
+    approveFixtureReplan(x, "design");
+    assert.throws(() => x.tr("advance"), /Resolve replan/);
+    const designNew = synchronizeFixtureArtifact(x, "design"),
+      planNew = synchronizeFixtureArtifact(x, "plan");
+    const meta = x.implement(planNew, "blocked", "sync-replan");
+    meta.producer = "flow-artifact-sync";
+    meta.blocker = "再検証待ち";
+    meta.commit = null;
+    meta.tasks.forEach((t) => (t.status = "pending"));
+    meta.verifications.forEach((v) => (v.status = "not_run"));
+    const [implementNew] = x.pub("artifacts/implement.md", meta);
+    assert.match(x.store.resumeCheck().attention, /finish_replan/);
+    const updated = x.tr("finish_replan", {
+      artifacts: { design: designNew, plan: planNew, implement: implementNew },
+    });
+    assert.equal(updated.phase, "design");
+    assert.deepEqual(updated.counters, counters);
+    assert.deepEqual(updated.cycle_counters, cycles);
+    assert.deepEqual(updated.reviews, {
+      design: null,
+      plan_decision: null,
+      plan_final: null,
+    });
+    x.store.resumeCheck();
+    x.review("design");
+    x.tr("advance");
+    x.review("plan_final");
+    x.tr("advance");
+    assert.equal(x.store.state().cycle_counters.design, cycles.design + 1);
+    assert.equal(
+      x.store.state().cycle_counters.plan_final,
+      cycles.plan_final + 1,
+    );
+    assert.throws(() => x.tr("advance"), /not completed/);
+  },
+);
+
+fixture(
+  "replan approval cannot use an unrelated response and cancellation restores original state",
+  (x, t) => {
+    x.writer("design");
+    checkpointRepository(x, t);
+    createFixtureCheckpoint(x);
+    const before = x.store.state(),
+      checkpoint = x.store
+        .events()[1]
+        .find((e) => e.event_type === "checkpoint.completed");
+    const prompt = x.event("interaction.presented", {
+      interaction_id: "replan-choice",
+      kind: "replan",
+      target: before.artifacts.design,
+      question_ids: ["R-001"],
+      text: "Design変更を承認しますか",
+    });
+    x.tr("request_replan", {
+      prompt_event_id: prompt.event_id,
+      target_phase: "design",
+      scope: "要件訂正",
+      reason: "前提変更",
+      checkpoint_event_id: checkpoint.event_id,
+    });
+    assert.throws(
+      () => synchronizeFixtureArtifact(x, "design"),
+      /awaiting human approval/,
+    );
+    const other = x.event(
+      "interaction.received",
+      { interaction_id: "other", prompt_event_id: null, text: "承認" },
+      randomUUID(),
+      "human",
+    );
+    assert.throws(
+      () =>
+        x.tr("begin_replan", {
+          response_event_id: other.event_id,
+          approval: "approve",
+        }),
+      /Missing human approval/,
+    );
+    const rejected = x.event(
+      "interaction.received",
+      {
+        interaction_id: prompt.data.interaction_id,
+        prompt_event_id: prompt.event_id,
+        text: "今回の変更は見送る",
+      },
+      randomUUID(),
+      "human",
+    );
+    const cancelled = x.tr("cancel_replan", {
+      response_event_id: rejected.event_id,
+    });
+    assert.equal(cancelled.phase, before.phase);
+    assert.equal(cancelled.state, before.state);
+    assert.deepEqual(cancelled.artifacts, before.artifacts);
+    assert.ok(cancelled.state_revision > before.state_revision);
+    x.store.resumeCheck();
+  },
+);
+
+for (const interruption of ["before-tag", "after-tag"]) {
+  fixture(
+    `checkpoint recovery ${interruption} inspects Git without silently repeating operations`,
+    (x, t) => {
+      x.writer("design");
+      const { run } = checkpointRepository(x, t);
+      const original = x.store.append.bind(x.store);
+      x.store.append = (...args) => {
+        if (
+          interruption === "before-tag" &&
+          args[0] === "checkpoint.prepared"
+        ) {
+          original(...args);
+          throw new Error("Interrupted before tag");
+        }
+        if (interruption === "after-tag" && args[0] === "checkpoint.completed")
+          throw new Error("Interrupted after tag");
+        return original(...args);
+      };
+      assert.throws(
+        () => createFixtureCheckpoint(x, "interrupted"),
+        /Interrupted/,
+      );
+      x.store.append = original;
+      const prepared = x.store
+        .events()[1]
+        .find((e) => e.event_type === "checkpoint.prepared");
+      assert.match(x.store.resumeCheck().attention, /checkpoint-recover/);
+      assert.throws(() => x.tr("advance"), /Unfinished checkpoint/);
+      if (interruption === "before-tag") {
+        assert.throws(
+          () =>
+            f.recoverCheckpoint(x.store, {
+              request_id: "interrupted",
+              create_missing_tag: false,
+            }),
+          /explicit/,
+        );
+        const checkpoint = f.recoverCheckpoint(x.store, {
+          request_id: "interrupted",
+          create_missing_tag: true,
+        });
+        assert.equal(
+          run("rev-parse", "refs/tags/" + checkpoint.tag),
+          checkpoint.commit,
+        );
+      } else
+        f.recoverCheckpoint(x.store, {
+          request_id: "interrupted",
+          create_missing_tag: false,
+        });
+      const count = x.store.events()[1].length;
+      f.recoverCheckpoint(x.store, {
+        request_id: "interrupted",
+        create_missing_tag: false,
+      });
+      assert.equal(x.store.events()[1].length, count);
+      assert.equal(
+        x.store
+          .events()[1]
+          .filter(
+            (e) =>
+              e.event_type === "checkpoint.completed" &&
+              e.caused_by.includes(prepared.event_id),
+          ).length,
+        1,
+      );
+      x.store.resumeCheck();
+    },
+  );
+}
+
+fixture(
+  "Plan replan cannot register a changed Design or retain old Plan approval",
+  (x, t) => {
+    x.writer("design");
+    x.review("design");
+    x.tr("advance");
+    x.writer("plan");
+    x.review("plan_final");
+    x.tr("advance");
+    checkpointRepository(x, t);
+    approveFixtureReplan(x, "plan");
+    const planNew = synchronizeFixtureArtifact(x, "plan");
+    const artifacts = { ...x.store.state().artifacts, plan: planNew };
+    const result = x.tr("finish_replan", { artifacts });
+    assert.equal(result.phase, "plan");
+    assert.equal(result.reviews.plan_final, null);
+    assert.ok(result.reviews.design);
+    assert.throws(() => x.tr("advance"), /No advance/);
+    x.store.resumeCheck();
+  },
+);
+
+fixture(
+  "checkpoint CLI runs from the standalone bundled skill and excludes its live lock",
+  (x, t) => {
+    x.writer("design");
+    const { run } = checkpointRepository(x, t);
+    const request = {
+      request_id: "cli-cp",
+      checkpoint_id: "cli-cp",
+      reason: "CLI snapshot",
+      paths: [],
+      decision_event_ids: [],
+    };
+    const result = spawnSync(
+      process.execPath,
+      [
+        path.resolve(".apm/skills/flow-artifact-sync/scripts/flowctl.js"),
+        "--root",
+        x.root,
+        "checkpoint-create",
+        "--request",
+        "-",
+      ],
+      { input: JSON.stringify(request), encoding: "utf8" },
+    );
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    const checkpoint = JSON.parse(result.stdout).result;
+    assert.equal(
+      run("ls-tree", "-r", "--name-only", checkpoint.commit).includes(
+        ".flowctl.lock",
+      ),
+      false,
+    );
+    assert.equal(
+      run("rev-parse", "refs/tags/" + checkpoint.tag),
+      checkpoint.commit,
+    );
+  },
+);
+
+fixture("Plan-only human approval cannot authorize changing Design", (x, t) => {
+  x.writer("design");
+  x.review("design");
+  x.tr("advance");
+  x.writer("plan");
+  checkpointRepository(x, t);
+  approveFixtureReplan(x, "plan");
+  const design = synchronizeFixtureArtifact(x, "design"),
+    plan = synchronizeFixtureArtifact(x, "plan");
+  assert.throws(
+    () =>
+      x.tr("finish_replan", { artifacts: { design, plan, implement: null } }),
+    /Plan replan cannot change Design/,
+  );
+  assert.equal(x.store.state().phase, "replanning");
+});
+
+fixture(
+  "pre-replan checkpoint must include the latest state boundary",
+  (x, t) => {
+    x.writer("design");
+    checkpointRepository(x, t);
+    createFixtureCheckpoint(x);
+    const checkpoint = x.store
+      .events()[1]
+      .find((e) => e.event_type === "checkpoint.completed");
+    x.tr("start_review", { stage: "design" });
+    const prompt = x.event("interaction.presented", {
+      interaction_id: "stale-checkpoint",
+      kind: "replan",
+      target: x.store.state().artifacts.design,
+      question_ids: ["R-001"],
+      text: "再計画しますか",
+    });
+    assert.throws(
+      () =>
+        x.tr("request_replan", {
+          prompt_event_id: prompt.event_id,
+          target_phase: "design",
+          scope: "要件訂正",
+          reason: "矛盾",
+          checkpoint_event_id: checkpoint.event_id,
+        }),
+      /predates current state/,
+    );
+  },
+);

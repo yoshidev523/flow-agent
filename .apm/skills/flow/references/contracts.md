@@ -1,4 +1,4 @@
-# Flow 4.0.0 契約
+# Flow 4.1.0 契約
 
 ## 正本
 
@@ -36,7 +36,7 @@ SHA-256は保存完了後の全バイトから計算する。成果物自身のd
 | finding/gate | id:text; classification:gate; resolution:revise/human_decision; decision_refs:text[]; target:text; problem:text; evidence:text; instruction:text; completion:text; judgment:judgment\|null |
 | finding/scope_candidate | id:text; classification:scope_candidate; decision_refs:text[]; proposal:text; evidence:text; impact:text; recommendation:text |
 | phase-artifact | schema_version:flow/phase-artifact-v2; artifact:design/plan; revision:integer>=1; status:needs_input/ready; producer:text; invocation_id:text; operation:create/revise/respond; updated_at:timestamp; inputs:reference[]; questions:question[]; feedback_results:feedback-result[]; tasks:task[]; verification_plan:verification-plan[]; handoff_checks:handoff-check[] |
-| implement-artifact | schema_version:flow/implement-artifact-v2; artifact:implement; revision:integer>=1; status:in_progress/blocked/completed; producer:flow-implement; invocation_id:text; operation:execute; updated_at:timestamp; plan:reference; tasks:task-progress[]; verifications:verification[]; blocker:text\|null; commit:小文字16進40〜64桁\|null |
+| implement-artifact | schema_version:flow/implement-artifact-v2; artifact:implement; revision:integer>=1; status:in_progress/blocked/completed; producer:flow-implement/flow-artifact-sync; invocation_id:text; operation:execute; updated_at:timestamp; plan:reference; tasks:task-progress[]; verifications:verification[]; blocker:text\|null; commit:小文字16進40〜64桁\|null |
 | review-source | phase:design/plan; review_stage:design/decision/final; review_cycle_id:cycle ID; target:reference; design:reference\|null; findings:finding[]; failure:failure\|null; schema_version:flow/review-source-v2; revision:1; source_id:text; source_kind:ai/human; status:passed/changes_required/blocked/unable; created_at:timestamp |
 | phase-review | phase:design/plan; review_stage:design/decision/final; review_cycle_id:cycle ID; target:reference; design:reference\|null; findings:finding[]; failure:failure\|null; schema_version:flow/phase-review-v2; revision:1; mode:ai/human; status:passed/changes_required/blocked/incomplete; sources:reference[]; judgments:judgment[]; created_at:timestamp; source_paths:text[]（重複不可） |
 | feedback-item | id:text; kind:change/answer; target:text; instruction:text; evidence:text; completion:text |
@@ -44,10 +44,15 @@ SHA-256は保存完了後の全バイトから計算する。成果物自身のd
 | counter | automatic_revision:0/1; execution_retry:0/1; human_retry:0/1 |
 | active-review | stage:design/plan_decision/plan_final; review_cycle_id:text; mode:ai/human; target:reference; design:reference\|null; path:text; scope_acknowledged:boolean; human_source:reference\|null |
 | invocation | invocation_id:text; component:text; operation:text; inputs:reference[] |
-| waiting | kind:writer_question/human_review/review_decision/scope_candidate/implement_blocker; target:reference; question_ids:text[1..]; prompt_event_id:text |
-| flow-state | schema_version:flow/flow-state-v2; feature_id:text; run_id:text; state_revision:integer>=1; phase:design/design_review/plan/plan_decision_review/plan_review/implement/completed; state:running/waiting_for_input/blocked/completed; artifacts:artifact参照map; reviews:review参照map; review_mode:mode map; counters:counter map; cycle_counters:cycle map; active_review:active-review\|null; active_invocation:invocation\|null; waiting:waiting\|null; blocker:text\|null; last_transition_event_id:text; updated_at:timestamp; pending_operation:create/revise/respond/execute/null; pending_feedback:reference\|null |
+| waiting | kind:writer_question/human_review/review_decision/scope_candidate/implement_blocker/replan; target:reference; question_ids:text[1..]; prompt_event_id:text |
+| flow-state | schema_version:flow/flow-state-v2; feature_id:text; run_id:text; state_revision:integer>=1; phase:design/design_review/plan/plan_decision_review/plan_review/implement/completed/replanning; state:running/waiting_for_input/blocked/completed; artifacts:artifact参照map; reviews:review参照map; review_mode:mode map; counters:counter map; cycle_counters:cycle map; active_review:active-review\|null; active_invocation:invocation\|null; waiting:waiting\|null; blocker:text\|null; last_transition_event_id:text; updated_at:timestamp; pending_operation:create/revise/respond/execute/null; pending_feedback:reference\|null; replan:replan\|null（省略可） |
 | audit-event | event_id:E-に続く6桁以上の数字; event_key:text; event_type:イベント一覧の名前; run_id:text; invocation_id:text\|null; occurred_at:timestamp; recorded_at:timestamp; actor:text; caused_by:text[]; data:イベント別object |
 | audit-log | schema_version:flow/audit-log-v1; feature_id:text; created_at:timestamp |
+| replan | target_phase:design/plan; scope:text; reason:text; prompt_event_id:text; response_event_id:text\|null; checkpoint_event_id:text; approved:boolean; previous_phase:text; before:artifact参照map |
+| checkpoint | checkpoint_id:text; tag:text; commit:SHA; parent:SHA; paths:text[]; artifacts:reference[]; audit_event_id:text; decision_event_ids:text[] |
+| checkpoint-request | request_id:text; checkpoint_id:kebab-case; reason:text; paths:text[]; decision_event_ids:text[] |
+| checkpoint-recover | request_id:text; create_missing_tag:boolean |
+| checkpoint-restore | request_id:text; checkpoint_id:text; branch:text |
 
 flow-stateのmapは次の固定keyをすべて持ち、未知keyを拒否する。
 
@@ -78,6 +83,8 @@ spec/YYYYMMDD_feature-name/
 ```
 
 state、feedback、human sourceのownerはFlow。
+明示的な同期中はflow-artifact-syncがDesign・Plan・Implementと同期用feedbackのownerになる。
+他ownerと同時実行せず、同期はstate・reviewを更新しない。
 Design/Planは対応writer、implementはexecutor、観点sourceは担当reviewer、aggregateはhub。
 CLIはownerの代わりに決まった形式で保存するだけで、内容を生成・評価しない。
 監査の物理writerは共通CLIだけ。各componentは自分の行動・判断だけを記録する。
@@ -87,7 +94,8 @@ CLIはownerの代わりに決まった形式で保存するだけで、内容を
 
 Design/Planは固定path、status needs_input/ready、正のrevision、producer、invocation_id、operation、
 updated_at、inputs、questions、feedback_results、tasks、verification_plan、handoff_checksを保持する。
-Designのproducerはflow-design、Planはflow-plan。Designのtasksは空。
+Designのproducerはflow-design、Planはflow-plan。明示的な同期ではどちらもflow-artifact-syncを使える。
+同期ownerは既存成果物だけを更新し、他ownerのactive invocation中にはpublishしない。Designのtasksは空。
 
 questionsはid、question、required、status open/resolved、2〜3 options、recommendation、reason、
 assumptions、answerを持つ。optionはid/text/impact。openのanswerはnull、resolvedは空でない文字列。
@@ -111,7 +119,7 @@ PlanにDesignを渡す場合はinputsへpath/revision/digestを記録する。
 
 ## implement-artifact-v2
 
-status in_progress/blocked/completed、revision、producer flow-implement、invocation_id、operation execute、
+status in_progress/blocked/completed、revision、producer flow-implementまたはflow-artifact-sync、invocation_id、operation execute、
 updated_at、plan参照、tasks、verifications、blocker、commitを持つ。
 task進捗はid/status pending|in_progress|blocked|completed/evidence。
 verificationはid/command/status passed|failed|not_run/required/reason。
@@ -121,7 +129,11 @@ blocked記録は不正なPlanを修復せず、呼出側が指定した参照と
 completedは全Plan taskがcompleted、Planに指定した検証結果がすべてあり、必須検証がpassed、commit SHAが記録済み。
 検証commandとrequiredはPlanの値から変更できない。
 commitが実際に対象変更を含むことと検証結果の真実性はexecutorが確認し、証拠を監査へ記録する。
-completed成果物は終端。in_progress/blockedの進捗変更もrevisionと変更履歴を更新する。
+通常executorにとってcompleted成果物は終端。同期ownerだけは既存のcompletedも更新できる。
+同期のpublishではstatus blocked、commit null、全tasks pending、全verifications not_runを必須とし、
+旧完了証拠を新Planへ流用しない。変更前の証拠は変更履歴・監査へ残す。
+in_progress/blockedの進捗変更もrevisionと変更履歴を更新する。
+同期はFlow stateを変更しない。旧revisionを参照するstate・reviewはstaleとして再利用しない。
 
 ## review-source-v2 / phase-review-v2
 
@@ -168,7 +180,7 @@ feedbackにはstatusを設けず、監査の状態欄もnullにする。
 
 ## flow-state-v2
 
-phaseはdesign/design_review/plan/plan_decision_review/plan_review/implement/completed。
+phaseはdesign/design_review/plan/plan_decision_review/plan_review/implement/completed/replanning。
 stateはrunning/waiting_for_input/blocked/completed。
 completed phase/stateは同時に成立し、実行・review・回答待ちがない。
 Planの質問はdecision review通過後に提示するためplanにwaiting_for_inputを置かない。
@@ -205,7 +217,7 @@ next_actionは保存せず、検証済みphase/stateから導く。
 start_invocationで起動を予約し、完了後finish_invocationでownerの出力を登録する。
 Flow内のwriterは承認したpending_operation/feedbackだけを使う。
 reviewのpassedは評価時・移行時のdigest一致を必須とする。
-blockedの採用回答変更は人間へ戻す。PlanでDesign/scope変更が必要なら別タスクとして扱う。
+blockedの採用回答変更は人間へ戻す。PlanでDesign/scope変更が必要なら人間承認付き再計画へ進む。
 
 ## audit-log-v1
 
@@ -247,6 +259,8 @@ dataは次の表のfieldをすべて持ち、未知fieldを拒否する。型は
 | flow.blocked | reason:text; resume_condition:text |
 | flow.resumed | reason:text; evidence:text[] |
 | flow.completed | implement:reference |
+| checkpoint.prepared | checkpoint:checkpoint; request_sha256:sha256 |
+| checkpoint.completed | checkpoint:checkpoint |
 
 feedback-mappingはitem_id:text、origin_ref:textのobject。item_idはfeedback item ID、
 origin_refは元の回答・指摘を識別できる参照を保持する。origin_event_idsは対応する監査event ID。
@@ -296,3 +310,27 @@ resume-check --recoverまたは元のtransition requestの再送で、保存済�
 末尾が途中の監査は読み飛ばさず拒否し、原本を保存して人間へ修復を求める。
 外部操作の完了は推測しない。active invocationは実態と証拠を確認して登録または停止する。
 履歴は訂正イベントで補正する。暗号学的な改ざん防止や複数fileの完全transactionを保証しない。
+
+## 再計画とチェックポイント（4.1.0）
+
+request_replanは進行中invocationがないこと、現在参照とcheckpointの一致、現在stateより後の
+checkpoint監査地点、kind replanの提示eventを検証し、phase replanningへ移す。
+completedからの通常操作は終端のまま、request_replanだけを許可する。
+begin_replanは提示と結び付くhuman回答とapproval approveを要求する。cancel_replanは未承認時だけ
+human回答を根拠に元のstateを復元し、state revisionと監査は前へ進める。
+finish_replanは承認後のsync保存event、最新入力参照、対象revisionの増加を検証する。
+Planへの戻りではDesignを変更できない。既存成果物の削除・未作成成果物の追加は行わない。
+既存Implementは最新Planに対するblockedへ同期する。必要なreview参照をnullにし、cycleとcounterを維持する。
+replanは通常stateでは省略またはnull。replanning中はcontext必須でactive invocation/reviewはnull。
+承認前はwaiting_for_input、承認後はrunning。resume-checkは承認済み同期中だけ旧artifact参照を
+一時的に許容し、通常再開を指示せずattentionを返す。
+
+checkpointは既存Git HEADを親とした専用commitとlocal tagで保存する。現在のHEAD・indexは変更しない。
+feature directoryと明示pathsの内容を保存し、lockは除く。無関係な作業fileの未保存変更は含めない。
+監査の保存地点はaudit_event_idで示し、commit/tag結果を後続eventへ追記する。
+checkpoint.prepared/completedはCLI専用。直接audit-appendせずcheckpoint commandが保存する。
+再送はfingerprintを照合し、未完了ならcheckpoint-recoverでcommit/tagを検査する。
+未完了checkpointがあれば他mutationを拒否し、resume-checkは外部操作を繰り返さずattentionを返す。
+未作成tagの作成はcreate_missing_tag:trueで明示した場合だけ行う。
+checkpoint-restoreは新しいbranchだけを作り、checkout・reset・push・Flow再開はしない。
+過去snapshotの参照はGit commit内のbytesと照合し、現在成果物のrevision変更で無効扱いにしない。

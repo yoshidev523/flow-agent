@@ -6,6 +6,10 @@ Node.js 22以上だけを必要とする。ZodとYAML処理は単一のflowctl.j
 利用側ではnpm install、ビルド、Python、schema fileの読み込みは不要。
 repositoryでは`.apm/skills/flow/scripts/flowctl.js`、配置後はこのFlow skillのscriptsを使う。
 他leafからは隣接する`../flow/scripts/flowctl.js`へ参照する。
+独立したflow-artifact-syncには同じCLI・契約・templateを同梱し、そのskill内だけで利用できる。
+同期ownerのpublishはphaseを制限せず、active invocationとの同時更新だけを拒否する。
+同期はstateを更新せず、旧参照がstaleになったことを呼出側へ報告する。
+Flowは人間承認付きreplanning中に同期し、finish_replanで最新参照を登録する。
 
 ```sh
 node {flow-skill-dir}/scripts/flowctl.js --root spec/YYYYMMDD_feature-name init --request /tmp/init.yml
@@ -98,6 +102,10 @@ feedback.createdでは原文イベントとitem IDの対応を記録する。
 | advance | なし |
 | block | reason、resume_condition |
 | resume | reason、evidence |
+| request_replan | prompt_event_id、target_phase design/plan、scope、reason、checkpoint_event_id |
+| begin_replan | response_event_id、approval approve |
+| cancel_replan | response_event_id |
+| finish_replan | artifacts（design/plan/implementの参照またはnull） |
 
 start_reviewの返却active_reviewにcycle ID、出力path、対象、modeがある。
 waitのkindはwriter_question/human_review/review_decision/scope_candidate/implement_blocker。
@@ -134,3 +142,26 @@ CLIが動作していないことを確認してdirectoryだけを除去する�
 共有network file systemと複数PCによる同時操作は対象外。
 Windowsではdirectory fsyncを行えない。
 旧Python版の空のlock fileが残っている場合は、旧CLIが動作していないことを確認して除去する。
+
+## checkpoint-create / checkpoint-recover / checkpoint-restore
+
+Gitが必要。Git repository内のfeature directoryと既存HEADを対象にする。
+checkpoint-createのrequestはrequest_id、checkpoint_id（kebab-case）、reason、paths（repo相対）、
+decision_event_ids。feature directoryは自動で保存し、pathsに今回の実装fileだけを指定する。
+機密を含むfileを対象にしない。feature directoryの成果物を保存するためignore指定でも含める。
+CLIは一時indexで専用commitを作り、flow/{feature_id}/{run_id}/{checkpoint_id}にlocal tagを付ける。
+現在HEAD・index・作業fileは変更しない。commit前の監査地点をsnapshotに含め、結果は後続監査へ記録する。
+失敗を通常成功として進めない。同じrequest再送は完了確認だけを行い、未完了は明示復旧する。
+
+checkpoint-recoverは元のrequest_id、create_missing_tag（boolean）。falseならtag存在と整合だけを確認する。
+未作成tagを作る必要がある場合だけtrueを明示する。既存tagの変更・削除は行わない。
+checkpoint-restoreはrequest_id、checkpoint_id、branch。指定commitへ新しいbranchだけを作る。
+中断後は同じrequestでbranchのcommitを照合して監査を補完できる。checkout/reset/pushは行わない。
+
+## 完了後の監査
+
+completedでもaudit-appendは利用できる。タスクに関係する質問・調査・訂正を記録し、説明だけなら
+stateを変更しない。過去の対話の補記では再構成であること、証拠、元日時の不明をdataに明示する。
+occurred_atは補記操作の実測日時、recorded_atはCLIが付ける。元日時を推測しない。
+
+checkpoint.preparedが未完了なら他のmutationを拒否する。resume-checkはcheckpoint-recoverを案内し、Git操作を再実行しない。

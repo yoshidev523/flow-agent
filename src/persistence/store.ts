@@ -270,6 +270,23 @@ export class Store extends Files {
     ];
   }
   consistent(replayingRequestId?: string): void {
+    const checkpointEvents = this.events()[1];
+    check(
+      checkpointEvents
+        .filter((e) => e.event_type === "checkpoint.prepared")
+        .every(
+          (e) =>
+            checkpointEvents.some(
+              (done) =>
+                done.event_type === "checkpoint.completed" &&
+                done.caused_by.includes(e.event_id),
+            ) ||
+            (replayingRequestId !== undefined &&
+              e.event_key === replayingRequestId + ":checkpoint-prepared"),
+        ),
+      "Unfinished checkpoint; use checkpoint-recover",
+      true,
+    );
     check(
       !this.pending().length,
       "Unfinished persistence operation; run resume-check --recover",
@@ -452,10 +469,12 @@ export class Store extends Files {
           "Multiple Design inputs",
         );
     } else if (kind === "implement-artifact") {
-      if (meta.status === "blocked") return;
+      if (meta.status === "blocked" && meta.producer !== "flow-artifact-sync")
+        return;
       const [plan] = this.reference(meta.plan);
       check(
-        plan.artifact === "plan" && plan.status === "ready",
+        plan.artifact === "plan" &&
+          (plan.status === "ready" || meta.producer === "flow-artifact-sync"),
         "Executor requires ready Plan",
       );
       check(
@@ -614,6 +633,19 @@ export class Store extends Files {
     }
     const p = this.path(name),
       kind = KINDS[meta.schema_version];
+    const syncing = meta.producer === "flow-artifact-sync";
+    if (syncing && fs.existsSync(this.path("flow-state.yml"))) {
+      check(
+        !this.state().replan || this.state().replan?.approved,
+        "Replan is awaiting human approval",
+        true,
+      );
+      check(
+        this.state().active_invocation === null,
+        "Cannot sync during an active invocation",
+        true,
+      );
+    }
     check(
       kind && kind !== "flow-state" && kind !== "audit-log",
       "publish only accepts phase documents",
@@ -622,6 +654,17 @@ export class Store extends Files {
       oldBody = "",
       before: ArtifactRef | null = null;
     if (fs.existsSync(p)) [old, oldBody, before] = this.document(name);
+    if (syncing) {
+      check(old !== null, "Sync only updates existing artifacts", true);
+      if (kind === "implement-artifact")
+        check(
+          meta.status === "blocked" &&
+            meta.commit === null &&
+            meta.tasks.every((t: Fields) => t.status === "pending") &&
+            meta.verifications.every((v: Fields) => v.status === "not_run"),
+          "Sync must invalidate implementation completion and verification evidence",
+        );
+    }
     check(
       Number.isInteger(request.expected_revision) &&
         request.expected_revision === (old?.revision ?? 0),
@@ -645,7 +688,7 @@ export class Store extends Files {
         "Cannot change artifact identity",
       );
       check(
-        !old || old.status !== "completed",
+        !old || old.status !== "completed" || syncing,
         "Completed implementation is terminal",
         true,
       );
@@ -1049,6 +1092,30 @@ export class Store extends Files {
     const state = this.state();
     [, events] = this.events();
     this.verifyStateRecord(state, events);
+    if (
+      events.some(
+        (e) =>
+          e.event_type === "checkpoint.prepared" &&
+          !events.some(
+            (done) =>
+              done.event_type === "checkpoint.completed" &&
+              done.caused_by.includes(e.event_id),
+          ),
+      )
+    )
+      return {
+        state,
+        recovered_events: recovered,
+        attention:
+          "Inspect checkpoint commit/tag and use checkpoint-recover; Git operations were not repeated",
+      };
+    if (state.replan?.approved)
+      return {
+        state,
+        recovered_events: recovered,
+        attention:
+          "Inspect synchronization and finish_replan; do not resume ordinary work",
+      };
     for (const [artifact, r] of Object.entries(state.artifacts))
       if (r) {
         try {

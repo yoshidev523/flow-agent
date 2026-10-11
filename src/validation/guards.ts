@@ -84,6 +84,8 @@ export const MANAGED_EVENTS = new Set([
   "artifact.update_prepared",
   "artifact.updated",
   "artifact.update_aborted",
+  "checkpoint.prepared",
+  "checkpoint.completed",
 ]);
 export function schemaCheck(
   name: ContractName | "event-data",
@@ -161,7 +163,11 @@ export function validateMeta(meta: Fields, body?: string): ContractName {
         meta.feedback_results.every((x: Fields) => x.result === "applied"),
       "ready cannot contain unresolved feedback",
     );
-    check(meta.producer === "flow-" + meta.artifact, "Wrong artifact owner");
+    check(
+      meta.producer === "flow-" + meta.artifact ||
+        meta.producer === "flow-artifact-sync",
+      "Wrong artifact owner",
+    );
     if (meta.artifact === "design")
       check(
         !meta.tasks.length &&
@@ -311,6 +317,19 @@ export function validateMeta(meta: Fields, body?: string): ContractName {
     );
   }
   if (kind === "flow-state") {
+    check(
+      (meta.phase === "replanning") === Boolean(meta.replan),
+      "Replanning phase/context mismatch",
+    );
+    if (meta.replan)
+      check(
+        meta.active_invocation === null &&
+          meta.active_review === null &&
+          (meta.replan.approved
+            ? meta.state === "running"
+            : meta.state === "waiting_for_input"),
+        "Invalid replan state",
+      );
     check(
       (meta.phase === "completed") === (meta.state === "completed"),
       "Completed phase/state mismatch",

@@ -154,17 +154,17 @@ var require_visit = __commonJS({
     visit2.BREAK = BREAK;
     visit2.SKIP = SKIP;
     visit2.REMOVE = REMOVE;
-    function visit_(key, node2, visitor, path3) {
-      const ctrl = callVisitor(key, node2, visitor, path3);
+    function visit_(key, node2, visitor, path4) {
+      const ctrl = callVisitor(key, node2, visitor, path4);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path3, ctrl);
-        return visit_(key, ctrl, visitor, path3);
+        replaceNode(key, path4, ctrl);
+        return visit_(key, ctrl, visitor, path4);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node2)) {
-          path3 = Object.freeze(path3.concat(node2));
+          path4 = Object.freeze(path4.concat(node2));
           for (let i = 0; i < node2.items.length; ++i) {
-            const ci = visit_(i, node2.items[i], visitor, path3);
+            const ci = visit_(i, node2.items[i], visitor, path4);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -175,13 +175,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node2)) {
-          path3 = Object.freeze(path3.concat(node2));
-          const ck = visit_("key", node2.key, visitor, path3);
+          path4 = Object.freeze(path4.concat(node2));
+          const ck = visit_("key", node2.key, visitor, path4);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node2.key = null;
-          const cv = visit_("value", node2.value, visitor, path3);
+          const cv = visit_("value", node2.value, visitor, path4);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -202,17 +202,17 @@ var require_visit = __commonJS({
     visitAsync.BREAK = BREAK;
     visitAsync.SKIP = SKIP;
     visitAsync.REMOVE = REMOVE;
-    async function visitAsync_(key, node2, visitor, path3) {
-      const ctrl = await callVisitor(key, node2, visitor, path3);
+    async function visitAsync_(key, node2, visitor, path4) {
+      const ctrl = await callVisitor(key, node2, visitor, path4);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path3, ctrl);
-        return visitAsync_(key, ctrl, visitor, path3);
+        replaceNode(key, path4, ctrl);
+        return visitAsync_(key, ctrl, visitor, path4);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node2)) {
-          path3 = Object.freeze(path3.concat(node2));
+          path4 = Object.freeze(path4.concat(node2));
           for (let i = 0; i < node2.items.length; ++i) {
-            const ci = await visitAsync_(i, node2.items[i], visitor, path3);
+            const ci = await visitAsync_(i, node2.items[i], visitor, path4);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -223,13 +223,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node2)) {
-          path3 = Object.freeze(path3.concat(node2));
-          const ck = await visitAsync_("key", node2.key, visitor, path3);
+          path4 = Object.freeze(path4.concat(node2));
+          const ck = await visitAsync_("key", node2.key, visitor, path4);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node2.key = null;
-          const cv = await visitAsync_("value", node2.value, visitor, path3);
+          const cv = await visitAsync_("value", node2.value, visitor, path4);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -256,23 +256,23 @@ var require_visit = __commonJS({
       }
       return visitor;
     }
-    function callVisitor(key, node2, visitor, path3) {
+    function callVisitor(key, node2, visitor, path4) {
       if (typeof visitor === "function")
-        return visitor(key, node2, path3);
+        return visitor(key, node2, path4);
       if (identity.isMap(node2))
-        return visitor.Map?.(key, node2, path3);
+        return visitor.Map?.(key, node2, path4);
       if (identity.isSeq(node2))
-        return visitor.Seq?.(key, node2, path3);
+        return visitor.Seq?.(key, node2, path4);
       if (identity.isPair(node2))
-        return visitor.Pair?.(key, node2, path3);
+        return visitor.Pair?.(key, node2, path4);
       if (identity.isScalar(node2))
-        return visitor.Scalar?.(key, node2, path3);
+        return visitor.Scalar?.(key, node2, path4);
       if (identity.isAlias(node2))
-        return visitor.Alias?.(key, node2, path3);
+        return visitor.Alias?.(key, node2, path4);
       return void 0;
     }
-    function replaceNode(key, path3, node2) {
-      const parent = path3[path3.length - 1];
+    function replaceNode(key, path4, node2) {
+      const parent = path4[path4.length - 1];
       if (identity.isCollection(parent)) {
         parent.items[key] = node2;
       } else if (identity.isPair(parent)) {
@@ -884,10 +884,10 @@ var require_Collection = __commonJS({
     var createNode = require_createNode();
     var identity = require_identity();
     var Node = require_Node();
-    function collectionFromPath(schema, path3, value) {
+    function collectionFromPath(schema, path4, value) {
       let v = value;
-      for (let i = path3.length - 1; i >= 0; --i) {
-        const k = path3[i];
+      for (let i = path4.length - 1; i >= 0; --i) {
+        const k = path4[i];
         if (typeof k === "number" && Number.isInteger(k) && k >= 0) {
           const a = [];
           a[k] = v;
@@ -906,7 +906,7 @@ var require_Collection = __commonJS({
         sourceObjects: /* @__PURE__ */ new Map()
       });
     }
-    var isEmptyPath = (path3) => path3 == null || typeof path3 === "object" && !!path3[Symbol.iterator]().next().done;
+    var isEmptyPath = (path4) => path4 == null || typeof path4 === "object" && !!path4[Symbol.iterator]().next().done;
     var Collection = class extends Node.NodeBase {
       constructor(type, schema) {
         super(type);
@@ -936,11 +936,11 @@ var require_Collection = __commonJS({
        * be a Pair instance or a `{ key, value }` object, which may not have a key
        * that already exists in the map.
        */
-      addIn(path3, value) {
-        if (isEmptyPath(path3))
+      addIn(path4, value) {
+        if (isEmptyPath(path4))
           this.add(value);
         else {
-          const [key, ...rest] = path3;
+          const [key, ...rest] = path4;
           const node2 = this.get(key, true);
           if (identity.isCollection(node2))
             node2.addIn(rest, value);
@@ -954,8 +954,8 @@ var require_Collection = __commonJS({
        * Removes a value from the collection.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path3) {
-        const [key, ...rest] = path3;
+      deleteIn(path4) {
+        const [key, ...rest] = path4;
         if (rest.length === 0)
           return this.delete(key);
         const node2 = this.get(key, true);
@@ -969,8 +969,8 @@ var require_Collection = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path3, keepScalar) {
-        const [key, ...rest] = path3;
+      getIn(path4, keepScalar) {
+        const [key, ...rest] = path4;
         const node2 = this.get(key, true);
         if (rest.length === 0)
           return !keepScalar && identity.isScalar(node2) ? node2.value : node2;
@@ -988,8 +988,8 @@ var require_Collection = __commonJS({
       /**
        * Checks if the collection includes a value with the key `key`.
        */
-      hasIn(path3) {
-        const [key, ...rest] = path3;
+      hasIn(path4) {
+        const [key, ...rest] = path4;
         if (rest.length === 0)
           return this.has(key);
         const node2 = this.get(key, true);
@@ -999,8 +999,8 @@ var require_Collection = __commonJS({
        * Sets a value in this collection. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path3, value) {
-        const [key, ...rest] = path3;
+      setIn(path4, value) {
+        const [key, ...rest] = path4;
         if (rest.length === 0) {
           this.set(key, value);
         } else {
@@ -3515,9 +3515,9 @@ var require_Document = __commonJS({
           this.contents.add(value);
       }
       /** Adds a value to the document. */
-      addIn(path3, value) {
+      addIn(path4, value) {
         if (assertCollection(this.contents))
-          this.contents.addIn(path3, value);
+          this.contents.addIn(path4, value);
       }
       /**
        * Create a new `Alias` node, ensuring that the target `node` has the required anchor.
@@ -3592,14 +3592,14 @@ var require_Document = __commonJS({
        * Removes a value from the document.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path3) {
-        if (Collection.isEmptyPath(path3)) {
+      deleteIn(path4) {
+        if (Collection.isEmptyPath(path4)) {
           if (this.contents == null)
             return false;
           this.contents = null;
           return true;
         }
-        return assertCollection(this.contents) ? this.contents.deleteIn(path3) : false;
+        return assertCollection(this.contents) ? this.contents.deleteIn(path4) : false;
       }
       /**
        * Returns item at `key`, or `undefined` if not found. By default unwraps
@@ -3614,10 +3614,10 @@ var require_Document = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path3, keepScalar) {
-        if (Collection.isEmptyPath(path3))
+      getIn(path4, keepScalar) {
+        if (Collection.isEmptyPath(path4))
           return !keepScalar && identity.isScalar(this.contents) ? this.contents.value : this.contents;
-        return identity.isCollection(this.contents) ? this.contents.getIn(path3, keepScalar) : void 0;
+        return identity.isCollection(this.contents) ? this.contents.getIn(path4, keepScalar) : void 0;
       }
       /**
        * Checks if the document includes a value with the key `key`.
@@ -3628,10 +3628,10 @@ var require_Document = __commonJS({
       /**
        * Checks if the document includes a value at `path`.
        */
-      hasIn(path3) {
-        if (Collection.isEmptyPath(path3))
+      hasIn(path4) {
+        if (Collection.isEmptyPath(path4))
           return this.contents !== void 0;
-        return identity.isCollection(this.contents) ? this.contents.hasIn(path3) : false;
+        return identity.isCollection(this.contents) ? this.contents.hasIn(path4) : false;
       }
       /**
        * Sets a value in this document. For `!!set`, `value` needs to be a
@@ -3648,13 +3648,13 @@ var require_Document = __commonJS({
        * Sets a value in this document. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path3, value) {
-        if (Collection.isEmptyPath(path3)) {
+      setIn(path4, value) {
+        if (Collection.isEmptyPath(path4)) {
           this.contents = value;
         } else if (this.contents == null) {
-          this.contents = Collection.collectionFromPath(this.schema, Array.from(path3), value);
+          this.contents = Collection.collectionFromPath(this.schema, Array.from(path4), value);
         } else if (assertCollection(this.contents)) {
-          this.contents.setIn(path3, value);
+          this.contents.setIn(path4, value);
         }
       }
       /**
@@ -5615,9 +5615,9 @@ var require_cst_visit = __commonJS({
     visit2.BREAK = BREAK;
     visit2.SKIP = SKIP;
     visit2.REMOVE = REMOVE;
-    visit2.itemAtPath = (cst, path3) => {
+    visit2.itemAtPath = (cst, path4) => {
       let item = cst;
-      for (const [field, index] of path3) {
+      for (const [field, index] of path4) {
         const tok = item?.[field];
         if (tok && "items" in tok) {
           item = tok.items[index];
@@ -5626,23 +5626,23 @@ var require_cst_visit = __commonJS({
       }
       return item;
     };
-    visit2.parentCollection = (cst, path3) => {
-      const parent = visit2.itemAtPath(cst, path3.slice(0, -1));
-      const field = path3[path3.length - 1][0];
+    visit2.parentCollection = (cst, path4) => {
+      const parent = visit2.itemAtPath(cst, path4.slice(0, -1));
+      const field = path4[path4.length - 1][0];
       const coll = parent?.[field];
       if (coll && "items" in coll)
         return coll;
       throw new Error("Parent collection not found");
     };
-    function _visit(path3, item, visitor) {
-      let ctrl = visitor(item, path3);
+    function _visit(path4, item, visitor) {
+      let ctrl = visitor(item, path4);
       if (typeof ctrl === "symbol")
         return ctrl;
       for (const field of ["key", "value"]) {
         const token = item[field];
         if (token && "items" in token) {
           for (let i = 0; i < token.items.length; ++i) {
-            const ci = _visit(Object.freeze(path3.concat([[field, i]])), token.items[i], visitor);
+            const ci = _visit(Object.freeze(path4.concat([[field, i]])), token.items[i], visitor);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -5653,10 +5653,10 @@ var require_cst_visit = __commonJS({
             }
           }
           if (typeof ctrl === "function" && field === "key")
-            ctrl = ctrl(item, path3);
+            ctrl = ctrl(item, path4);
         }
       }
-      return typeof ctrl === "function" ? ctrl(item, path3) : ctrl;
+      return typeof ctrl === "function" ? ctrl(item, path4) : ctrl;
     }
     exports2.visit = visit2;
   }
@@ -6958,14 +6958,14 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs5 = this.flowScalar(this.type);
+              const fs6 = this.flowScalar(this.type);
               if (atNextItem || it.value) {
-                map2.items.push({ start, key: fs5, sep: [] });
+                map2.items.push({ start, key: fs6, sep: [] });
                 this.onKeyLine = true;
               } else if (it.sep) {
-                this.stack.push(fs5);
+                this.stack.push(fs6);
               } else {
-                Object.assign(it, { key: fs5, sep: [] });
+                Object.assign(it, { key: fs6, sep: [] });
                 this.onKeyLine = true;
               }
               return;
@@ -7093,13 +7093,13 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs5 = this.flowScalar(this.type);
+              const fs6 = this.flowScalar(this.type);
               if (!it || it.value)
-                fc.items.push({ start: [], key: fs5, sep: [] });
+                fc.items.push({ start: [], key: fs6, sep: [] });
               else if (it.sep)
-                this.stack.push(fs5);
+                this.stack.push(fs6);
               else
-                Object.assign(it, { key: fs5, sep: [] });
+                Object.assign(it, { key: fs6, sep: [] });
               return;
             }
             case "flow-map-end":
@@ -7408,7 +7408,7 @@ var require_dist = __commonJS({
 });
 
 // src/cli.ts
-var import_node_fs4 = __toESM(require("node:fs"), 1);
+var import_node_fs5 = __toESM(require("node:fs"), 1);
 
 // src/persistence/store.ts
 var import_node_fs3 = __toESM(require("node:fs"), 1);
@@ -8486,10 +8486,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path3) {
-  if (!path3)
+function getElementAtPath(obj, path4) {
+  if (!path4)
     return obj;
-  return path3.reduce((acc, key) => acc?.[key], obj);
+  return path4.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -8829,11 +8829,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path3, issues) {
+function prefixIssues(path4, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path3);
+    iss.path.unshift(path4);
     return iss;
   });
 }
@@ -9283,16 +9283,16 @@ function flattenError(error62, mapper = (issue2) => issue2.message) {
 }
 function formatError(error62, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error63, path3 = []) => {
+  const processError = (error63, path4 = []) => {
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path3, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path4, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path3, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path4, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path3, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path4, ...issue2.path]);
       } else {
-        const fullpath = [...path3, ...issue2.path];
+        const fullpath = [...path4, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -9331,17 +9331,17 @@ function formatError(error62, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error62, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error63, path3 = []) => {
+  const processError = (error63, path4 = []) => {
     var _a3;
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path3, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path4, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path3, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path4, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path3, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path4, ...issue2.path]);
       } else {
-        const fullpath = [...path3, ...issue2.path];
+        const fullpath = [...path4, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -9380,8 +9380,8 @@ function treeifyError(error62, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path3 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path3) {
+  const path4 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path4) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -26483,13 +26483,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path3 = ref.slice(1).split("/").filter(Boolean);
-  if (path3.length === 0) {
+  const path4 = ref.slice(1).split("/").filter(Boolean);
+  if (path4.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path3[0] === defsKey) {
-    const key = path3[1] === void 0 ? void 0 : decodeJSONPointerSegment(path3[1]);
+  if (path4[0] === defsKey) {
+    const key = path4[1] === void 0 ? void 0 : decodeJSONPointerSegment(path4[1]);
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -27466,7 +27466,7 @@ var ImplementArtifactSchema = external_exports.strictObject({
   artifact: external_exports.literal("implement"),
   revision: external_exports.number().int().min(1),
   status: external_exports.enum(["in_progress", "blocked", "completed"]),
-  producer: external_exports.literal("flow-implement"),
+  producer: external_exports.enum(["flow-implement", "flow-artifact-sync"]),
   invocation_id: text,
   operation: external_exports.literal("execute"),
   updated_at: timestamp,
@@ -27555,11 +27555,53 @@ var WaitingSchema = external_exports.strictObject({
     "human_review",
     "review_decision",
     "scope_candidate",
-    "implement_blocker"
+    "implement_blocker",
+    "replan"
   ]),
   target: ReferenceSchema,
   question_ids: external_exports.array(text).min(1),
   prompt_event_id: text
+});
+var ReplanSchema = external_exports.strictObject({
+  target_phase: external_exports.enum(["design", "plan"]),
+  scope: text,
+  reason: text,
+  prompt_event_id: text,
+  response_event_id: text.nullable(),
+  checkpoint_event_id: text,
+  approved: external_exports.boolean(),
+  previous_phase: text,
+  before: external_exports.strictObject({
+    design: ReferenceSchema.nullable(),
+    plan: ReferenceSchema.nullable(),
+    implement: ReferenceSchema.nullable()
+  })
+});
+var CheckpointSchema = external_exports.strictObject({
+  checkpoint_id: text,
+  tag: text,
+  commit: external_exports.string().regex(/^[0-9a-f]{40,64}$/),
+  parent: external_exports.string().regex(/^[0-9a-f]{40,64}$/),
+  paths: external_exports.array(text).min(1),
+  artifacts: external_exports.array(ReferenceSchema),
+  audit_event_id: text,
+  decision_event_ids: external_exports.array(text)
+});
+var CheckpointRequestSchema = external_exports.strictObject({
+  request_id: text,
+  checkpoint_id: text.regex(/^[a-z0-9][a-z0-9-]*$/),
+  reason: text,
+  paths: external_exports.array(text),
+  decision_event_ids: external_exports.array(text)
+});
+var CheckpointRecoverSchema = external_exports.strictObject({
+  request_id: text,
+  create_missing_tag: external_exports.boolean()
+});
+var CheckpointRestoreSchema = external_exports.strictObject({
+  request_id: text,
+  checkpoint_id: text,
+  branch: text
 });
 var FlowStateSchema = external_exports.strictObject({
   schema_version: external_exports.literal("flow/flow-state-v2"),
@@ -27573,7 +27615,8 @@ var FlowStateSchema = external_exports.strictObject({
     "plan_decision_review",
     "plan_review",
     "implement",
-    "completed"
+    "completed",
+    "replanning"
   ]),
   state: external_exports.enum(["running", "waiting_for_input", "blocked", "completed"]),
   artifacts: external_exports.strictObject({
@@ -27613,7 +27656,8 @@ var FlowStateSchema = external_exports.strictObject({
     external_exports.literal("execute"),
     external_exports.literal(null)
   ]),
-  pending_feedback: ReferenceSchema.nullable()
+  pending_feedback: ReferenceSchema.nullable(),
+  replan: ReplanSchema.nullable().optional()
 });
 var AuditEventSchema = external_exports.strictObject({
   event_id: external_exports.string().regex(new RegExp("^E-[0-9]{6,}$")),
@@ -27640,7 +27684,9 @@ var AuditEventSchema = external_exports.strictObject({
     "retry.scheduled",
     "flow.blocked",
     "flow.resumed",
-    "flow.completed"
+    "flow.completed",
+    "checkpoint.prepared",
+    "checkpoint.completed"
   ]),
   run_id: text,
   invocation_id: text.nullable(),
@@ -27680,9 +27726,19 @@ var contracts = {
   "audit-event": AuditEventSchema,
   "audit-log": AuditLogSchema,
   "verification-plan": VerificationPlanSchema,
-  "handoff-check": HandoffCheckSchema
+  "handoff-check": HandoffCheckSchema,
+  replan: ReplanSchema,
+  checkpoint: CheckpointSchema,
+  "checkpoint-request": CheckpointRequestSchema,
+  "checkpoint-recover": CheckpointRecoverSchema,
+  "checkpoint-restore": CheckpointRestoreSchema
 };
 var eventData = {
+  "checkpoint.prepared": external_exports.strictObject({
+    checkpoint: CheckpointSchema,
+    request_sha256: external_exports.string().regex(/^[0-9a-f]{64}$/)
+  }),
+  "checkpoint.completed": external_exports.strictObject({ checkpoint: CheckpointSchema }),
   "flow.started": external_exports.strictObject({
     state: FlowStateSchema,
     request_path: text
@@ -27888,7 +27944,9 @@ var MANAGED_EVENTS = /* @__PURE__ */ new Set([
   "flow.transition_aborted",
   "artifact.update_prepared",
   "artifact.updated",
-  "artifact.update_aborted"
+  "artifact.update_aborted",
+  "checkpoint.prepared",
+  "checkpoint.completed"
 ]);
 function schemaCheck(name, value, eventType) {
   const schema = name === "event-data" ? eventData[eventType] : contracts[name];
@@ -27947,7 +28005,10 @@ function validateMeta(meta3, body) {
       meta3.status !== "ready" || meta3.feedback_results.every((x) => x.result === "applied"),
       "ready cannot contain unresolved feedback"
     );
-    requireCondition(meta3.producer === "flow-" + meta3.artifact, "Wrong artifact owner");
+    requireCondition(
+      meta3.producer === "flow-" + meta3.artifact || meta3.producer === "flow-artifact-sync",
+      "Wrong artifact owner"
+    );
     if (meta3.artifact === "design")
       requireCondition(
         !meta3.tasks.length && !meta3.verification_plan.length && !meta3.handoff_checks.length,
@@ -28084,6 +28145,15 @@ function validateMeta(meta3, body) {
   }
   if (kind === "flow-state") {
     requireCondition(
+      meta3.phase === "replanning" === Boolean(meta3.replan),
+      "Replanning phase/context mismatch"
+    );
+    if (meta3.replan)
+      requireCondition(
+        meta3.active_invocation === null && meta3.active_review === null && (meta3.replan.approved ? meta3.state === "running" : meta3.state === "waiting_for_input"),
+        "Invalid replan state"
+      );
+    requireCondition(
       meta3.phase === "completed" === (meta3.state === "completed"),
       "Completed phase/state mismatch"
     );
@@ -28131,6 +28201,223 @@ function validateMeta(meta3, body) {
 
 // src/transitions.ts
 var import_node_fs2 = __toESM(require("node:fs"), 1);
+
+// src/replanning.ts
+function replanTransition(store, state, action, args, evidence) {
+  const fields = (...names) => requireCondition(
+    equal(Object.keys(args).sort(), names.sort()),
+    "Invalid fields for action " + action
+  );
+  const events = store.events()[1];
+  if (action === "request_replan") {
+    fields(
+      "prompt_event_id",
+      "target_phase",
+      "scope",
+      "reason",
+      "checkpoint_event_id"
+    );
+    requireCondition(
+      !state.active_invocation && !state.replan,
+      "Resolve active operation before replanning",
+      true
+    );
+    requireCondition(
+      ["design", "plan"].includes(args.target_phase) && typeof args.scope === "string" && args.scope.trim() && typeof args.reason === "string" && args.reason.trim(),
+      "Invalid replan scope/phase"
+    );
+    store.resumeCheck();
+    const prompt = events.find((e) => e.event_id === args.prompt_event_id);
+    requireCondition(
+      prompt && prompt.event_type === "interaction.presented" && prompt.run_id === state.run_id && prompt.data.kind === "replan",
+      "Missing replan prompt"
+    );
+    requireCondition(
+      prompt.data.question_ids.length === 1,
+      "Replan prompt must identify one approval question"
+    );
+    const target = state.artifacts[args.target_phase];
+    requireCondition(
+      target && equal(prompt.data.target, target),
+      "Replan prompt target mismatch"
+    );
+    store.reference(target);
+    const checkpoint = events.find(
+      (e) => e.event_id === args.checkpoint_event_id
+    );
+    requireCondition(
+      checkpoint && checkpoint.event_type === "checkpoint.completed" && checkpoint.run_id === state.run_id,
+      "Missing pre-replan checkpoint"
+    );
+    const snapshot = checkpoint.data.checkpoint;
+    requireCondition(
+      equal(snapshot.artifacts, Object.values(state.artifacts).filter(Boolean)),
+      "Checkpoint does not capture current artifacts"
+    );
+    const saved = events.find((e) => e.event_id === snapshot.audit_event_id);
+    requireCondition(
+      saved && events.indexOf(saved) > events.findIndex(
+        (e) => e.event_id === state.last_transition_event_id
+      ),
+      "Checkpoint predates current state"
+    );
+    state.replan = {
+      target_phase: args.target_phase,
+      scope: args.scope,
+      reason: args.reason,
+      prompt_event_id: prompt.event_id,
+      response_event_id: null,
+      checkpoint_event_id: checkpoint.event_id,
+      approved: false,
+      previous_phase: state.phase,
+      before: structuredClone(state.artifacts)
+    };
+    state.phase = "replanning";
+    state.state = "waiting_for_input";
+    state.waiting = {
+      kind: "replan",
+      target,
+      question_ids: prompt.data.question_ids,
+      prompt_event_id: prompt.event_id
+    };
+    state.active_review = null;
+    state.blocker = null;
+    state.pending_operation = null;
+    state.pending_feedback = null;
+    evidence.push(target);
+  } else if (action === "begin_replan") {
+    fields("response_event_id", "approval");
+    const context = state.replan;
+    requireCondition(
+      context && !context.approved && state.state === "waiting_for_input",
+      "No pending replan approval",
+      true
+    );
+    requireCondition(args.approval === "approve", "Replan requires explicit approval");
+    const response = events.find((e) => e.event_id === args.response_event_id), prompt = events.find((e) => e.event_id === context.prompt_event_id);
+    requireCondition(
+      response && response.event_type === "interaction.received" && response.actor === "human" && response.run_id === state.run_id && response.data.prompt_event_id === context.prompt_event_id && response.data.interaction_id === prompt?.data.interaction_id,
+      "Missing human approval for this replan"
+    );
+    requireCondition(
+      !events.some(
+        (e) => e.event_type === "flow.transition_prepared" && e.data.action === "begin_replan" && e.data.arguments.response_event_id === response.event_id
+      ),
+      "Approval already consumed"
+    );
+    context.approved = true;
+    context.response_event_id = response.event_id;
+    state.state = "running";
+    state.waiting = null;
+  } else if (action === "cancel_replan") {
+    fields("response_event_id");
+    const context = state.replan;
+    requireCondition(
+      context && !context.approved,
+      "Only unapproved replans can be cancelled",
+      true
+    );
+    const response = events.find((e) => e.event_id === args.response_event_id);
+    const prompt = events.find((e) => e.event_id === context.prompt_event_id);
+    requireCondition(
+      response && response.event_type === "interaction.received" && response.actor === "human" && response.run_id === state.run_id && response.data.prompt_event_id === context.prompt_event_id && response.data.interaction_id === prompt?.data.interaction_id,
+      "Missing human cancellation"
+    );
+    const prepared = events.find(
+      (e) => e.event_type === "flow.transition_prepared" && e.data.action === "request_replan" && e.data.after.replan.prompt_event_id === context.prompt_event_id
+    );
+    requireCondition(prepared, "Missing original replan state");
+    for (const ref of Object.values(context.before))
+      if (ref) store.reference(ref);
+    const revision = state.state_revision;
+    Object.assign(state, prepared.data.before, {
+      state_revision: revision,
+      replan: null
+    });
+  } else {
+    fields("artifacts");
+    const context = state.replan;
+    requireCondition(
+      context?.approved && state.phase === "replanning" && state.state === "running",
+      "No approved replan",
+      true
+    );
+    requireCondition(
+      args.artifacts && equal(Object.keys(args.artifacts).sort(), [
+        "design",
+        "implement",
+        "plan"
+      ]),
+      "Invalid replan artifacts"
+    );
+    const approval = events.findIndex(
+      (e) => e.event_type === "flow.transitioned" && e.data.action === "begin_replan" && e.run_id === state.run_id && e.data.after_revision === state.state_revision
+    );
+    for (const artifact of ["design", "plan", "implement"]) {
+      const before = context.before[artifact], ref = args.artifacts[artifact];
+      requireCondition(!before || ref, "Cannot discard existing artifact");
+      requireCondition(before || !ref, "Replan only synchronizes existing artifacts");
+      if (!ref) continue;
+      const [meta3] = store.reference(ref);
+      requireCondition(
+        ref.path === `artifacts/${artifact}.md` && meta3.artifact === artifact,
+        "Wrong replan artifact identity"
+      );
+      store.checkDocumentInputs(meta3);
+      if (!equal(ref, before)) {
+        requireCondition(
+          meta3.producer === "flow-artifact-sync" && ref.revision > before.revision,
+          "Replan update must be owned by sync"
+        );
+        requireCondition(
+          events.some(
+            (e, index) => index > approval && e.event_type === "artifact.updated" && equal(e.data.artifact, ref)
+          ),
+          "Artifact was not synchronized after approval"
+        );
+      }
+      evidence.push(ref);
+    }
+    requireCondition(
+      !equal(
+        args.artifacts[context.target_phase],
+        context.before[context.target_phase]
+      ),
+      "Approved target was not revised"
+    );
+    if (context.target_phase === "plan")
+      requireCondition(
+        equal(args.artifacts.design, context.before.design),
+        "Plan replan cannot change Design"
+      );
+    const design = args.artifacts.design, plan = args.artifacts.plan;
+    if (plan)
+      requireCondition(
+        store.reference(plan)[0].inputs.some((r) => equal(r, design)),
+        "Replanned Plan must reference latest Design"
+      );
+    const implement = args.artifacts.implement;
+    if (implement) {
+      const [meta3] = store.reference(implement);
+      requireCondition(
+        meta3.producer === "flow-artifact-sync" && meta3.status === "blocked" && equal(meta3.plan, plan),
+        "Replan must invalidate old implementation evidence"
+      );
+    }
+    state.artifacts = args.artifacts;
+    state.reviews.plan_decision = null;
+    state.reviews.plan_final = null;
+    if (context.target_phase === "design") state.reviews.design = null;
+    state.phase = context.target_phase;
+    state.replan = null;
+    state.pending_operation = null;
+    state.pending_feedback = null;
+    state.active_review = null;
+    state.blocker = null;
+  }
+}
+
+// src/transitions.ts
 function transition(store, request) {
   store.consistent(request.request_id);
   requireCondition(
@@ -28148,7 +28435,18 @@ function transition(store, request) {
     "State revision changed",
     true
   );
-  requireCondition(current.state !== "completed", "Completed Flow is terminal", true);
+  requireCondition(
+    current.state !== "completed" || request.action === "request_replan",
+    "Completed Flow is terminal without replan approval",
+    true
+  );
+  requireCondition(
+    !current.replan || ["begin_replan", "finish_replan", "cancel_replan"].includes(
+      request.action
+    ),
+    "Resolve replan before other transitions",
+    true
+  );
   const state = structuredClone(current), action = request.action, args = Object.fromEntries(
     Object.entries(request).filter(
       ([k]) => !["request_id", "expected_state_revision", "action"].includes(k)
@@ -28188,7 +28486,14 @@ function transition(store, request) {
     pending_operation: operation,
     pending_feedback: ref
   });
-  if (action === "start_invocation") {
+  if ([
+    "request_replan",
+    "begin_replan",
+    "finish_replan",
+    "cancel_replan"
+  ].includes(action)) {
+    replanTransition(store, state, action, args, evidence);
+  } else if (action === "start_invocation") {
     fields("invocation_id", "component", "operation", "inputs");
     running();
     const components = {
@@ -28198,7 +28503,8 @@ function transition(store, request) {
       design_review: "flow-design-review",
       plan_decision_review: "flow-plan-decision-review",
       plan_review: "flow-plan-review",
-      completed: null
+      completed: null,
+      replanning: null
     };
     requireCondition(
       args.component === components[state.phase],
@@ -28649,7 +28955,7 @@ function transition(store, request) {
       Object.assign(state, {
         phase,
         active_review: null,
-        pending_operation: phase === "plan" ? "create" : "execute",
+        pending_operation: phase === "plan" ? state.artifacts.plan ? null : "create" : "execute",
         pending_feedback: null
       });
     } else if (state.phase === "implement") {
@@ -28958,6 +29264,16 @@ ${dump(event)}\`\`\`
     ];
   }
   consistent(replayingRequestId) {
+    const checkpointEvents = this.events()[1];
+    requireCondition(
+      checkpointEvents.filter((e) => e.event_type === "checkpoint.prepared").every(
+        (e) => checkpointEvents.some(
+          (done) => done.event_type === "checkpoint.completed" && done.caused_by.includes(e.event_id)
+        ) || replayingRequestId !== void 0 && e.event_key === replayingRequestId + ":checkpoint-prepared"
+      ),
+      "Unfinished checkpoint; use checkpoint-recover",
+      true
+    );
     requireCondition(
       !this.pending().length,
       "Unfinished persistence operation; run resume-check --recover",
@@ -29119,10 +29435,11 @@ ${dump(event)}\`\`\`
           "Multiple Design inputs"
         );
     } else if (kind === "implement-artifact") {
-      if (meta3.status === "blocked") return;
+      if (meta3.status === "blocked" && meta3.producer !== "flow-artifact-sync")
+        return;
       const [plan] = this.reference(meta3.plan);
       requireCondition(
-        plan.artifact === "plan" && plan.status === "ready",
+        plan.artifact === "plan" && (plan.status === "ready" || meta3.producer === "flow-artifact-sync"),
         "Executor requires ready Plan"
       );
       requireCondition(
@@ -29262,12 +29579,33 @@ ${dump(event)}\`\`\`
       name = `feedback/${meta3.phase}/feedback-${String(Math.max(0, ...numbers) + 1).padStart(4, "0")}.md`;
     }
     const p = this.path(name), kind = KINDS[meta3.schema_version];
+    const syncing = meta3.producer === "flow-artifact-sync";
+    if (syncing && import_node_fs3.default.existsSync(this.path("flow-state.yml"))) {
+      requireCondition(
+        !this.state().replan || this.state().replan?.approved,
+        "Replan is awaiting human approval",
+        true
+      );
+      requireCondition(
+        this.state().active_invocation === null,
+        "Cannot sync during an active invocation",
+        true
+      );
+    }
     requireCondition(
       kind && kind !== "flow-state" && kind !== "audit-log",
       "publish only accepts phase documents"
     );
     let old = null, oldBody = "", before = null;
     if (import_node_fs3.default.existsSync(p)) [old, oldBody, before] = this.document(name);
+    if (syncing) {
+      requireCondition(old !== null, "Sync only updates existing artifacts", true);
+      if (kind === "implement-artifact")
+        requireCondition(
+          meta3.status === "blocked" && meta3.commit === null && meta3.tasks.every((t) => t.status === "pending") && meta3.verifications.every((v) => v.status === "not_run"),
+          "Sync must invalidate implementation completion and verification evidence"
+        );
+    }
     requireCondition(
       Number.isInteger(request.expected_revision) && request.expected_revision === (old?.revision ?? 0),
       "Revision changed before save",
@@ -29290,7 +29628,7 @@ ${dump(event)}\`\`\`
         "Cannot change artifact identity"
       );
       requireCondition(
-        !old || old.status !== "completed",
+        !old || old.status !== "completed" || syncing,
         "Completed implementation is terminal",
         true
       );
@@ -29663,6 +30001,22 @@ ${dump(event)}\`\`\`
     const state = this.state();
     [, events] = this.events();
     this.verifyStateRecord(state, events);
+    if (events.some(
+      (e) => e.event_type === "checkpoint.prepared" && !events.some(
+        (done) => done.event_type === "checkpoint.completed" && done.caused_by.includes(e.event_id)
+      )
+    ))
+      return {
+        state,
+        recovered_events: recovered,
+        attention: "Inspect checkpoint commit/tag and use checkpoint-recover; Git operations were not repeated"
+      };
+    if (state.replan?.approved)
+      return {
+        state,
+        recovered_events: recovered,
+        attention: "Inspect synchronization and finish_replan; do not resume ordinary work"
+      };
     for (const [artifact, r] of Object.entries(state.artifacts))
       if (r) {
         try {
@@ -29698,18 +30052,330 @@ ${dump(event)}\`\`\`
   }
 };
 
+// src/checkpoints.ts
+var import_node_fs4 = __toESM(require("node:fs"), 1);
+var import_node_os = __toESM(require("node:os"), 1);
+var import_node_path3 = __toESM(require("node:path"), 1);
+var import_node_child_process = require("node:child_process");
+var import_node_crypto3 = require("node:crypto");
+function git(cwd, args, input2, env = {}) {
+  const result = (0, import_node_child_process.spawnSync)("git", args, {
+    cwd,
+    input: input2,
+    encoding: "utf8",
+    env: { ...process.env, ...env },
+    maxBuffer: 16 * 1024 * 1024
+  });
+  requireCondition(
+    result.status === 0,
+    "Git operation failed: " + (result.stderr || result.error?.message || args[0]),
+    true
+  );
+  return result.stdout.trim();
+}
+function repository(store) {
+  return import_node_fs4.default.realpathSync(git(store.root, ["rev-parse", "--show-toplevel"]));
+}
+function verify(store, repo, checkpoint) {
+  requireCondition(
+    git(repo, ["rev-parse", "refs/tags/" + checkpoint.tag]) === checkpoint.commit,
+    "Checkpoint tag differs from recorded commit",
+    true
+  );
+  const relative = import_node_path3.default.relative(repo, store.root).split(import_node_path3.default.sep).join("/");
+  for (const ref of checkpoint.artifacts) {
+    const result = (0, import_node_child_process.spawnSync)(
+      "git",
+      [
+        "show",
+        checkpoint.commit + ":" + [relative, ref.path].filter(Boolean).join("/")
+      ],
+      { cwd: repo }
+    );
+    requireCondition(result.status === 0, "Checkpoint artifact is missing");
+    requireCondition(
+      (0, import_node_crypto3.createHash)("sha256").update(result.stdout).digest("hex") === ref.sha256,
+      "Checkpoint artifact digest mismatch"
+    );
+  }
+}
+function createCheckpoint(store, request) {
+  requireCondition(
+    CheckpointRequestSchema.safeParse(request).success,
+    "Invalid checkpoint request"
+  );
+  store.ensureAudit();
+  store.consistent(request.request_id);
+  const repo = repository(store), events = store.events()[1];
+  const prepared = events.find(
+    (e) => e.event_key === request.request_id + ":checkpoint-prepared"
+  );
+  if (prepared) {
+    requireCondition(
+      prepared.data.request_sha256 === fingerprint(request),
+      "Checkpoint request ID reused with different content"
+    );
+    const done = events.find(
+      (e) => e.event_key === request.request_id + ":checkpoint-completed"
+    );
+    requireCondition(done, "Checkpoint interrupted; use checkpoint-recover", true);
+    verify(store, repo, done.data.checkpoint);
+    return done.data.checkpoint;
+  }
+  const feature = import_node_path3.default.relative(repo, store.root).split(import_node_path3.default.sep).join("/");
+  requireCondition(
+    feature !== "" && !feature.startsWith("../"),
+    "Feature must be inside a Git repository subdirectory"
+  );
+  const selected = [.../* @__PURE__ */ new Set([feature, ...request.paths])];
+  for (const name of selected) {
+    requireCondition(
+      typeof name === "string" && name.length && !import_node_path3.default.isAbsolute(name) && !name.split(/[\\/]/).some((p) => p === ".." || p === ".git") && !name.startsWith(":"),
+      "Invalid checkpoint path"
+    );
+    const candidate = import_node_path3.default.resolve(repo, name);
+    if (import_node_fs4.default.existsSync(candidate))
+      requireCondition(
+        import_node_fs4.default.realpathSync(candidate).startsWith(repo + import_node_path3.default.sep),
+        "Checkpoint path escapes repository"
+      );
+  }
+  const state = store.state();
+  store.resumeCheck();
+  requireCondition(
+    !state.active_invocation && !state.replan?.approved,
+    "Checkpoint requires idle state",
+    true
+  );
+  for (const id of request.decision_event_ids)
+    requireCondition(
+      events.some(
+        (e) => e.event_id === id && e.run_id === state.run_id && ["decision.made", "interaction.received"].includes(e.event_type)
+      ),
+      "Unknown checkpoint decision event"
+    );
+  const tag = `flow/${state.feature_id}/${state.run_id}/${request.checkpoint_id}`;
+  const existing = (0, import_node_child_process.spawnSync)(
+    "git",
+    ["show-ref", "--verify", "--quiet", "refs/tags/" + tag],
+    { cwd: repo }
+  );
+  requireCondition(existing.status === 1, "Checkpoint tag already exists", true);
+  git(repo, ["check-ref-format", "refs/tags/" + tag]);
+  const parent = git(repo, ["rev-parse", "HEAD"]);
+  const start = store.append(
+    "action.started",
+    {
+      action: "checkpoint:" + request.checkpoint_id,
+      detail: JSON.stringify({
+        request_sha256: fingerprint(request),
+        reason: request.reason
+      })
+    },
+    request.request_id + ":checkpoint-start",
+    "flow",
+    state.run_id
+  );
+  const temporary = import_node_fs4.default.mkdtempSync(
+    import_node_path3.default.join(import_node_os.default.tmpdir(), "flow-checkpoint-index-")
+  );
+  let commit;
+  try {
+    const env = { GIT_INDEX_FILE: import_node_path3.default.join(temporary, "index") };
+    git(repo, ["read-tree", parent], void 0, env);
+    git(repo, ["add", "-f", "--", ...selected], void 0, env);
+    git(
+      repo,
+      [
+        "rm",
+        "-r",
+        "--cached",
+        "--ignore-unmatch",
+        "--",
+        feature + "/.flowctl.lock",
+        feature + "/.flowctl.lock.recovery"
+      ],
+      void 0,
+      env
+    );
+    const tree = git(repo, ["write-tree"], void 0, env);
+    commit = git(
+      repo,
+      ["commit-tree", tree, "-p", parent],
+      `Flow checkpoint ${request.checkpoint_id}
+
+${request.reason}
+`
+    );
+  } finally {
+    import_node_fs4.default.rmSync(temporary, { recursive: true, force: true });
+  }
+  const checkpoint = {
+    checkpoint_id: request.checkpoint_id,
+    tag,
+    commit,
+    parent,
+    paths: selected,
+    artifacts: Object.values(state.artifacts).filter(Boolean),
+    audit_event_id: start.event_id,
+    decision_event_ids: request.decision_event_ids
+  };
+  const saved = store.append(
+    "checkpoint.prepared",
+    { checkpoint, request_sha256: fingerprint(request) },
+    request.request_id + ":checkpoint-prepared",
+    "flow",
+    state.run_id,
+    null,
+    [start.event_id]
+  );
+  git(repo, [
+    "update-ref",
+    "refs/tags/" + tag,
+    commit,
+    "0".repeat(commit.length)
+  ]);
+  verify(store, repo, checkpoint);
+  store.append(
+    "checkpoint.completed",
+    { checkpoint },
+    request.request_id + ":checkpoint-completed",
+    "flow",
+    state.run_id,
+    null,
+    [saved.event_id]
+  );
+  return checkpoint;
+}
+function recoverCheckpoint(store, request) {
+  requireCondition(
+    CheckpointRecoverSchema.safeParse(request).success,
+    "Invalid checkpoint recovery request"
+  );
+  store.consistent(request.request_id);
+  const events = store.events()[1], prepared = events.find(
+    (e) => e.event_key === request.request_id + ":checkpoint-prepared"
+  );
+  requireCondition(prepared, "Missing prepared checkpoint");
+  const checkpoint = prepared.data.checkpoint, repo = repository(store);
+  const exists = (0, import_node_child_process.spawnSync)(
+    "git",
+    ["show-ref", "--verify", "--quiet", "refs/tags/" + checkpoint.tag],
+    { cwd: repo }
+  );
+  if (exists.status === 1) {
+    requireCondition(
+      request.create_missing_tag,
+      "Checkpoint tag is missing; explicit create_missing_tag is required",
+      true
+    );
+    requireCondition(
+      git(repo, ["cat-file", "-t", checkpoint.commit]) === "commit",
+      "Checkpoint commit is missing"
+    );
+    git(repo, [
+      "update-ref",
+      "refs/tags/" + checkpoint.tag,
+      checkpoint.commit,
+      "0".repeat(checkpoint.commit.length)
+    ]);
+  }
+  verify(store, repo, checkpoint);
+  store.append(
+    "checkpoint.completed",
+    { checkpoint },
+    request.request_id + ":checkpoint-completed",
+    "flow",
+    prepared.run_id,
+    null,
+    [prepared.event_id]
+  );
+  return checkpoint;
+}
+function restoreCheckpoint(store, request) {
+  requireCondition(
+    CheckpointRestoreSchema.safeParse(request).success,
+    "Invalid checkpoint restore request"
+  );
+  store.consistent();
+  const repo = repository(store), events = store.events()[1];
+  const event = events.find(
+    (e) => e.event_type === "checkpoint.completed" && e.data.checkpoint.checkpoint_id === request.checkpoint_id
+  );
+  requireCondition(event, "Unknown completed checkpoint");
+  const checkpoint = event.data.checkpoint;
+  verify(store, repo, checkpoint);
+  git(repo, ["check-ref-format", "refs/heads/" + request.branch]);
+  const key = "checkpoint-restore:" + request.request_id;
+  const previous = events.find((e) => e.event_key === key);
+  if (previous)
+    requireCondition(
+      equal(previous.data.evidence, [checkpoint.commit, request.branch]),
+      "Restore request ID reused"
+    );
+  const branch = (0, import_node_child_process.spawnSync)(
+    "git",
+    ["rev-parse", "--verify", "refs/heads/" + request.branch],
+    { cwd: repo, encoding: "utf8" }
+  );
+  if (branch.status === 0) {
+    const started = events.find((e) => e.event_key === key + ":started");
+    requireCondition(
+      (previous || started && started.data.detail === JSON.stringify({
+        commit: checkpoint.commit,
+        branch: request.branch
+      })) && branch.stdout.trim() === checkpoint.commit,
+      "Restore branch already exists",
+      true
+    );
+  } else {
+    store.append(
+      "action.started",
+      {
+        action: key,
+        detail: JSON.stringify({
+          commit: checkpoint.commit,
+          branch: request.branch
+        })
+      },
+      key + ":started",
+      "flow",
+      event.run_id
+    );
+    git(repo, [
+      "update-ref",
+      "refs/heads/" + request.branch,
+      checkpoint.commit,
+      "0".repeat(checkpoint.commit.length)
+    ]);
+  }
+  store.append(
+    "action.completed",
+    {
+      action: key,
+      result: "\u5FA9\u5E30\u7528branch\u3092\u4F5C\u6210\u3002checkout\u3068Flow\u518D\u958B\u306F\u672A\u5B9F\u65BD\u3002",
+      evidence: [checkpoint.commit, request.branch]
+    },
+    key,
+    "flow",
+    event.run_id
+  );
+  return { commit: checkpoint.commit, branch: request.branch };
+}
+
 // src/cli.ts
-var help = `flowctl 4.0.0 \u2014 Flow persistence and contract guards
+var help = `flowctl 4.1.0 \u2014 Flow persistence and contract guards
 Usage: node flowctl.js --root FEATURE COMMAND [OPTIONS]
 Commands: init, publish, transition, audit-append, review-check --request FILE|-
           validate PATH [--references]
           resume-check [--recover]
+          checkpoint-create, checkpoint-recover, checkpoint-restore --request FILE|-
 Options: --version, --help
 `;
 async function main(argv = process.argv.slice(2)) {
   try {
     if (argv.includes("--version")) {
-      console.log("flowctl 4.0.0");
+      console.log("flowctl 4.1.0");
       return 0;
     }
     if (argv.includes("--help") || argv.includes("-h")) {
@@ -29754,7 +30420,10 @@ async function main(argv = process.argv.slice(2)) {
           "publish",
           "transition",
           "audit-append",
-          "review-check"
+          "review-check",
+          "checkpoint-create",
+          "checkpoint-recover",
+          "checkpoint-restore"
         ].includes(command ?? ""),
         "Unknown command"
       );
@@ -29763,8 +30432,14 @@ async function main(argv = process.argv.slice(2)) {
         "--request FILE|- is required"
       );
       const request = object(
-        load(utf8(import_node_fs4.default.readFileSync(argv[1] === "-" ? 0 : argv[1])))
+        load(utf8(import_node_fs5.default.readFileSync(argv[1] === "-" ? 0 : argv[1])))
       );
+      if (command === "checkpoint-create")
+        return createCheckpoint(store, request);
+      if (command === "checkpoint-recover")
+        return recoverCheckpoint(store, request);
+      if (command === "checkpoint-restore")
+        return restoreCheckpoint(store, request);
       if (command === "init") return store.initialize(request);
       if (command === "publish") return store.publish(request);
       if (command === "transition") return store.transition(request);

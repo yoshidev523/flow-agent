@@ -1,4 +1,4 @@
-# flow-agent 4.0.0
+# flow-agent 4.1.0
 
 Codex / Claude Codeで仕様駆動開発を進めるためのエージェントパッケージです。
 Design、Review、Plan、Implementを順に実行し、判断と成果物を`spec/`配下に保存します。
@@ -29,10 +29,18 @@ $flow 認証機能を追加して
 Flowの現在地は`flow-state.yml`、操作・判断・利用者対話の履歴は追記型の`audit.md`に残します。
 旧schemaの成果物は自動移行しません。
 
+再計画の変更を既存成果物へ反映するときは
+[flow-artifact-sync](.apm/skills/flow-artifact-sync/SKILL.md)が既存成果物の本文・入力参照を更新し、
+同期の開始と結果を監査へ残します。他スキルやFlow stateなしで、どのフェーズからでも使えます。
+CLI・契約・templateを同梱し、更新した実装記録は再検証待ちにします。
+同期はFlow stateを変更しません。Flowは人間の承認を得て再計画を開始し、同期後の参照を登録して再レビューします。
+完了後の関連対話も監査へ残します。節目の成果と判断はGitチェックポイントへ保存し、
+復帰用branchを作成できます。現在のbranchや作業fileを巻き戻しません。
+
 ## 共通CLI
 
 Node.js 22以上だけで実行できます。Zod・YAML処理を含む単一のJavaScriptを同梱しているため、
-利用側のnpm install・ビルド・Pythonは不要です。
+利用側のnpm install・ビルド・Pythonは不要です。チェックポイント操作にはGitと既存のGit repositoryが必要です。
 配置後の`flow-skill-dir`は通常`.agents/skills/flow`または`.claude/skills/flow`です。
 
 ```sh
