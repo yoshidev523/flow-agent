@@ -32,6 +32,8 @@ Planのpath・revision・digest、target path、feature directory、監査用run
 4. タスクの依存順に実装し、監査へ操作開始・結果・裁量判断を逐一記録する。
 5. checkpointsでtasks、verifications、blockerを更新し、publishする。
 6. Plan外の公開API、責務、入出力、error、範囲、検証条件の変更が必要ならblockedで停止する。
+   矛盾・崩れた前提の証拠、影響、通常修正で解決できない理由、必要な変更をblockerと本文へ記録し、
+   呼出側へ人間判断を求める。上流成果物やscopeを勝手に変更しない。
 7. 検証のcommand、結果、未実施理由を記録する。必須検証の未実施・失敗をcompletedにしない。
 8. 全タスクと必須検証の完了後、Plan対象fileとimplementにgit check-ignore --no-indexを実行する。
    ignore対象を強制追加しない。既存変更・Plan外変更を含めず、今回の実装変更だけをcommitする。

@@ -13,6 +13,8 @@ import {
 import { STAGES, validateMeta, type Stage } from "./validation/guards.js";
 import { FlowError, requireCondition as check } from "./errors.js";
 
+import { replanTransition } from "./replanning.js";
+
 export function transition(store: Store, request: Fields): FlowState {
   store.consistent(request.request_id);
   check(
@@ -31,7 +33,19 @@ export function transition(store: Store, request: Fields): FlowState {
     "State revision changed",
     true,
   );
-  check(current.state !== "completed", "Completed Flow is terminal", true);
+  check(
+    current.state !== "completed" || request.action === "request_replan",
+    "Completed Flow is terminal without replan approval",
+    true,
+  );
+  check(
+    !current.replan ||
+      ["begin_replan", "finish_replan", "cancel_replan"].includes(
+        request.action,
+      ),
+    "Resolve replan before other transitions",
+    true,
+  );
   const state = structuredClone(current),
     action = request.action,
     args = Object.fromEntries(
@@ -85,7 +99,16 @@ export function transition(store: Store, request: Fields): FlowState {
       pending_operation: operation,
       pending_feedback: ref,
     });
-  if (action === "start_invocation") {
+  if (
+    [
+      "request_replan",
+      "begin_replan",
+      "finish_replan",
+      "cancel_replan",
+    ].includes(action)
+  ) {
+    replanTransition(store, state, action, args, evidence);
+  } else if (action === "start_invocation") {
     fields("invocation_id", "component", "operation", "inputs");
     running();
     const components = {
@@ -96,6 +119,7 @@ export function transition(store: Store, request: Fields): FlowState {
       plan_decision_review: "flow-plan-decision-review",
       plan_review: "flow-plan-review",
       completed: null,
+      replanning: null,
     };
     check(
       args.component === components[state.phase],
@@ -614,7 +638,12 @@ export function transition(store: Store, request: Fields): FlowState {
       Object.assign(state, {
         phase,
         active_review: null,
-        pending_operation: phase === "plan" ? "create" : "execute",
+        pending_operation:
+          phase === "plan"
+            ? state.artifacts.plan
+              ? null
+              : "create"
+            : "execute",
         pending_feedback: null,
       });
     } else if (state.phase === "implement") {

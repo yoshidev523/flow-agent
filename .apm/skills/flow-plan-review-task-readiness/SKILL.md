@@ -28,6 +28,16 @@ scope_candidateは任意改善、追加機能、将来拡張、追加の品質�
 trade-off、残存risk、成立前提、受容判断があり必須制約と矛盾しなければpassedにできる。
 質問の推奨を再評価せず、採用回答の反映を確認する。
 
+## 重要判断の評価
+
+writerのreadyや既存資料との一致だけで判断根拠を妥当としない。
+今回採用・変更するもの、影響の大きいもの、前提に疑いがあるものを対象に、
+採用内容・根拠・前提・影響・再検討条件を確認する。
+Planで新たに確定した重要HOWの根拠・前提と、その成立を確認する検証が具体化されているか確認する。
+全既存選定の再調査は要求しない。現在scopeの成立を妨げる根拠不足はgate、
+成立するが改善余地があるものはscope_candidateへ分ける。判断IDをdecision_refsで示す。
+採用済みの利用者回答を自動変更せず、変更が必要ならhuman_decisionとして返す。
+
 ## 出力
 
 review-source-v2、source_kind ai、statusは`passed | changes_required | blocked | unable`。

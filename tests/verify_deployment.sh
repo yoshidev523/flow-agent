@@ -16,7 +16,7 @@ printf 'Deployment verification directory: %s\n' "$flow_verify_root"
   apm install "$flow_fixture_dir" --target claude,codex
   apm compile --validate --target claude,codex
 )
-for skill_name in flow flow-design flow-plan flow-implement \
+for skill_name in flow flow-artifact-sync flow-design flow-plan flow-implement \
   flow-design-review flow-design-review-requirements flow-design-review-quality-risk \
   flow-plan-decision-review flow-plan-review-decision-quality flow-plan-review flow-plan-review-task-readiness
 do
@@ -47,6 +47,13 @@ done
 ! rg -q 'model_reasoning_effort|nickname_candidates' "$flow_consumer_dir/.codex/agents"
 for skill_root in .agents .claude
 do
+  cmp "$flow_source_dir/.apm/skills/flow-artifact-sync/scripts/flowctl.js" "$flow_consumer_dir/$skill_root/skills/flow-artifact-sync/scripts/flowctl.js"
+  cmp "$flow_source_dir/.apm/skills/flow-artifact-sync/references/contracts.md" "$flow_consumer_dir/$skill_root/skills/flow-artifact-sync/references/contracts.md"
+  test -f "$flow_consumer_dir/$skill_root/skills/flow-artifact-sync/assets/templates/implement.md"
+  flow_sync_only_dir="$flow_verify_root/sync-only-$skill_root"
+  mkdir -p "$flow_sync_only_dir"
+  cp -R "$flow_consumer_dir/$skill_root/skills/flow-artifact-sync" "$flow_sync_only_dir/flow-artifact-sync"
+  node "$flow_sync_only_dir/flow-artifact-sync/scripts/flowctl.js" --help >/dev/null
   cmp "$flow_source_dir/.apm/skills/flow/scripts/flowctl.js" "$flow_consumer_dir/$skill_root/skills/flow/scripts/flowctl.js"
   cmp "$flow_source_dir/.apm/skills/flow/references/contracts.md" "$flow_consumer_dir/$skill_root/skills/flow/references/contracts.md"
   test ! -e "$flow_consumer_dir/$skill_root/skills/flow/references/contracts.schema.json"

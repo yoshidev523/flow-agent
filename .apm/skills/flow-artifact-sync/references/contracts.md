@@ -1,0 +1,336 @@
+# Flow 4.1.0 契約
+
+## 正本
+
+repositoryの`src/contracts/`に置くZod定義が機械契約の正本。
+成果物と監査の入出力形式はこの文書とtemplateで参照する。CLIはZodを内蔵する。
+契約の変更時はZod定義・この文書・templateを同時に更新する。
+field間の整合性・状態遷移・file参照の検査は別のguardで実施する。
+全fieldを必須とし、nullable fieldはnullを明記する。未知field、重複YAML key、旧schema、
+別名status、並行する承認状態を拒否する。日時はtimezone付きISO 8601。
+pathはfeature directoryからの相対pathで、絶対path、親directory参照、外へのsymlinkを拒否する。
+SHA-256は保存完了後の全バイトから計算する。成果物自身のdigestを自身へ埋め込まない。
+
+## 型と必須フィールド
+
+次の表はfront matterとFlow stateの入力項目を列挙する。すべて必須で、省略や暗黙の補完はしない。
+`text`は空でない文字列、`boolean`はtrue/false、`integer`は安全に表現できる整数、
+`timestamp`はtimezone付きISO 8601文字列、`sha256`は小文字16進64桁。
+`T[]`は型Tの配列で、空配列は明記する。`T|null`は値がない場合にnullを明記する。
+`json-object`は文字列keyとJSON値を持つobject。名前付きobjectは未知fieldを拒否する。
+`reference`などの型名は同じ表の契約を指す。表中のschema_versionは文字列の固定値。
+
+| 契約 | 必須フィールド（field:型。区切りはセミコロン） |
+| --- | --- |
+| reference | path:text; revision:integer>=1; sha256:sha256 |
+| option | id:text; text:text; impact:text |
+| question | id:text; question:text; required:boolean; status:open/resolved; options:option[2..3]; recommendation:text; reason:text; assumptions:text[]; answer:text\|null |
+| feedback-result | id:text; result:applied/unresolved; location:text |
+| task | id:text; files:text[1..]; dependencies:text[]; completion:text; verification:text; verification_ids:text[1..]（重複不可） |
+| verification-plan | id:text; command:text; required:boolean |
+| handoff-check | id:scope/files/responsibilities/interfaces/errors/dependencies/completion/verification; status:ok/not_applicable/pending; reason:text |
+| task-progress | id:text; status:pending/in_progress/blocked/completed; evidence:text |
+| verification | id:text; command:text; status:passed/failed/not_run; required:boolean; reason:text |
+| failure | kind:execution/contract; reason:text |
+| judgment | id:text; question:text; background:text; options:option[2..3]; recommendation:text; reason:text; answer_format:text |
+| finding/gate | id:text; classification:gate; resolution:revise/human_decision; decision_refs:text[]; target:text; problem:text; evidence:text; instruction:text; completion:text; judgment:judgment\|null |
+| finding/scope_candidate | id:text; classification:scope_candidate; decision_refs:text[]; proposal:text; evidence:text; impact:text; recommendation:text |
+| phase-artifact | schema_version:flow/phase-artifact-v2; artifact:design/plan; revision:integer>=1; status:needs_input/ready; producer:text; invocation_id:text; operation:create/revise/respond; updated_at:timestamp; inputs:reference[]; questions:question[]; feedback_results:feedback-result[]; tasks:task[]; verification_plan:verification-plan[]; handoff_checks:handoff-check[] |
+| implement-artifact | schema_version:flow/implement-artifact-v2; artifact:implement; revision:integer>=1; status:in_progress/blocked/completed; producer:flow-implement/flow-artifact-sync; invocation_id:text; operation:execute; updated_at:timestamp; plan:reference; tasks:task-progress[]; verifications:verification[]; blocker:text\|null; commit:小文字16進40〜64桁\|null |
+| review-source | phase:design/plan; review_stage:design/decision/final; review_cycle_id:cycle ID; target:reference; design:reference\|null; findings:finding[]; failure:failure\|null; schema_version:flow/review-source-v2; revision:1; source_id:text; source_kind:ai/human; status:passed/changes_required/blocked/unable; created_at:timestamp |
+| phase-review | phase:design/plan; review_stage:design/decision/final; review_cycle_id:cycle ID; target:reference; design:reference\|null; findings:finding[]; failure:failure\|null; schema_version:flow/phase-review-v2; revision:1; mode:ai/human; status:passed/changes_required/blocked/incomplete; sources:reference[]; judgments:judgment[]; created_at:timestamp; source_paths:text[]（重複不可） |
+| feedback-item | id:text; kind:change/answer; target:text; instruction:text; evidence:text; completion:text |
+| phase-feedback | schema_version:flow/phase-feedback-v2; revision:1; phase:design/plan; target:reference; operation:revise/respond; created_at:timestamp; items:feedback-item[1..] |
+| counter | automatic_revision:0/1; execution_retry:0/1; human_retry:0/1 |
+| active-review | stage:design/plan_decision/plan_final; review_cycle_id:text; mode:ai/human; target:reference; design:reference\|null; path:text; scope_acknowledged:boolean; human_source:reference\|null |
+| invocation | invocation_id:text; component:text; operation:text; inputs:reference[] |
+| waiting | kind:writer_question/human_review/review_decision/scope_candidate/implement_blocker/replan; target:reference; question_ids:text[1..]; prompt_event_id:text |
+| flow-state | schema_version:flow/flow-state-v2; feature_id:text; run_id:text; state_revision:integer>=1; phase:design/design_review/plan/plan_decision_review/plan_review/implement/completed/replanning; state:running/waiting_for_input/blocked/completed; artifacts:artifact参照map; reviews:review参照map; review_mode:mode map; counters:counter map; cycle_counters:cycle map; active_review:active-review\|null; active_invocation:invocation\|null; waiting:waiting\|null; blocker:text\|null; last_transition_event_id:text; updated_at:timestamp; pending_operation:create/revise/respond/execute/null; pending_feedback:reference\|null; replan:replan\|null（省略可） |
+| audit-event | event_id:E-に続く6桁以上の数字; event_key:text; event_type:イベント一覧の名前; run_id:text; invocation_id:text\|null; occurred_at:timestamp; recorded_at:timestamp; actor:text; caused_by:text[]; data:イベント別object |
+| audit-log | schema_version:flow/audit-log-v1; feature_id:text; created_at:timestamp |
+| replan | target_phase:design/plan; scope:text; reason:text; prompt_event_id:text; response_event_id:text\|null; checkpoint_event_id:text; approved:boolean; previous_phase:text; before:artifact参照map |
+| checkpoint | checkpoint_id:text; tag:text; commit:SHA; parent:SHA; paths:text[]; artifacts:reference[]; audit_event_id:text; decision_event_ids:text[] |
+| checkpoint-request | request_id:text; checkpoint_id:kebab-case; reason:text; paths:text[]; decision_event_ids:text[] |
+| checkpoint-recover | request_id:text; create_missing_tag:boolean |
+| checkpoint-restore | request_id:text; checkpoint_id:text; branch:text |
+
+flow-stateのmapは次の固定keyをすべて持ち、未知keyを拒否する。
+
+- artifacts: design、plan、implement。それぞれreferenceまたはnull。
+- reviews: design、plan_decision、plan_final。それぞれreferenceまたはnull。
+- review_mode: design、plan。それぞれaiまたはhuman。
+- counters: design、plan_decision、plan_final。それぞれcounter。
+- cycle_counters: design、plan_decision、plan_final。それぞれ0以上のinteger。
+
+finding[]はgateとscope_candidateを混在できるが、decision reviewはgateだけ。
+cycle IDの形式は`{design|plan-decision|plan-final}-cycle-{4桁以上の数字}`。
+質問・選択肢・task・verification・handoff・feedback・finding・judgmentのIDの一意性、
+statusと内容の整合性、参照の鮮度、保存pathは各契約の説明とCLIのguardで検証する。
+本文の必須見出しは対応templateに従う。固定artifactの変更履歴sectionはdraft時に空にする。
+
+## 配置と所有
+
+```text
+spec/YYYYMMDD_feature-name/
+├── flow-state.yml
+├── audit.md
+├── inputs/request.md
+├── artifacts/{design,plan,implement}.md
+├── feedback/{design,plan}/feedback-0001.md
+└── reviews/{design,plan-decision,plan-final}/cycle-0001/
+    ├── review.md
+    └── sources/{source-id}.md
+```
+
+state、feedback、human sourceのownerはFlow。
+明示的な同期中はflow-artifact-syncがDesign・Plan・Implementと同期用feedbackのownerになる。
+他ownerと同時実行せず、同期はstate・reviewを更新しない。
+Design/Planは対応writer、implementはexecutor、観点sourceは担当reviewer、aggregateはhub。
+CLIはownerの代わりに決まった形式で保存するだけで、内容を生成・評価しない。
+監査の物理writerは共通CLIだけ。各componentは自分の行動・判断だけを記録する。
+`.flowctl.lock`は排他制御用であり成果物ではない。draft/requestは一時directoryまたはstdinを使う。
+
+## phase-artifact-v2
+
+Design/Planは固定path、status needs_input/ready、正のrevision、producer、invocation_id、operation、
+updated_at、inputs、questions、feedback_results、tasks、verification_plan、handoff_checksを保持する。
+Designのproducerはflow-design、Planはflow-plan。明示的な同期ではどちらもflow-artifact-syncを使える。
+同期ownerは既存成果物だけを更新し、他ownerのactive invocation中にはpublishしない。Designのtasksは空。
+
+questionsはid、question、required、status open/resolved、2〜3 options、recommendation、reason、
+assumptions、answerを持つ。optionはid/text/impact。openのanswerはnull、resolvedは空でない文字列。
+needs_inputは未回答の必須質問が1件以上、readyは未回答の必須質問とunresolved feedbackがない。
+任意質問は重要判断の代わりに使わない。readyのPlanは1件以上のtaskを必要とする。
+
+taskはid/files/dependencies/completion/verification/verification_ids。
+Planはverification_planにid/command/requiredを保持し、taskからIDで参照する。
+readyはhandoff_checksのscope/files/responsibilities/interfaces/errors/dependencies/completion/verificationが
+okまたは理由付きnot_applicableであることを必要とする。Designはこれらを空にする。依存先IDの存在と循環を検証する。
+feedback_resultsはid/result applied|unresolved/location。入力feedback全itemの処理結果を保持する。
+PlanにDesignを渡す場合はinputsへpath/revision/digestを記録する。
+単独Planの直接要求ではDesign参照を省略できるが、Flow内のPlan reviewにはDesignが必須。
+
+### 変更履歴
+
+本文末尾の`## 変更履歴`はpublisherが管理する。draftの同sectionは空にする。
+更新ごとにrevision、日時、操作、変更内容、背景・理由、変更箇所、参照、状態変更を追加する。
+過去履歴は保持し、訂正を新revisionへ記録する。読み取りや検証だけではrevisionを増やさない。
+過去本文の完全復元は目的としない。
+
+## implement-artifact-v2
+
+status in_progress/blocked/completed、revision、producer flow-implementまたはflow-artifact-sync、invocation_id、operation execute、
+updated_at、plan参照、tasks、verifications、blocker、commitを持つ。
+task進捗はid/status pending|in_progress|blocked|completed/evidence。
+verificationはid/command/status passed|failed|not_run/required/reason。
+blockedはblocker必須。他statusのblockerはnull。
+blocked記録は不正なPlanを修復せず、呼出側が指定した参照と停止理由を保存できる。
+開始・再開・完了には有効なready Planとの一致が必要。
+completedは全Plan taskがcompleted、Planに指定した検証結果がすべてあり、必須検証がpassed、commit SHAが記録済み。
+検証commandとrequiredはPlanの値から変更できない。
+commitが実際に対象変更を含むことと検証結果の真実性はexecutorが確認し、証拠を監査へ記録する。
+通常executorにとってcompleted成果物は終端。同期ownerだけは既存のcompletedも更新できる。
+同期のpublishではstatus blocked、commit null、全tasks pending、全verifications not_runを必須とし、
+旧完了証拠を新Planへ流用しない。変更前の証拠は変更履歴・監査へ残す。
+in_progress/blockedの進捗変更もrevisionと変更履歴を更新する。
+同期はFlow stateを変更しない。旧revisionを参照するstate・reviewはstaleとして再利用しない。
+
+## review-source-v2 / phase-review-v2
+
+sourceはrevision 1、phase、review_stage design|decision|final、review_cycle_id、target、design、
+source_id、source_kind ai|human、status、findings、failure、created_atを保持する。
+Designはdesign:null。Planは入力Design参照が必須。
+cycle IDはdesign-cycle-0001、plan-decision-cycle-0001、plan-final-cycle-0001。
+cycle番号はstageごとに増やし、再試行・mode変更でも再利用しない。
+
+AIの必要sourceはDesignがrequirementsとquality-risk、decisionがdecision-quality、finalがtask-readiness。
+Humanはhuman 1件だけ。同cycleで混在させない。
+
+findingはgate/scope_candidate。
+gateはid/classification/resolution revise|human_decision/decision_refs/target/problem/evidence/instruction/completion/judgment。
+human_decisionにはjudgment必須、それ以外はnull。
+scope_candidateはid/classification/decision_refs/proposal/evidence/impact/recommendation。
+judgmentはid/question/background/options/recommendation/reason/answer_format。
+現在scopeの成立に必須な問題だけをgateとし、追加scopeはstatusから除外する。
+decision reviewではscope_candidateを生成しない。
+
+sourceのstatusはfailureありならunable、human_decision gateありならblocked、revise gateありなら
+changes_required、gateなしならpassed。failureはkind execution|contract/reason。
+
+aggregateはphase/review_stage/review_cycle_id/target/design/findings/failureをsourceと共有し、
+schema_version、revision、mode、status、sources参照、source_paths、judgments、created_atを持つ。
+source_idとsource_kindはaggregateへ持ち込まない。
+source_pathsには欠落・不正sourceも含めた必要path全部を保持し、sourcesには検証済みsourceだけを保持する。
+review-checkがstatus、参照、findings、failure、judgmentsを算出する。
+sourceのfinding IDとjudgment IDはsource-id:IDへ名前空間化する。
+契約不一致/欠落/unableがあればincomplete、その後blocked、changes_required、passedの順。
+複数sourceで契約不一致と実行障害が混在する場合はcontractを優先する。sourceの読込順で分類を変えない。
+本文の重複説明を整理できるが機械的なfindingsと結論は削除・変更しない。
+各cycleのsourceとaggregateは一度だけpublishし、上書きしない。
+
+## phase-feedback-v2
+
+revision 1、phase design|plan、target参照、operation revise|respond、created_at、itemsを保持する。
+itemはid/kind change|answer/target/instruction/evidence/completion。
+reviseはchangeだけ、respondはanswerだけ。回答itemのtargetは提示済み質問ID。
+review主体やsource固有のmetadataはwriterへ渡さず、対応関係はauditへ記録する。
+feedbackは発行後不変。古いtargetへ再適用しない。
+inputsは今回の操作へ渡された入力だけを保持し、過去feedbackの参照は変更履歴と監査へ残す。
+feedbackにはstatusを設けず、監査の状態欄もnullにする。
+
+## flow-state-v2
+
+phaseはdesign/design_review/plan/plan_decision_review/plan_review/implement/completed/replanning。
+stateはrunning/waiting_for_input/blocked/completed。
+completed phase/stateは同時に成立し、実行・review・回答待ちがない。
+Planの質問はdecision review通過後に提示するためplanにwaiting_for_inputを置かない。
+waiting_for_inputはwaiting必須、blockedはblocker必須。
+
+artifactsとreviewsは現在の参照を持つ。review_modeはdesign/planでai|human。
+countersはdesign/plan_decision/plan_finalごとのautomatic_revision/execution_retry/human_retryを0/1で持つ。
+cycle_countersはstageごとの発行数。counterをcycle/revision更新でリセットしない。
+active_reviewはstage/review_cycle_id/mode/target/design/path/scope_acknowledged/human_source。
+Flow内のhuman hubは、人間回答を記録してhuman sourceを登録した後だけ起動する。
+active_invocationはinvocation_id/component/operation/inputs。
+waitingはkind/target/question_ids/prompt_event_id。
+pending_operationとpending_feedbackは次writerへ許可した操作とfeedback。
+next_actionは保存せず、検証済みphase/stateから導く。
+
+### 遷移条件
+
+| 操作 | 条件 | 結果 |
+| --- | --- | --- |
+| start_review design | Design ready | design_review、新cycle |
+| advance design_review | 同一対象のpassed、追加scope処理済み | plan/create |
+| start_review plan_decision | Plan needs_input、Design参照一致 | plan_decision_review |
+| wait review_decision | decision passedまたはreview blocked | 提示済み質問への回答待ち |
+| answer | 対応する人間回答、正規化feedback | writer/respond |
+| start_review plan_final | Plan ready、Design参照一致 | plan_review |
+| advance plan_review | 同一Plan/Designのpassed、追加scope処理済み | implement/execute |
+| advance implement | Plan一致、Implement completed | completed |
+| revise | changes_required、AIなら自動修正未使用 | writer/revise、事前にcounter消費 |
+| retry | incomplete/execution、当該modeのretry未使用 | 新cycleの開始を許可 |
+| set_mode自動 | AI自動修正後もchanges_required、またはretry後も実行障害 | humanへ切替 |
+| block | 契約不一致・実行継続不能など | 停止理由と再開条件を保存 |
+| resume | blocked、解消根拠を確認 | running、phaseを飛ばさない |
+
+start_invocationで起動を予約し、完了後finish_invocationでownerの出力を登録する。
+Flow内のwriterは承認したpending_operation/feedbackだけを使う。
+reviewのpassedは評価時・移行時のdigest一致を必須とする。
+blockedの採用回答変更は人間へ戻す。PlanでDesign/scope変更が必要なら人間承認付き再計画へ進む。
+
+## audit-log-v1
+
+front matterはschema_version/feature_id/created_atだけ。本文は`# 監査ログ`に続き、
+`## E-000001 — event.type`と1つのyaml blockを追記する。自由な段落を挟まない。
+共通fieldはevent_id/event_key/event_type/run_id/invocation_id/occurred_at/recorded_at/actor/caused_by/data。
+event_keyは送信側の一意key、event_idは記録処理が付ける連番。
+occurred_atは実際の発生時刻、recorded_atは保存時刻。並列の因果関係はcaused_byで表す。
+人間回答のactorはhuman。Flowが原文を記録する。提示/受領をinteraction_idとprompt_event_idで結ぶ。
+記録するのは行動、結論、規則、根拠、前提と観測結果であり内部思考過程ではない。
+
+### イベント一覧
+
+dataは次の表のfieldをすべて持ち、未知fieldを拒否する。型は「型と必須フィールド」に従う。
+`before_sha256`・`after_sha256`などtext型のdigest欄も、送信時は実測SHA-256を指定する。
+文字列配列のevidenceは根拠のpathや識別子、reference配列のevidenceは成果物参照を保持する。
+
+| イベント | dataの必須フィールド（field:型） |
+| --- | --- |
+| flow.started | state:flow-state; request_path:text |
+| flow.transition_prepared | action:text; before_sha256:text; after_sha256:text; after:flow-state; evidence:reference[]; request_sha256:sha256; before:flow-state; arguments:json-object |
+| flow.transitioned | prepared_event_id:text; action:text; before_revision:integer>=1; after_revision:integer>=1; from_phase:text; to_phase:text; from_state:text; to_state:text; evidence:reference[] |
+| flow.transition_aborted | prepared_event_id:text; reason:text |
+| artifact.update_prepared | target_path:text; before_sha256:text\|null; after:reference; operation:text; change:text; reason:text; sections:text[]; references:text[]; old_status:text\|null; new_status:text\|null; request_sha256:sha256 |
+| artifact.updated | prepared_event_id:text; artifact:reference |
+| artifact.update_aborted | prepared_event_id:text; reason:text |
+| invocation.started | component:text; operation:text; inputs:reference[] |
+| invocation.completed | outputs:reference[] |
+| invocation.failed | reason:text; evidence:text[] |
+| action.started | action:text; detail:text |
+| action.completed | action:text; result:text; evidence:text[] |
+| decision.made | decision:text; rule_id:text; reason:text; evidence:text[]; assumptions:text[] |
+| interaction.presented | interaction_id:text; kind:text; target:reference; question_ids:text[]; text:text |
+| interaction.received | interaction_id:text; prompt_event_id:text\|null; text:text |
+| feedback.created | feedback:reference; origin_event_ids:text[]; mappings:feedback-mapping[] |
+| review.completed | review:reference; status:text |
+| review.mode_changed | stage:design/plan_decision/plan_final; from:ai/human; to:ai/human; reason:text |
+| retry.scheduled | stage:design/plan_decision/plan_final; counter:execution_retry/human_retry/automatic_revision; used:1; reason:text |
+| flow.blocked | reason:text; resume_condition:text |
+| flow.resumed | reason:text; evidence:text[] |
+| flow.completed | implement:reference |
+| checkpoint.prepared | checkpoint:checkpoint; request_sha256:sha256 |
+| checkpoint.completed | checkpoint:checkpoint |
+
+feedback-mappingはitem_id:text、origin_ref:textのobject。item_idはfeedback item ID、
+origin_refは元の回答・指摘を識別できる参照を保持する。origin_event_idsは対応する監査event ID。
+interaction.presentedのkindはwaitと結ぶ場合、waiting.kindのいずれかを使う。
+人間からの自発的feedbackはprompt_event_id:nullで記録する。
+caused_byはすでに記録されたevent IDだけを指定し、同じevent_keyで異なる内容を再送しない。
+
+CLI専用の予約eventはflow.started、flow.transition_prepared、flow.transitioned、
+flow.transition_aborted、artifact.update_prepared、artifact.updated、artifact.update_aborted。
+これらはinit/publish/transition/resume-checkが記録し、audit-appendへの直接送信は拒否する。
+invocation.started/completed/failedとFlow完了時のflow.completedはtransitionが通常自動記録する。
+同じ事実を別のevent_keyで重複記録しない。
+その他のeventは各componentがaudit-appendで記録する。review.mode_changedなどは自動生成されず、
+対応するtransitionの結果を確認してcomponentが記録する。復旧時も外部行動の完了を推測しない。
+
+例: 利用者の回答を記録するaudit-appendのrequest。
+
+```yaml
+event_key: response-unique-id
+event_type: interaction.received
+actor: human
+run_id: run-001
+invocation_id: null
+occurred_at: '2026-10-10T12:00:00+09:00'
+caused_by: [E-000010]
+data:
+  interaction_id: question-001
+  prompt_event_id: E-000010
+  text: Aを採用してください
+```
+
+CLIがevent_idとrecorded_atを付けてaudit.mdへ追記する。提示に対する回答ではprompt_event_id、
+interaction_id、run_idが先行するinteraction.presentedと一致することを確認する。
+
+### 保存と中断
+
+publishとtransitionは、変更前/変更後digestを含むpreparedイベント、対象fileのatomic置換、
+completedイベントの順で処理する。stateの遷移イベントは変更前後のsnapshotと操作引数を保持する。
+単一lockで監査と保存を直列化し、request IDによる再送を重複実行しない。
+未完了preparedが残れば次のmutationを拒否する。
+resume-check --recoverは対象が保存後digestなら完了を記録し、保存前digestなら中止を記録する。
+保存済みtransitionに対応するinvocation.started/completed/failed、flow.completedの欠落も検出する。
+resume-check --recoverまたは元のtransition requestの再送で、保存済み引数から監査だけを補完する。
+補完eventのoccurred_atは元の遷移時刻、recorded_atは補完時刻とする。外部操作は再実行しない。
+欠落監査を解消するまでは別の保存・監査・状態更新を拒否する。invocation IDは保存済み開始遷移でも使用済みと判定する。
+両方と不一致なら自動修復せず停止する。中止した要求の再実行には新request IDを使う。
+末尾が途中の監査は読み飛ばさず拒否し、原本を保存して人間へ修復を求める。
+外部操作の完了は推測しない。active invocationは実態と証拠を確認して登録または停止する。
+履歴は訂正イベントで補正する。暗号学的な改ざん防止や複数fileの完全transactionを保証しない。
+
+## 再計画とチェックポイント（4.1.0）
+
+request_replanは進行中invocationがないこと、現在参照とcheckpointの一致、現在stateより後の
+checkpoint監査地点、kind replanの提示eventを検証し、phase replanningへ移す。
+completedからの通常操作は終端のまま、request_replanだけを許可する。
+begin_replanは提示と結び付くhuman回答とapproval approveを要求する。cancel_replanは未承認時だけ
+human回答を根拠に元のstateを復元し、state revisionと監査は前へ進める。
+finish_replanは承認後のsync保存event、最新入力参照、対象revisionの増加を検証する。
+Planへの戻りではDesignを変更できない。既存成果物の削除・未作成成果物の追加は行わない。
+既存Implementは最新Planに対するblockedへ同期する。必要なreview参照をnullにし、cycleとcounterを維持する。
+replanは通常stateでは省略またはnull。replanning中はcontext必須でactive invocation/reviewはnull。
+承認前はwaiting_for_input、承認後はrunning。resume-checkは承認済み同期中だけ旧artifact参照を
+一時的に許容し、通常再開を指示せずattentionを返す。
+
+checkpointは既存Git HEADを親とした専用commitとlocal tagで保存する。現在のHEAD・indexは変更しない。
+feature directoryと明示pathsの内容を保存し、lockは除く。無関係な作業fileの未保存変更は含めない。
+監査の保存地点はaudit_event_idで示し、commit/tag結果を後続eventへ追記する。
+checkpoint.prepared/completedはCLI専用。直接audit-appendせずcheckpoint commandが保存する。
+再送はfingerprintを照合し、未完了ならcheckpoint-recoverでcommit/tagを検査する。
+未完了checkpointがあれば他mutationを拒否し、resume-checkは外部操作を繰り返さずattentionを返す。
+未作成tagの作成はcreate_missing_tag:trueで明示した場合だけ行う。
+checkpoint-restoreは新しいbranchだけを作り、checkout・reset・push・Flow再開はしない。
+過去snapshotの参照はGit commit内のbytesと照合し、現在成果物のrevision変更で無効扱いにしない。

@@ -147,7 +147,7 @@ export const ImplementArtifactSchema = z.strictObject({
   artifact: z.literal("implement"),
   revision: z.number().int().min(1),
   status: z.enum(["in_progress", "blocked", "completed"]),
-  producer: z.literal("flow-implement"),
+  producer: z.enum(["flow-implement", "flow-artifact-sync"]),
   invocation_id: text,
   operation: z.literal("execute"),
   updated_at: timestamp,
@@ -253,10 +253,53 @@ export const WaitingSchema = z.strictObject({
     "review_decision",
     "scope_candidate",
     "implement_blocker",
+    "replan",
   ]),
   target: ReferenceSchema,
   question_ids: z.array(text).min(1),
   prompt_event_id: text,
+});
+
+export const ReplanSchema = z.strictObject({
+  target_phase: z.enum(["design", "plan"]),
+  scope: text,
+  reason: text,
+  prompt_event_id: text,
+  response_event_id: text.nullable(),
+  checkpoint_event_id: text,
+  approved: z.boolean(),
+  previous_phase: text,
+  before: z.strictObject({
+    design: ReferenceSchema.nullable(),
+    plan: ReferenceSchema.nullable(),
+    implement: ReferenceSchema.nullable(),
+  }),
+});
+export const CheckpointSchema = z.strictObject({
+  checkpoint_id: text,
+  tag: text,
+  commit: z.string().regex(/^[0-9a-f]{40,64}$/),
+  parent: z.string().regex(/^[0-9a-f]{40,64}$/),
+  paths: z.array(text).min(1),
+  artifacts: z.array(ReferenceSchema),
+  audit_event_id: text,
+  decision_event_ids: z.array(text),
+});
+export const CheckpointRequestSchema = z.strictObject({
+  request_id: text,
+  checkpoint_id: text.regex(/^[a-z0-9][a-z0-9-]*$/),
+  reason: text,
+  paths: z.array(text),
+  decision_event_ids: z.array(text),
+});
+export const CheckpointRecoverSchema = z.strictObject({
+  request_id: text,
+  create_missing_tag: z.boolean(),
+});
+export const CheckpointRestoreSchema = z.strictObject({
+  request_id: text,
+  checkpoint_id: text,
+  branch: text,
 });
 
 export const FlowStateSchema = z.strictObject({
@@ -272,6 +315,7 @@ export const FlowStateSchema = z.strictObject({
     "plan_review",
     "implement",
     "completed",
+    "replanning",
   ]),
   state: z.enum(["running", "waiting_for_input", "blocked", "completed"]),
   artifacts: z.strictObject({
@@ -312,6 +356,7 @@ export const FlowStateSchema = z.strictObject({
     z.literal(null),
   ]),
   pending_feedback: ReferenceSchema.nullable(),
+  replan: ReplanSchema.nullable().optional(),
 });
 
 export const AuditEventSchema = z.strictObject({
@@ -340,6 +385,8 @@ export const AuditEventSchema = z.strictObject({
     "flow.blocked",
     "flow.resumed",
     "flow.completed",
+    "checkpoint.prepared",
+    "checkpoint.completed",
   ]),
   run_id: text,
   invocation_id: text.nullable(),
@@ -382,9 +429,19 @@ export const contracts = {
   "audit-log": AuditLogSchema,
   "verification-plan": VerificationPlanSchema,
   "handoff-check": HandoffCheckSchema,
+  replan: ReplanSchema,
+  checkpoint: CheckpointSchema,
+  "checkpoint-request": CheckpointRequestSchema,
+  "checkpoint-recover": CheckpointRecoverSchema,
+  "checkpoint-restore": CheckpointRestoreSchema,
 };
 
 export const eventData = {
+  "checkpoint.prepared": z.strictObject({
+    checkpoint: CheckpointSchema,
+    request_sha256: z.string().regex(/^[0-9a-f]{64}$/),
+  }),
+  "checkpoint.completed": z.strictObject({ checkpoint: CheckpointSchema }),
   "flow.started": z.strictObject({
     state: FlowStateSchema,
     request_path: text,
