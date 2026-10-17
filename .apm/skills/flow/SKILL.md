@@ -1,11 +1,11 @@
 ---
 name: flow
-description: 利用者が`$flow`（Claudeでは`/flow`）を明示した場合だけ、spec配下の永続成果物を介してDesign、Review、Plan、Implementを接続する状態遷移ハブ。通常の設計・レビュー・計画・実装依頼から暗黙に起動しない。
+description: 利用者が`$flow`（Claudeでは`/flow`）を明示した場合だけ、flow-spec配下の永続成果物を介してDesign、Review、Plan、Implementを接続する状態遷移ハブ。通常の設計・レビュー・計画・実装依頼から暗黙に起動しない。
 disable-model-invocation: true
 user-invocable: true
 ---
 
-# Flow 4.1.0
+# Flow 4.2.0
 
 ## 起動と責務
 
@@ -23,9 +23,29 @@ writer・review hub・executorは自分の契約だけを扱い、Flowが成果�
 `node {このskillのdirectory}/scripts/flowctl.js --root {feature_dir}`を使う。
 Node.js 22以上が必要。依存はCLIへ同梱済みで、利用側のnpm install・ビルドは不要。
 
-feature directoryは`spec/YYYYMMDD_feature-name/`。initで要求、state、auditを作る。
+新規feature directoryは`flow-spec/YYYYMMDD_feature-name/`。initで要求、state、auditを作る。
+既存タスクを再開するときは指定されたdirectoryを使い、旧`spec/`から自動移動しない。
 artifactsは固定pathで更新し、変更履歴を残す。reviewはcycle-0001、feedbackは
 feedback-0001.mdの発行単位で保存する。pathはfeature directory基準。
+
+## 起動時のGit設定
+
+新規・再開とも、init / resume-checkの前に対象project直下の`.gitattributes`を確認する。
+存在しなければ作成し、次の設定を保存する。
+
+```gitattributes
+flow-spec/** linguist-generated=true
+```
+
+既存fileは内容・改行を保持し、この設定がなければ末尾へ追記する。
+同じ設定、または`flow-spec/** linguist-generated`が既にあれば重複追加しない。
+改行なしで終わるfileへ追記するときは改行を挟む。
+対象projectの設定だけを更新し、skillの配置directoryへは作らない。
+設定の確認・補完はFlowが行い、CLIのinit / resume-checkへ副作用を追加しない。
+
+成果物はGit管理し、GitHubのPRでは差分を既定で折りたたむ。必要なときは展開して確認できる。
+`.gitignore`へ`flow-spec/`を追加しない。設定の変更があれば、init / resume-check成功後に
+既存のactionイベントで監査へ記録する。
 
 ## ワークフロー
 
@@ -122,10 +142,36 @@ checkpointは専用commitとlocal tagへ保存され、現在のbranch・index�
 復帰はcheckpoint-restoreで別branchを作成する。checkout・reset・push・再開を自動実行しない。
 Gitの保存結果とFlowの再計画は別に扱い、過去snapshotのcompletedを現在の承認へ流用しない。
 
+## 応答終了前の保存commit
+
+Flowは各応答を終える前に、対象タスクの成果物と監査を現在のbranchへ通常commitする。
+質問・承認の回答待ち、blockedによる停止、全体完了、completed後の関連対話にも適用する。
+checkpoint-createの専用commit / local tagとは別に実行する。
+
+1. その応答で行った操作・判断・提示内容の監査を共通CLIで保存し、必要なstate・成果物の保存を終える。
+   writerなどが更新中なら完了を待ち、保存commitと同時に対象fileを更新させない。
+2. git statusと差分を確認し、対象feature directoryの`audit.md`、`flow-state.yml`、
+   artifacts、inputs、reviews、feedbackの未保存差分をまとめる。
+   Flowが起動時に作成・補完した`.gitattributes`も対象に含める。
+   lockなどの一時file、機密、別タスク・利用者の無関係な変更、実装途中のcodeは含めない。
+3. 対象pathを明示してstageし、今回の保存対象だけをcommitする。
+   既存の無関係なstaged変更は保持し、commitへ混入させない。混在fileの変更を安全に分離できなければ停止する。
+   ignore対象は強制追加せず、Git未初期化・権限・署名・hookなどの障害と同様に保存失敗として扱う。
+   対象差分がなければ空commitを作らない。件名は`[flow] {保存内容を表す短い命令形}`とする。
+4. commit後に対象差分が残っていないことを確認し、応答で保存commit SHAを報告する。
+   commitできなければ、未保存の対象と理由を報告し、保存済みとして扱わない。
+   保存失敗だけを理由にphaseや成果物のstatusを変更しない。
+
+この保存commitと、そのための差分確認・stage・結果確認は監査への追記対象から除外し、
+Git履歴を証跡とする。成功・失敗を記録するためにaudit.mdや他の成果物を再更新しない。
+実装commit、checkpoint操作、push・PR作成など他の操作は従来どおり監査へ記録する。
+pushやtagの作成はこの手順に含めず、pushは利用者の明示依頼がある場合だけ行う。
+
 ## 監査と所有
 
 対象タスクの要求・成果物・判断に関係するAIの操作・判断、利用者への提示と原文回答、
-feedbackへの対応をaudit-appendで逐一記録する。completed後の質問・調査・説明訂正・追加要望も対象。
+feedbackへの対応をaudit-appendで逐一記録する。応答終了前の保存commit関連操作だけは上記の例外とする。
+completed後の質問・調査・説明訂正・追加要望も対象。
 説明や調査だけならcompletedを維持し、成果物変更が必要なら人間承認付き再計画へ進む。
 通常会話へ切り離して関連対話を省略しない。補記は再構成・補記であることと根拠を明示し、
 元の発言日時が不明なら推測せず、occurred_atには補記操作の実測日時を使う。

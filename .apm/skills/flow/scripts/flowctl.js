@@ -30364,7 +30364,7 @@ function restoreCheckpoint(store, request) {
 }
 
 // src/cli.ts
-var help = `flowctl 4.1.0 \u2014 Flow persistence and contract guards
+var help = `flowctl 4.2.0 \u2014 Flow persistence and contract guards
 Usage: node flowctl.js --root FEATURE COMMAND [OPTIONS]
 Commands: init, publish, transition, audit-append, review-check --request FILE|-
           validate PATH [--references]
@@ -30375,7 +30375,7 @@ Options: --version, --help
 async function main(argv = process.argv.slice(2)) {
   try {
     if (argv.includes("--version")) {
-      console.log("flowctl 4.1.0");
+      console.log("flowctl 4.2.0");
       return 0;
     }
     if (argv.includes("--help") || argv.includes("-h")) {

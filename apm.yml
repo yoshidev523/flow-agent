@@ -1,5 +1,5 @@
 name: flow-agent
-version: 4.1.0
+version: 4.2.0
 description: 仕様駆動開発を行うエージェントを管理します
 author: Yoshiki Honda
 # Which agent platforms to deploy to.

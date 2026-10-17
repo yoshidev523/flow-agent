@@ -1,7 +1,7 @@
-# flow-agent 4.1.0
+# flow-agent 4.2.0
 
 Codex / Claude Codeで仕様駆動開発を進めるためのエージェントパッケージです。
-Design、Review、Plan、Implementを順に実行し、判断と成果物を`spec/`配下に保存します。
+Design、Review、Plan、Implementを順に実行し、判断と成果物を`flow-spec/`配下に保存します。
 
 ## インストール
 
@@ -23,11 +23,15 @@ $flow 認証機能を追加して
 /flow 認証機能を追加して
 ```
 
-実行内容は`spec/YYYYMMDD_feature-name/`へ保存します。
+実行内容は`flow-spec/YYYYMMDD_feature-name/`へ保存します。
 `artifacts/`のDesign・Plan・Implementは常に最新で、本文の変更履歴に内容と理由を残します。
 レビューは`reviews/*/cycle-0001/`、feedbackは`feedback/*/feedback-0001.md`へ保存します。
 Flowの現在地は`flow-state.yml`、操作・判断・利用者対話の履歴は追記型の`audit.md`に残します。
-旧schemaの成果物は自動移行しません。
+旧schemaの成果物は自動移行しません。既存の`spec/`にあるタスクは元のpathで再開します。
+
+Flow起動時に対象projectの`.gitattributes`を確認し、なければ作成します。
+既存の内容を保持し、`flow-spec/** linguist-generated=true`が未設定なら追記します。
+成果物はGit管理しながら、GitHubのPRでは差分を既定で折りたたみます。
 
 再計画の変更を既存成果物へ反映するときは
 [flow-artifact-sync](.apm/skills/flow-artifact-sync/SKILL.md)が既存成果物の本文・入力参照を更新し、
@@ -44,7 +48,7 @@ Node.js 22以上だけで実行できます。Zod・YAML処理を含む単一の
 配置後の`flow-skill-dir`は通常`.agents/skills/flow`または`.claude/skills/flow`です。
 
 ```sh
-node {flow-skill-dir}/scripts/flowctl.js --root spec/YYYYMMDD_feature-name resume-check
+node {flow-skill-dir}/scripts/flowctl.js --root flow-spec/YYYYMMDD_feature-name resume-check
 ```
 
 CLIは成果物検証、revisionと変更履歴を伴う保存、review集約判定、状態遷移、
