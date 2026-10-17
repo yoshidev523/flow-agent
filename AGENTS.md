@@ -8,8 +8,8 @@
 `.agents/skills/`に置きます。パッケージ設定は`apm.yml`、依存関係の固定情報は
 `apm.lock.yaml`で管理します。
 
-機能ごとの実行成果物は`spec/YYYYMMDD_feature/`へ保存します。
-Flow 4.1.0では`flow-state.yml`、追記型の`audit.md`、固定pathの
+機能ごとの実行成果物は`flow-spec/YYYYMMDD_feature/`へ保存します。
+Flow 4.2.0では`flow-state.yml`、追記型の`audit.md`、固定pathの
 `artifacts/design.md`、`artifacts/plan.md`、`artifacts/implement.md`を使います。
 固定成果物はrevisionと変更履歴を更新し、revision別fileは作りません。
 レビューは`reviews/{design,plan-decision,plan-final}/cycle-0001/`へsourceとreview.md、
@@ -35,7 +35,7 @@ apm run verify-flow-deployment
 `verify-flow-deployment`は下記の配置検証を自動化し、CLI・Markdown契約・templateの同梱も確認します。
 
 ```sh
-node .apm/skills/flow/scripts/flowctl.js --root spec/YYYYMMDD_feature validate artifacts/design.md
+node .apm/skills/flow/scripts/flowctl.js --root flow-spec/YYYYMMDD_feature validate artifacts/design.md
 ```
 
 開発時は`npm ci`で依存を導入します。TypeScriptは`src/`、Zod契約は`src/contracts/`が正本です。
@@ -226,7 +226,7 @@ agent定義はfront matter後を「あなたは〜です。」で始め、「主
 履歴には確立済みのcommit規約がないため、命令形で対象を明確にした短い件名を使います。
 PRには目的、変更file、検証結果または未実施理由を記載し、関連Issueがあればlinkします。
 
-## Flow 4.1.0 の機械処理
+## Flow 4.2.0 の機械処理
 
 HOWは`.apm/skills/flow/references/`、schemaの正本は`src/contracts/`のZod定義です。
 実行処理はTypeScriptで実装し、依存を含む`scripts/flowctl.js`をFlow skillへ同梱します。

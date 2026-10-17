@@ -1,4 +1,4 @@
-# Flow 4.1.0 契約
+# Flow 4.2.0 契約
 
 ## 正本
 
@@ -71,7 +71,7 @@ statusと内容の整合性、参照の鮮度、保存pathは各契約の説明�
 ## 配置と所有
 
 ```text
-spec/YYYYMMDD_feature-name/
+flow-spec/YYYYMMDD_feature-name/
 ├── flow-state.yml
 ├── audit.md
 ├── inputs/request.md
@@ -311,7 +311,7 @@ resume-check --recoverまたは元のtransition requestの再送で、保存済�
 外部操作の完了は推測しない。active invocationは実態と証拠を確認して登録または停止する。
 履歴は訂正イベントで補正する。暗号学的な改ざん防止や複数fileの完全transactionを保証しない。
 
-## 再計画とチェックポイント（4.1.0）
+## 再計画とチェックポイント（4.2.0）
 
 request_replanは進行中invocationがないこと、現在参照とcheckpointの一致、現在stateより後の
 checkpoint監査地点、kind replanの提示eventを検証し、phase replanningへ移す。

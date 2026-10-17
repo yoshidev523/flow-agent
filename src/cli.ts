@@ -8,11 +8,11 @@ import {
   recoverCheckpoint,
   restoreCheckpoint,
 } from "./checkpoints.js";
-const help = `flowctl 4.1.0 — Flow persistence and contract guards\nUsage: node flowctl.js --root FEATURE COMMAND [OPTIONS]\nCommands: init, publish, transition, audit-append, review-check --request FILE|-\n          validate PATH [--references]\n          resume-check [--recover]\n          checkpoint-create, checkpoint-recover, checkpoint-restore --request FILE|-\nOptions: --version, --help\n`;
+const help = `flowctl 4.2.0 — Flow persistence and contract guards\nUsage: node flowctl.js --root FEATURE COMMAND [OPTIONS]\nCommands: init, publish, transition, audit-append, review-check --request FILE|-\n          validate PATH [--references]\n          resume-check [--recover]\n          checkpoint-create, checkpoint-recover, checkpoint-restore --request FILE|-\nOptions: --version, --help\n`;
 async function main(argv = process.argv.slice(2)): Promise<number> {
   try {
     if (argv.includes("--version")) {
-      console.log("flowctl 4.1.0");
+      console.log("flowctl 4.2.0");
       return 0;
     }
     if (argv.includes("--help") || argv.includes("-h")) {

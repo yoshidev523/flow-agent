@@ -12,7 +12,7 @@ repositoryでは`.apm/skills/flow/scripts/flowctl.js`、配置後はこのFlow s
 Flowは人間承認付きreplanning中に同期し、finish_replanで最新参照を登録する。
 
 ```sh
-node {flow-skill-dir}/scripts/flowctl.js --root spec/YYYYMMDD_feature-name init --request /tmp/init.yml
+node {flow-skill-dir}/scripts/flowctl.js --root flow-spec/YYYYMMDD_feature-name init --request /tmp/init.yml
 ```
 
 全commandはstdoutへJSONを返す。成功は`ok:true,result`。
@@ -157,6 +157,16 @@ checkpoint-recoverは元のrequest_id、create_missing_tag（boolean）。false�
 未作成tagを作る必要がある場合だけtrueを明示する。既存tagの変更・削除は行わない。
 checkpoint-restoreはrequest_id、checkpoint_id、branch。指定commitへ新しいbranchだけを作る。
 中断後は同じrequestでbranchのcommitを照合して監査を補完できる。checkout/reset/pushは行わない。
+
+## 応答終了前の保存commit
+
+Flowは各応答の終了前に、監査・state・成果物を保存した後、対象feature directoryの成果物と
+起動時に補完した`.gitattributes`を現在のbranchへ通常commitする。回答待ち・停止・完了後も対象。
+対象はFlow自身のタスクに限定し、無関係な変更や一時fileを混入させない。保存失敗は応答で報告する。
+この手順はFlowの責務で、独立したleafやflow-artifact-syncの単独実行には適用しない。
+これはFlowが行うGit操作であり、CLI commandやcheckpointの副作用としては追加しない。
+この保存commitと付随する差分確認・stage・結果確認は監査対象から除外し、Git履歴を証跡とする。
+保存結果をaudit.mdや成果物へ追記しない。実装commitとcheckpoint操作は引き続き監査対象とする。
 
 ## 完了後の監査
 
