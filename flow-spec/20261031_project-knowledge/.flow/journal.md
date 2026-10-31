@@ -283,3 +283,77 @@ data:
     - package-lock.json
     - src/cli.ts
 ```
+
+## E-000011 — artifact.update_prepared
+
+```yaml
+event_id: "E-000011"
+event_key: project-knowledge-complete-0040249ebe2181ef84b5b59caed33421bf5a1919:prepared
+event_type: artifact.update_prepared
+run_id: project-knowledge-20261031
+invocation_id: project-knowledge-implementation
+occurred_at: "2026-10-31T10:28:08+00:00"
+recorded_at: "2026-10-31T10:28:08+00:00"
+actor: flow-implement
+caused_by: []
+data:
+  target_path: artifacts/implement.md
+  before_sha256: b8fca4496159804027eb46da87ed24a7fade1ba0564f9994281874d823bf44ba
+  request_sha256: 9e065f284c7dcbadc52a5924b36b4662fb04eb9ff857232b4cbe5f5bb0297757
+  after:
+    path: artifacts/implement.md
+    revision: 4
+    sha256: 045adc99497a13a1996515be66c8f3496b0d7b4cd2696180167874fe675868ea
+  operation: execute
+  change: 実装commitを記録して完了状態へ更新
+  reason: 利用者のコミット依頼に従い、実装・必須検証・Git保存を完了
+  sections:
+    - タスク進捗
+    - 未完了事項
+  references:
+    - 0040249ebe2181ef84b5b59caed33421bf5a1919
+  old_status: in_progress
+  new_status: completed
+```
+
+## E-000012 — artifact.updated
+
+```yaml
+event_id: "E-000012"
+event_key: project-knowledge-complete-0040249ebe2181ef84b5b59caed33421bf5a1919:completed
+event_type: artifact.updated
+run_id: project-knowledge-20261031
+invocation_id: project-knowledge-implementation
+occurred_at: "2026-10-31T10:28:08+00:00"
+recorded_at: "2026-10-31T10:28:08+00:00"
+actor: flow-implement
+caused_by:
+  - "E-000011"
+data:
+  prepared_event_id: "E-000011"
+  artifact:
+    path: artifacts/implement.md
+    revision: 4
+    sha256: 045adc99497a13a1996515be66c8f3496b0d7b4cd2696180167874fe675868ea
+```
+
+## E-000013 — action.completed
+
+```yaml
+event_id: "E-000013"
+event_key: project-knowledge-completed-0040249ebe2181ef84b5b59caed33421bf5a1919
+event_type: action.completed
+run_id: project-knowledge-20261031
+invocation_id: null
+occurred_at: "2026-10-31T10:28:08+00:00"
+recorded_at: "2026-10-31T10:28:08+00:00"
+actor: codex
+caused_by:
+  - "E-000012"
+data:
+  action: プロジェクト知識機能の実装完了
+  result: 実装タスク・必須検証・実装commitを完了し、implement.mdをcompletedへ更新した。
+  evidence:
+    - artifacts/implement.md
+    - 0040249ebe2181ef84b5b59caed33421bf5a1919
+```

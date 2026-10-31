@@ -1,12 +1,12 @@
 ---
 schema_version: flow/implement-artifact-v2
 artifact: implement
-revision: 3
-status: in_progress
+revision: 4
+status: completed
 producer: flow-implement
 invocation_id: project-knowledge-implementation
 operation: execute
-updated_at: "2026-10-31T10:05:12+00:00"
+updated_at: "2026-10-31T10:28:08+00:00"
 plan:
   path: artifacts/plan.md
   revision: 1
@@ -43,7 +43,7 @@ verifications:
     required: true
     reason: 独立consumerで新規2スキルとreviewerのCodex/Claude配置・同梱物を確認
 blocker: null
-commit: null
+commit: 0040249ebe2181ef84b5b59caed33421bf5a1919
 project_knowledge:
   discovery: 対象repositoryのAGENTS.mdと.apm/skills/flow/referencesの既存契約・CLI・再計画手順を確認。外部文書運用をローカルMarkdownに限定しないという利用者の指定を採用。
   completeness: complete
@@ -79,7 +79,7 @@ project_knowledge:
 
 ## タスク進捗
 
-T-001〜T-003の実装・検証完了。Git commitは未実施のため契約上のstatusはin_progress。
+T-001〜T-003の実装・検証完了。実装commit 0040249ebe2181ef84b5b59caed33421bf5a1919を保存し、statusをcompletedへ更新。
 
 ## 変更サマリ
 
@@ -99,7 +99,7 @@ T-001〜T-003の実装・検証完了。Git commitは未実施のため契約上
 
 ## 未完了事項
 
-実装と必須検証の未完了なし。Git commitは未実施。実際の外部サービスを使う取得・更新は本作業では実行していない。
+実装と必須検証の未完了なし。Git commitを保存済み。実際の外部サービスを使う取得・更新は本作業では実行していない。
 
 ## プロジェクト知識
 
@@ -136,3 +136,13 @@ AGENTS.mdの責務分離、正本管理、既存契約・CLI利用と配布検�
 - 変更箇所: 検証ログ、補足・計画との差分
 - 参照: apm.yml、package.json、package-lock.json、src/cli.ts
 - 状態変更: in_progress → in_progress
+
+### revision 4
+
+- 日時: 2026-10-31T10:28:08+00:00
+- 操作: execute
+- 変更内容: 実装commitを記録して完了状態へ更新
+- 背景・理由: 利用者のコミット依頼に従い、実装・必須検証・Git保存を完了
+- 変更箇所: タスク進捗、未完了事項
+- 参照: 0040249ebe2181ef84b5b59caed33421bf5a1919
+- 状態変更: in_progress → completed
