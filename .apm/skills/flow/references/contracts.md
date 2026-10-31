@@ -237,30 +237,25 @@ CLIが`.flow/journal.md`から決定的に生成する。手動編集・自由�
 - 参照：artifacts/implement.md r18
 ```
 
+### 監査の記録方針
+
 記録対象はフェーズ移行、回答待ち・停止・再開、問題と解消、review結果、feedback、
 重要な決定・承認、再計画、タスク単位の検証結果。
-読取・検索・通常command開始、TDDの各Red/Green、説明だけの対話はイベントを送らない。
-詳細は既存成果物へ残し、監査には要点とpathを記録する。判断依頼と原文回答は一度だけ保存し、
-再利用はevent IDで参照する。完了後も新しい課題・変更要求・決定訂正だけを追記する。
+読取・検索・通常command開始、TDDの各Red/Green、説明だけの対話は記録しない。
+詳細は成果物へ残し、監査には要点とpathを示す。判断依頼と原文回答は一度だけ保存し、再利用はevent IDで参照する。
+completed後も新しい課題・変更要求・決定訂正だけを記録する。
 
-viewにはflow.started、意味のあるflow.transitioned、invocation.failed、action.completed、
-decision.made、interaction.presented/received、feedback.created、review.completed、
-review.mode_changed、retry.scheduled、flow.blocked/resumed、保存中止を表示する。
-aggregateのartifact.updatedからreview結果を表示し、同一参照のreview.completedは重複表示しない。
-prepared、通常のartifact保存、invocation開始/終了、checkpointの内部処理は表示しない。
-完了はcompletedへのフェーズ移行で表示し、flow.completedを重複表示しない。
-通常操作は開始/完了の対を要求せず、重要な結果だけをaction.completedへまとめる。
-同期全体のaction.startedだけは中断追跡の内部記録として保持し、viewには結果を表示する。
+review結果はaggregateのpublish、Flowの停止・再開はtransitionから自動生成し、別eventを送らない。
+`review.completed / flow.blocked / flow.resumed`は旧履歴の読取専用とし、audit-appendは拒否する。
+その他の重要な結果はaction.completedへまとめる。通常操作のaction.startedは不要。
+同期全体のaction.startedだけは中断追跡用に保持する。prepared、通常保存、invocation開始/終了、
+checkpointの内部処理はjournalだけへ残し、viewへ展開しない。同じ事実を重複記録しない。
 
-`.flow/journal.md`は従来の`flow/audit-log-v1`を使うCLI専用の追記型正本。
-復旧、request再送の重複防止、因果参照、state snapshot照合はjournalだけを参照する。
-両fileをGit保存とcheckpointへ含める。CLIはjournalをfsyncした後viewをatomic置換する。
-view生成失敗は操作失敗として返し、次のmutationを拒否する。resume-check --recoverで
-journalからviewを再生成し、保存の未完了も従来どおり照合する。外部操作は再実行しない。
-validate audit.mdはjournalの構造とviewの完全一致を検証する。
-旧audit.mdは自動読替えしない。明示的なaudit-migrateが全eventを検証して原本のbytesを
-journalへatomic保存し、その後viewを生成する。途中中断と同じcommandの再送でも原本を上書きしない。
-既存イベントの分類を推測して削除しないため、移行済みの過去の通常操作はviewにも残る。
+`.flow/journal.md`は復旧・重複実行防止・因果参照の正本であり、従来のaudit-log-v1を使う。
+両fileをGit保存とcheckpointへ含め、共通CLI以外から編集しない。
+CLIはjournalをfsyncした後viewをatomic置換する。欠落・不一致のviewは次操作・検証・再開時に
+自動再生成する。表示の不一致だけで停止せず、復旧用journalの破損・未完了保存は従来どおり検査する。
+旧audit.mdは明示的なaudit-migrateで原本をjournalへ保持して移行し、旧eventを推測で削除しない。
 
 ### 内部journalの形式
 
@@ -316,7 +311,7 @@ flow.transition_aborted、artifact.update_prepared、artifact.updated、artifact
 これらはinit/publish/transition/resume-checkが記録し、audit-appendへの直接送信は拒否する。
 invocation.started/completed/failedとFlow完了時のflow.completedはtransitionが通常自動記録する。
 同じ事実を別のevent_keyで重複記録しない。
-その他のeventは各componentがaudit-appendで記録する。review.mode_changedなどは自動生成されず、
+読取専用eventを除き、その他は各componentがaudit-appendで記録する。review.mode_changedなどは自動生成されず、
 対応するtransitionの結果を確認してcomponentが記録する。復旧時も外部行動の完了を推測しない。
 
 例: 利用者の回答を記録するaudit-appendのrequest。

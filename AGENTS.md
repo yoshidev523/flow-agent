@@ -238,6 +238,7 @@ JSON Schemaの生成・配布は行いません。
 通常の読取・検索・command開始・TDD各段階・説明だけの応答は記録しません。
 復旧と重複実行防止の正本は`.flow/journal.md`とし、CLIが`audit.md`を生成します。
 両fileをGit保存とcheckpointへ含め、直接編集しません。
+表示の欠落・不一致はCLIが自動再生成し、旧review.completed/flow.blocked/flow.resumedは読取専用とします。
 旧audit-log-v1は明示的な`audit-migrate`で原本をjournalへ保持して移行します。
 各agentは自分のイベントを共通記録処理へ渡し、監査を直接編集しません。
 完了後も新しい課題・変更要求・判断訂正だけを監査へ記録します。

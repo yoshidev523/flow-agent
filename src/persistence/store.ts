@@ -279,7 +279,7 @@ export class Store extends Files {
     ];
   }
   consistent(replayingRequestId?: string): void {
-    this.validateAudit();
+    this.syncAudit();
     const checkpointEvents = this.events()[1];
     check(
       checkpointEvents
@@ -564,37 +564,24 @@ export class Store extends Files {
         );
     }
   }
-  syncAudit(): void {
+  syncAudit(): number {
     const [meta, events] = this.events();
-    const expected = auditView(meta, events);
+    const expected = Buffer.from(auditView(meta, events));
     if (
       !fs.existsSync(this.path("audit.md")) ||
-      utf8(fs.readFileSync(this.path("audit.md"))) !== expected
+      !fs.readFileSync(this.path("audit.md")).equals(expected)
     )
       this.atomic("audit.md", expected);
-  }
-  validateAudit(): number {
-    const [meta, events] = this.events();
-    check(
-      fs.existsSync(this.path("audit.md")) &&
-        utf8(fs.readFileSync(this.path("audit.md"))) ===
-          auditView(meta, events),
-      "Audit view is missing or stale; run resume-check --recover",
-      true,
-    );
     return events.length;
   }
   migrateAudit(): Fields {
     if (!fs.existsSync(this.path(JOURNAL))) {
       const original = fs.readFileSync(this.path("audit.md"));
-      const [meta] = markdown(utf8(original));
-      schemaCheck("audit-log", meta);
       // Validate the entire legacy stream before creating a journal or replacing the view.
       this.parseEvents(utf8(original));
       this.atomic(JOURNAL, original);
     }
-    this.syncAudit();
-    return { events: this.validateAudit(), journal: JOURNAL };
+    return { events: this.syncAudit(), journal: JOURNAL };
   }
   ensureAudit(): void {
     if (fs.existsSync(this.path(JOURNAL))) return;
@@ -965,6 +952,12 @@ export class Store extends Files {
       !MANAGED_EVENTS.has(request.event_type),
       "Persistence events are reserved for flowctl",
     );
+    check(
+      !["review.completed", "flow.blocked", "flow.resumed"].includes(
+        request.event_type,
+      ),
+      "Legacy event is read-only; use publish for reviews or transition for block/resume",
+    );
     schemaCheck("event-data", request.data, request.event_type);
     if (request.event_type === "interaction.received") {
       check(
@@ -1045,8 +1038,7 @@ export class Store extends Files {
   }
   resumeCheck(recover = false): Fields {
     let [, events] = this.events();
-    if (recover) this.syncAudit();
-    else this.validateAudit();
+    this.syncAudit();
     const standalone = !events.some((e) => e.event_type === "flow.started");
     if (!fs.existsSync(this.path("flow-state.yml")) && !standalone) {
       const started = events.filter((e) => e.event_type === "flow.started");

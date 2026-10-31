@@ -37,7 +37,7 @@ node {flowctl} --root {feature_dir} validate audit.md
 消費済みfeedbackは保存時の変更前digestを監査へ照合する。
 過去cycleのreviewやfeedbackは現在参照と一致しないことがあるため、歴史資料として構造検証する。
 flow-state.ymlの--referencesはresume-check相当。
-validate audit.mdは内部journalと生成済みviewの一致も検証する。
+validate audit.mdは内部journalを検証し、欠落・不一致のviewを自動再生成する。
 
 ## audit-migrate
 
@@ -89,13 +89,9 @@ review_cycle_id、mode ai|human、source_paths。
 request: event_key、event_type、actor、run_id、invocation_idまたはnull、
 occurred_at、caused_by、data。
 dataは[contracts.mdの監査イベント契約](contracts.md#イベント一覧)に一致させる。
-CLI専用の予約eventはflow.started、flow.transition_prepared、flow.transitioned、
-flow.transition_aborted、artifact.update_prepared、artifact.updated、artifact.update_aborted。
-これらはaudit-appendへ直接送信できない。invocation.*はtransitionが通常自動記録する。
-通常操作のstarted/completedは送らない。タスク単位の重要な結果だけをaction.completedへまとめる。
-読取・検索・TDD各段階・説明だけの対話は記録対象外。問題・決定・feedback・検証結果を残す。
-同期全体のaction.startedは中断追跡用として例外的に保持する。
-AIの自動判断はdecision.made、人間の提示/回答はinteraction.presented/receivedを使う。
+記録対象と自動記録・旧eventの扱いは[共通の記録方針](contracts.md#監査の記録方針)に従う。
+CLI専用eventを直接送信しない。
+重要な決定はdecision.made、人間の判断依頼/回答はinteraction.presented/receivedを使う。
 feedback.createdでは原文イベントとitem IDの対応を記録する。
 
 ## transition
@@ -141,8 +137,8 @@ node {flowctl} --root {feature_dir} resume-check
 node {flowctl} --root {feature_dir} resume-check --recover
 ```
 
-stateと内部journalのsnapshot、現在の参照、未完了prepared、audit.mdの一致を検査する。
---recoverは欠落・不一致のviewをjournalから再生成する。journal自体の破損は自動修復しない。
+stateと内部journalのsnapshot、現在の参照、未完了preparedを検査する。
+viewの欠落・不一致は--recoverなしでも自動再生成する。journal自体の破損は自動修復しない。
 --recoverは保存の前後digestが一致する場合だけ監査を補完する。
 保存済みtransitionの付随監査eventの欠落も検出し、--recoverまたは元のtransition request再送で補完する。
 欠落がある間は別のmutationを拒否する。補完ではstate revisionを増やさない。

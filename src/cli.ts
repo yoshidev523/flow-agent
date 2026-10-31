@@ -39,7 +39,7 @@ async function main(argv = process.argv.slice(2)): Promise<number> {
           "Invalid validate arguments",
         );
         if (name === JOURNAL) return { events: store.events()[1].length };
-        if (name === "audit.md") return { events: store.validateAudit() };
+        if (name === "audit.md") return { events: store.syncAudit() };
         if (name === "flow-state.yml")
           return argv.includes("--references")
             ? store.resumeCheck()

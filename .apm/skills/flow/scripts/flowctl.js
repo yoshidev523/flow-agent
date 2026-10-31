@@ -7619,6 +7619,7 @@ function auditView(meta3, events) {
         fact = "\u5909\u66F4\u30FB\u56DE\u7B54\u3092\u6210\u679C\u7269\u3078\u6E21\u3059\u30D5\u30A3\u30FC\u30C9\u30D0\u30C3\u30AF\u3068\u3057\u3066\u4FDD\u5B58\u3057\u305F\u3002";
         references = [ref(d.feedback), ...d.origin_event_ids];
         break;
+      // Read-only legacy events: new reviews and block/resume use publish/transition.
       case "review.completed":
         if (!reviews.has(ref(d.review))) {
           title = "\u30EC\u30D3\u30E5\u30FC\u7D50\u679C";
@@ -29416,7 +29417,7 @@ ${dump(event)}\`\`\`
     ];
   }
   consistent(replayingRequestId) {
-    this.validateAudit();
+    this.syncAudit();
     const checkpointEvents = this.events()[1];
     requireCondition(
       checkpointEvents.filter((e) => e.event_type === "checkpoint.prepared").every(
@@ -29668,29 +29669,18 @@ ${dump(event)}\`\`\`
   }
   syncAudit() {
     const [meta3, events] = this.events();
-    const expected = auditView(meta3, events);
-    if (!import_node_fs3.default.existsSync(this.path("audit.md")) || utf8(import_node_fs3.default.readFileSync(this.path("audit.md"))) !== expected)
+    const expected = Buffer.from(auditView(meta3, events));
+    if (!import_node_fs3.default.existsSync(this.path("audit.md")) || !import_node_fs3.default.readFileSync(this.path("audit.md")).equals(expected))
       this.atomic("audit.md", expected);
-  }
-  validateAudit() {
-    const [meta3, events] = this.events();
-    requireCondition(
-      import_node_fs3.default.existsSync(this.path("audit.md")) && utf8(import_node_fs3.default.readFileSync(this.path("audit.md"))) === auditView(meta3, events),
-      "Audit view is missing or stale; run resume-check --recover",
-      true
-    );
     return events.length;
   }
   migrateAudit() {
     if (!import_node_fs3.default.existsSync(this.path(JOURNAL))) {
       const original = import_node_fs3.default.readFileSync(this.path("audit.md"));
-      const [meta3] = markdown(utf8(original));
-      schemaCheck("audit-log", meta3);
       this.parseEvents(utf8(original));
       this.atomic(JOURNAL, original);
     }
-    this.syncAudit();
-    return { events: this.validateAudit(), journal: JOURNAL };
+    return { events: this.syncAudit(), journal: JOURNAL };
   }
   ensureAudit() {
     if (import_node_fs3.default.existsSync(this.path(JOURNAL))) return;
@@ -30026,6 +30016,12 @@ ${dump(event)}\`\`\`
       !MANAGED_EVENTS.has(request.event_type),
       "Persistence events are reserved for flowctl"
     );
+    requireCondition(
+      !["review.completed", "flow.blocked", "flow.resumed"].includes(
+        request.event_type
+      ),
+      "Legacy event is read-only; use publish for reviews or transition for block/resume"
+    );
     schemaCheck("event-data", request.data, request.event_type);
     if (request.event_type === "interaction.received") {
       requireCondition(
@@ -30101,8 +30097,7 @@ ${dump(event)}\`\`\`
   }
   resumeCheck(recover = false) {
     let [, events] = this.events();
-    if (recover) this.syncAudit();
-    else this.validateAudit();
+    this.syncAudit();
     const standalone = !events.some((e) => e.event_type === "flow.started");
     if (!import_node_fs3.default.existsSync(this.path("flow-state.yml")) && !standalone) {
       const started = events.filter((e) => e.event_type === "flow.started");
@@ -30588,7 +30583,7 @@ async function main(argv = process.argv.slice(2)) {
           "Invalid validate arguments"
         );
         if (name === JOURNAL) return { events: store.events()[1].length };
-        if (name === "audit.md") return { events: store.validateAudit() };
+        if (name === "audit.md") return { events: store.syncAudit() };
         if (name === "flow-state.yml")
           return argv.includes("--references") ? store.resumeCheck() : store.state();
         const [meta3, , ref] = store.document(name);

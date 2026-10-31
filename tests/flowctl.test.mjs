@@ -2187,7 +2187,7 @@ fixture(
     assert.match(journal, /flow.transition_prepared/);
     assert.match(journal, /artifact.update_prepared/);
     assert.equal((view.match(/^## /gm) ?? []).length, 1);
-    x.store.validateAudit();
+    x.store.syncAudit();
   },
 );
 
@@ -2219,21 +2219,29 @@ fixture(
   },
 );
 
-fixture("aggregateのレビュー結果を一度だけ表示する", (x) => {
-  x.writer("design");
-  x.review("design");
-  x.event("review.completed", {
-    review: x.store.state().reviews.design,
-    status: "passed",
-  });
-  const view = fs.readFileSync(x.store.path("audit.md"), "utf8");
-  assert.equal((view.match(/— レビュー結果 /g) ?? []).length, 1);
-  assert.match(view, /— design_review — レビュー結果/);
-  assert.match(view, /事実：passed/);
-  assert.match(view, /reviews\/design\/cycle-0001\/review.md r1/);
-});
+fixture(
+  "旧履歴を読み取ってもaggregateのレビュー結果を一度だけ表示する",
+  (x) => {
+    x.writer("design");
+    x.review("design");
+    // Simulate a pre-migration record; the public audit-append API no longer accepts it.
+    x.store.append(
+      "review.completed",
+      {
+        review: x.store.state().reviews.design,
+        status: "passed",
+      },
+      "legacy-review",
+    );
+    const view = fs.readFileSync(x.store.path("audit.md"), "utf8");
+    assert.equal((view.match(/— レビュー結果 /g) ?? []).length, 1);
+    assert.match(view, /— design_review — レビュー結果/);
+    assert.match(view, /事実：passed/);
+    assert.match(view, /reviews\/design\/cycle-0001\/review.md r1/);
+  },
+);
 
-fixture("view生成の中断は次操作を止め、外部行動を繰り返さず復旧する", (x) => {
+fixture("view生成の中断は通常の再送で回復し、外部行動を重複記録しない", (x) => {
   const atomic = x.store.atomic.bind(x.store);
   x.store.atomic = (name, data) => {
     if (name === "audit.md") throw new Error("view disk failure");
@@ -2254,12 +2262,6 @@ fixture("view生成の中断は次操作を止め、外部行動を繰り返さ�
   );
   x.store.atomic = atomic;
   const count = x.store.events()[1].length;
-  assert.throws(() => x.store.validateAudit(), /missing or stale/);
-  assert.throws(
-    () => x.event("action.started", { action: "next", detail: "next" }),
-    /missing or stale/,
-  );
-  x.store.resumeCheck(true);
   x.event(
     "action.completed",
     { action: "外部操作", result: "完了済み", evidence: [] },
@@ -2325,15 +2327,49 @@ fixture("移行中断後は保存済み原本から再開する", (x) => {
   x.store.atomic = atomic;
   x.store.migrateAudit();
   assert.deepEqual(fs.readFileSync(journal), original);
-  x.store.validateAudit();
+  x.store.syncAudit();
 });
 
-fixture("viewの消失は復旧できるがjournalの消失は推測で補完しない", (x) => {
-  fs.unlinkSync(x.store.path("audit.md"));
-  assert.throws(() => x.store.resumeCheck(), /missing or stale/);
-  x.store.resumeCheck(true);
-  x.store.validateAudit();
-  fs.unlinkSync(x.store.path(".flow/journal.md"));
-  assert.throws(() => x.store.resumeCheck(true), /Missing .flow\/journal.md/);
-  assert.throws(() => x.store.migrateAudit(), f.FlowError);
+fixture(
+  "viewの欠落・破損は通常操作で自動再生成し、journalの消失は補完しない",
+  (x) => {
+    const original = fs.readFileSync(x.store.path(".flow/journal.md"));
+    fs.unlinkSync(x.store.path("audit.md"));
+    x.store.resumeCheck();
+    assert.deepEqual(
+      fs.readFileSync(x.store.path(".flow/journal.md")),
+      original,
+    );
+    fs.writeFileSync(x.store.path("audit.md"), Buffer.from([0xff]));
+    const result = runCli(["--root", x.root, "validate", "audit.md"]);
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.deepEqual(
+      fs.readFileSync(x.store.path(".flow/journal.md")),
+      original,
+    );
+    fs.writeFileSync(x.store.path("audit.md"), "stale view");
+    x.event("action.completed", {
+      action: "検証",
+      result: "成功",
+      evidence: [],
+    });
+    assert.match(
+      fs.readFileSync(x.store.path("audit.md"), "utf8"),
+      /事実：成功/,
+    );
+    fs.unlinkSync(x.store.path(".flow/journal.md"));
+    assert.throws(() => x.store.resumeCheck(true), /Missing .flow\/journal.md/);
+    assert.throws(() => x.store.migrateAudit(), f.FlowError);
+  },
+);
+
+fixture("新規review結果・停止・再開を重複イベントとして追加できない", (x) => {
+  const count = x.store.events()[1].length;
+  for (const [type, data] of [
+    ["review.completed", { review: null, status: "passed" }],
+    ["flow.blocked", { reason: "停止", resume_condition: "解消" }],
+    ["flow.resumed", { reason: "解消", evidence: [] }],
+  ])
+    assert.throws(() => x.event(type, data), /Legacy event is read-only/);
+  assert.equal(x.store.events()[1].length, count);
 });

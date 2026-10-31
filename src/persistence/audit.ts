@@ -108,6 +108,7 @@ export function auditView(meta: Fields, events: AuditEvent[]): string {
         fact = "変更・回答を成果物へ渡すフィードバックとして保存した。";
         references = [ref(d.feedback), ...d.origin_event_ids];
         break;
+      // Read-only legacy events: new reviews and block/resume use publish/transition.
       case "review.completed":
         if (!reviews.has(ref(d.review))) {
           title = "レビュー結果";
