@@ -27585,6 +27585,42 @@ var HandoffCheckSchema = external_exports.strictObject({
   status: external_exports.enum(["ok", "not_applicable", "pending"]),
   reason: text
 });
+var KnowledgeDocumentSchema = external_exports.strictObject({
+  id: text,
+  location: text.regex(/^(?:\/|[a-zA-Z][a-zA-Z0-9+.-]*:)/),
+  scope: text,
+  status: external_exports.enum(["available", "unavailable"]),
+  sha256: external_exports.string().regex(/^[0-9a-f]{64}$/).nullable(),
+  version: text.nullable(),
+  reason: text
+});
+var KnowledgeCheckSchema = external_exports.strictObject({
+  id: text,
+  document_ids: external_exports.array(text).min(1),
+  rule: text,
+  requirement: external_exports.enum([
+    "required",
+    "recommended",
+    "context",
+    "assumption",
+    "exception"
+  ]),
+  applicability: text,
+  status: external_exports.enum([
+    "compliant",
+    "non_compliant",
+    "not_applicable",
+    "unverifiable"
+  ]),
+  evidence: text,
+  finding_ids: external_exports.array(text)
+});
+var ProjectKnowledgeSchema = external_exports.strictObject({
+  discovery: text,
+  completeness: external_exports.enum(["complete", "partial"]),
+  documents: external_exports.array(KnowledgeDocumentSchema),
+  checks: external_exports.array(KnowledgeCheckSchema)
+});
 var PhaseArtifactSchema = external_exports.strictObject({
   schema_version: external_exports.literal("flow/phase-artifact-v2"),
   artifact: external_exports.enum(["design", "plan"]),
@@ -27599,7 +27635,8 @@ var PhaseArtifactSchema = external_exports.strictObject({
   feedback_results: external_exports.array(FeedbackResultSchema),
   tasks: external_exports.array(TaskSchema),
   verification_plan: external_exports.array(VerificationPlanSchema),
-  handoff_checks: external_exports.array(HandoffCheckSchema)
+  handoff_checks: external_exports.array(HandoffCheckSchema),
+  project_knowledge: ProjectKnowledgeSchema.optional()
 });
 var ImplementArtifactSchema = external_exports.strictObject({
   schema_version: external_exports.literal("flow/implement-artifact-v2"),
@@ -27614,7 +27651,8 @@ var ImplementArtifactSchema = external_exports.strictObject({
   tasks: external_exports.array(TaskProgressSchema),
   verifications: external_exports.array(VerificationSchema),
   blocker: text.nullable(),
-  commit: external_exports.string().regex(new RegExp("^[0-9a-f]{40,64}$")).nullable()
+  commit: external_exports.string().regex(new RegExp("^[0-9a-f]{40,64}$")).nullable(),
+  project_knowledge: ProjectKnowledgeSchema.optional()
 });
 var ReviewSourceSchema = external_exports.strictObject({
   phase: external_exports.enum(["design", "plan"]),
@@ -27628,6 +27666,7 @@ var ReviewSourceSchema = external_exports.strictObject({
   revision: external_exports.literal(1),
   source_id: text,
   source_kind: external_exports.enum(["ai", "human"]),
+  project_knowledge: ProjectKnowledgeSchema.optional(),
   status: external_exports.enum(["passed", "changes_required", "blocked", "unable"]),
   created_at: timestamp
 });
@@ -27642,6 +27681,7 @@ var PhaseReviewSchema = external_exports.strictObject({
   schema_version: external_exports.literal("flow/phase-review-v2"),
   revision: external_exports.literal(1),
   mode: external_exports.enum(["ai", "human"]),
+  project_knowledge: ProjectKnowledgeSchema.optional(),
   status: external_exports.enum(["passed", "changes_required", "blocked", "incomplete"]),
   sources: external_exports.array(ReferenceSchema),
   judgments: external_exports.array(JudgmentSchema),
@@ -27855,6 +27895,9 @@ var contracts = {
   failure: FailureSchema,
   judgment: JudgmentSchema,
   finding: FindingSchema,
+  "project-knowledge": ProjectKnowledgeSchema,
+  "knowledge-document": KnowledgeDocumentSchema,
+  "knowledge-check": KnowledgeCheckSchema,
   "phase-artifact": PhaseArtifactSchema,
   "implement-artifact": ImplementArtifactSchema,
   "review-source": ReviewSourceSchema,
@@ -28029,9 +28072,9 @@ var STAGES = {
   plan_final: ["plan_review", "plan", "final"]
 };
 var EXPECTED = {
-  design: ["requirements", "quality-risk"],
-  plan_decision: ["decision-quality"],
-  plan_final: ["task-readiness"]
+  design: ["requirements", "quality-risk", "project-rules"],
+  plan_decision: ["decision-quality", "project-rules"],
+  plan_final: ["task-readiness", "project-rules"]
 };
 var HEADINGS = {
   design: [
@@ -28123,6 +28166,65 @@ function validateMeta(meta3, body) {
   const kind = KINDS[meta3.schema_version];
   requireCondition(kind, "Unsupported schema_version (no implicit migration)");
   schemaCheck(kind, meta3);
+  const knowledge = meta3.project_knowledge;
+  if (knowledge) {
+    if (kind === "review-source")
+      requireCondition(
+        ["project-rules", "human"].includes(meta3.source_id),
+        "Knowledge coverage belongs to project-rules or human source"
+      );
+    uniqueIds(knowledge.documents, "knowledge document");
+    uniqueIds(knowledge.checks, "knowledge check");
+    const documents = new Map(
+      knowledge.documents.map((d) => [d.id, d])
+    );
+    for (const d of knowledge.documents)
+      requireCondition(
+        d.status === "available" === (d.sha256 !== null),
+        "Knowledge document status/digest mismatch"
+      );
+    for (const c of knowledge.checks) {
+      requireCondition(
+        new Set(c.document_ids).size === c.document_ids.length && c.document_ids.every((id) => documents.has(id)),
+        "Unknown or duplicate knowledge document reference"
+      );
+      requireCondition(
+        c.status !== "compliant" || c.document_ids.every(
+          (id) => documents.get(id)?.status === "available"
+        ),
+        "Unavailable document cannot establish compliance"
+      );
+      requireCondition(
+        new Set(c.finding_ids).size === c.finding_ids.length,
+        "Duplicate knowledge finding reference"
+      );
+      if (kind === "review-source" || kind === "phase-review") {
+        requireCondition(
+          c.finding_ids.every(
+            (id) => meta3.findings.some((f) => f.id === id)
+          ),
+          "Unknown knowledge finding reference"
+        );
+        if (!meta3.failure && c.requirement === "required" && ["non_compliant", "unverifiable"].includes(c.status))
+          requireCondition(
+            c.finding_ids.some(
+              (id) => meta3.findings.some(
+                (f) => f.id === id && f.classification === "gate"
+              )
+            ),
+            "Required rule problem needs a gate or failure"
+          );
+      } else
+        requireCondition(!c.finding_ids.length, "Writer cannot reference review findings");
+    }
+    if ((kind === "review-source" || kind === "phase-review") && !meta3.failure)
+      requireCondition(
+        knowledge.completeness === "complete",
+        "Partial knowledge review requires failure"
+      );
+  }
+  if (kind === "review-source" && meta3.source_id === "project-rules" && !meta3.failure)
+    requireCondition(knowledge, "Project rules source requires knowledge coverage");
   if (kind === "phase-artifact") {
     for (const [key, label] of [
       ["questions", "question"],
@@ -29491,6 +29593,7 @@ ${dump(event)}\`\`\`
     requireCondition(new Set(paths).size === paths.length, "Duplicate source paths");
     const sources = [], findings = [], seen = /* @__PURE__ */ new Set();
     let failure2 = null;
+    let projectKnowledge;
     for (const sourcePath of paths) {
       if (!import_node_fs3.default.existsSync(this.path(sourcePath))) {
         if (!failure2 || failure2.kind !== "contract")
@@ -29518,6 +29621,7 @@ ${dump(event)}\`\`\`
           sm.source_kind === mode && expected.includes(sm.source_id) && !seen.has(sm.source_id),
           "Unexpected source owner/mode"
         );
+        if (!sm.failure) this.checkKnowledgeDocuments(sm);
         seen.add(sm.source_id);
         sources.push(sr);
         if (sm.failure && (!failure2 || sm.failure.kind === "contract"))
@@ -29534,6 +29638,13 @@ ${dump(event)}\`\`\`
           if (f.judgment) f.judgment.id = sm.source_id + ":" + f.judgment.id;
           findings.push(f);
         }
+        if (sm.project_knowledge) {
+          projectKnowledge = structuredClone(sm.project_knowledge);
+          for (const c of projectKnowledge.checks)
+            c.finding_ids = c.finding_ids.map(
+              (id) => sm.source_id + ":" + id
+            );
+        }
       } catch (e) {
         if (!(e instanceof FlowError)) throw e;
         failure2 = { kind: "contract", reason: e.message };
@@ -29545,6 +29656,7 @@ ${dump(event)}\`\`\`
     if (design) this.reference(design);
     return {
       ...base,
+      ...projectKnowledge ? { project_knowledge: projectKnowledge } : {},
       status: failure2 ? "incomplete" : findingStatus(findings),
       sources,
       source_paths: paths,
@@ -29552,6 +29664,21 @@ ${dump(event)}\`\`\`
       failure: failure2,
       judgments: findings.filter((f) => f.judgment).map((f) => f.judgment)
     };
+  }
+  checkKnowledgeDocuments(meta3) {
+    for (const d of meta3.project_knowledge?.documents ?? []) {
+      if (d.status !== "available" || !import_node_path2.default.isAbsolute(d.location)) continue;
+      requireCondition(
+        import_node_fs3.default.existsSync(d.location) && import_node_fs3.default.statSync(d.location).isFile(),
+        "Missing knowledge document: " + d.location,
+        true
+      );
+      requireCondition(
+        digest(import_node_fs3.default.readFileSync(d.location)) === d.sha256,
+        "Stale knowledge document: " + d.location,
+        true
+      );
+    }
   }
   checkDocumentInputs(meta3, publishing = false) {
     const kind = KINDS[meta3.schema_version];
@@ -29628,6 +29755,7 @@ ${dump(event)}\`\`\`
         "Wrong feedback target"
       );
     } else if (kind === "review-source" && meta3.failure === null) {
+      this.checkKnowledgeDocuments(meta3);
       const [target] = this.reference(meta3.target);
       requireCondition(
         target.status === (meta3.review_stage === "decision" ? "needs_input" : "ready") && target.artifact === meta3.phase,
@@ -29659,7 +29787,8 @@ ${dump(event)}\`\`\`
         "sources",
         "findings",
         "failure",
-        "judgments"
+        "judgments",
+        "project_knowledge"
       ])
         requireCondition(
           equal(meta3[key], result[key]),
@@ -30088,6 +30217,7 @@ ${dump(event)}\`\`\`
       equal(result.target, active.target) && equal(result.design, active.design),
       "Review target mismatch"
     );
+    if (result.status === "passed") this.checkDocumentInputs(result);
     this.reference(active.target);
     if (active.design) this.reference(active.design);
     return result;
@@ -30546,7 +30676,7 @@ function restoreCheckpoint(store, request) {
 }
 
 // src/cli.ts
-var help = `flowctl 4.3.0 \u2014 Flow persistence and contract guards
+var help = `flowctl 4.4.0 \u2014 Flow persistence and contract guards
 Usage: node flowctl.js --root FEATURE COMMAND [OPTIONS]
 Commands: init, publish, transition, audit-append, review-check --request FILE|-
           validate PATH [--references]
@@ -30557,7 +30687,7 @@ Options: --version, --help
 async function main(argv = process.argv.slice(2)) {
   try {
     if (argv.includes("--version")) {
-      console.log("flowctl 4.3.0");
+      console.log("flowctl 4.4.0");
       return 0;
     }
     if (argv.includes("--help") || argv.includes("-h")) {

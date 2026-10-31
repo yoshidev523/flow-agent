@@ -7,7 +7,7 @@ description: Flowから明示的に起動された場合だけ、DesignのAIま�
 
 主な責務:
 - 指定modeに必要なreview sourceを収集する。
-- AI modeでは2観点reviewerを直接起動する。
+- AI modeでは汎用観点とプロジェクト固有ルールのreviewerを直接起動する。
 - sourceの対象revisionとdigestを検証し、指定cycleの`review.md`へ集約する。
 
 行動ルール:

@@ -1,4 +1,4 @@
-# flow-agent 4.3.0
+# flow-agent 4.4.0
 
 Codex / Claude Codeで仕様駆動開発を進めるためのエージェントパッケージです。
 Design、Review、Plan、Implementを順に実行し、判断と成果物を`flow-spec/`配下に保存します。

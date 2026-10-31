@@ -125,6 +125,47 @@ export const HandoffCheckSchema = z.strictObject({
   reason: text,
 });
 
+// 正本はプロジェクトの文書。これは今回の適用・確認の記録でありルールの複製台帳ではない。
+export const KnowledgeDocumentSchema = z.strictObject({
+  id: text,
+  location: text.regex(/^(?:\/|[a-zA-Z][a-zA-Z0-9+.-]*:)/),
+  scope: text,
+  status: z.enum(["available", "unavailable"]),
+  sha256: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/)
+    .nullable(),
+  version: text.nullable(),
+  reason: text,
+});
+export const KnowledgeCheckSchema = z.strictObject({
+  id: text,
+  document_ids: z.array(text).min(1),
+  rule: text,
+  requirement: z.enum([
+    "required",
+    "recommended",
+    "context",
+    "assumption",
+    "exception",
+  ]),
+  applicability: text,
+  status: z.enum([
+    "compliant",
+    "non_compliant",
+    "not_applicable",
+    "unverifiable",
+  ]),
+  evidence: text,
+  finding_ids: z.array(text),
+});
+export const ProjectKnowledgeSchema = z.strictObject({
+  discovery: text,
+  completeness: z.enum(["complete", "partial"]),
+  documents: z.array(KnowledgeDocumentSchema),
+  checks: z.array(KnowledgeCheckSchema),
+});
+
 export const PhaseArtifactSchema = z.strictObject({
   schema_version: z.literal("flow/phase-artifact-v2"),
   artifact: z.enum(["design", "plan"]),
@@ -140,6 +181,7 @@ export const PhaseArtifactSchema = z.strictObject({
   tasks: z.array(TaskSchema),
   verification_plan: z.array(VerificationPlanSchema),
   handoff_checks: z.array(HandoffCheckSchema),
+  project_knowledge: ProjectKnowledgeSchema.optional(),
 });
 
 export const ImplementArtifactSchema = z.strictObject({
@@ -156,6 +198,7 @@ export const ImplementArtifactSchema = z.strictObject({
   verifications: z.array(VerificationSchema),
   blocker: text.nullable(),
   commit: z.string().regex(new RegExp("^[0-9a-f]{40,64}$")).nullable(),
+  project_knowledge: ProjectKnowledgeSchema.optional(),
 });
 
 export const ReviewSourceSchema = z.strictObject({
@@ -172,6 +215,7 @@ export const ReviewSourceSchema = z.strictObject({
   revision: z.literal(1),
   source_id: text,
   source_kind: z.enum(["ai", "human"]),
+  project_knowledge: ProjectKnowledgeSchema.optional(),
   status: z.enum(["passed", "changes_required", "blocked", "unable"]),
   created_at: timestamp,
 });
@@ -189,6 +233,7 @@ export const PhaseReviewSchema = z.strictObject({
   schema_version: z.literal("flow/phase-review-v2"),
   revision: z.literal(1),
   mode: z.enum(["ai", "human"]),
+  project_knowledge: ProjectKnowledgeSchema.optional(),
   status: z.enum(["passed", "changes_required", "blocked", "incomplete"]),
   sources: z.array(ReferenceSchema),
   judgments: z.array(JudgmentSchema),
@@ -418,6 +463,9 @@ export const contracts = {
   failure: FailureSchema,
   judgment: JudgmentSchema,
   finding: FindingSchema,
+  "project-knowledge": ProjectKnowledgeSchema,
+  "knowledge-document": KnowledgeDocumentSchema,
+  "knowledge-check": KnowledgeCheckSchema,
   "phase-artifact": PhaseArtifactSchema,
   "implement-artifact": ImplementArtifactSchema,
   "review-source": ReviewSourceSchema,

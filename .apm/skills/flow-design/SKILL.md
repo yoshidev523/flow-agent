@@ -52,6 +52,22 @@ questionsとfeedback_resultsの機械的な正本はfront matter。
 最低成立条件を推奨条件として扱わず、弱い根拠の重要判断を質問なしだけで確定しない。
 通常の可逆な判断まで一律に利用者へ質問したり、全既存選定を毎回再調査したりしない。
 
+## プロジェクト知識の適用
+
+対象projectと対象範囲は呼出側の指定を使い、単独利用では対象コードと作業directoryから確認する。
+
+[flow-project-knowledge](../flow-project-knowledge/SKILL.md)の把握手順で、適用範囲のAGENTS.mdと
+参照先を確認する。参照先は別repository・外部文書serviceも含み、projectの文書運用を守る。
+[共通手順](../flow/references/project-knowledge.md)に従い、project_knowledgeへ出典・版・digest・
+適用範囲と照合結果を記録し、本文の「プロジェクト知識」で根拠・例外・未確認事項を説明する。
+要件・制約・受け入れ条件への反映を確認する。
+必須ルールと推奨・仮説を混同せず、評価前の把握を適合としない。必須判断の矛盾・不明点は確認事項へ残す。
+
+再利用できる暗黙知やfeedbackは本文の「知識の更新候補」へ根拠とともに残す。
+自分で恒久ルールを採用・文書更新したり、利用者へ直接提案したりしない。Flowまたは単独利用の
+呼出側が判断の確定後に知識スキルへ更新提案を依頼する。候補だけでstatusを変更しない。
+最終報告には規約の適用結果・例外・確認不能事項と成果物linkを含める。
+
 ## 共通契約と機械処理
 
 実行前に隣接するFlow skillの`../flow/references/contracts.md`と

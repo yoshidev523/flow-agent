@@ -150,6 +150,16 @@ class Fixture {
       design: ar.design,
       source_id: sourceId,
       source_kind: ar.mode,
+      ...(sourceId === "project-rules"
+        ? {
+            project_knowledge: {
+              discovery: "対象projectに追加の規約なし",
+              completeness: "complete",
+              documents: [],
+              checks: [],
+            },
+          }
+        : {}),
       status: failure ? "unable" : f.findingStatus(findings),
       findings,
       failure,
@@ -458,7 +468,7 @@ fixture(
     const response = x.interact(
       "scope_candidate",
       x.store.state().artifacts.design,
-      ["requirements:S-001", "quality-risk:S-001"],
+      ["requirements:S-001", "quality-risk:S-001", "project-rules:S-001"],
     );
     x.tr("answer", {
       response_event_id: response.event_id,
@@ -520,11 +530,12 @@ fixture("blocked review requires human answer feedback", (x) => {
   const response = x.interact(
       "review_decision",
       x.store.state().artifacts.design,
-      ["requirements:D-001", "quality-risk:D-001"],
+      ["requirements:D-001", "quality-risk:D-001", "project-rules:D-001"],
     ),
     feedback = x.feedback("design", "respond", [
       "requirements:D-001",
       "quality-risk:D-001",
+      "project-rules:D-001",
     ]);
   assert.equal(
     x.tr("answer", {
@@ -2373,3 +2384,282 @@ fixture("新規review結果・停止・再開を重複イベントとして追�
     assert.throws(() => x.event(type, data), /Legacy event is read-only/);
   assert.equal(x.store.events()[1].length, count);
 });
+
+// Project rules are independent sources; evidence must survive aggregation and remain current.
+const knowledgeRecord = (location, contents = "開発方針") => ({
+  discovery: "対象範囲のAGENTS.mdと参照先を確認",
+  completeness: "complete",
+  documents: [
+    {
+      id: "DOC-001",
+      location,
+      scope: "対象project",
+      status: "available",
+      sha256: f.digest(contents),
+      version: "v1",
+      reason: "正本の規約を取得",
+    },
+  ],
+  checks: [
+    {
+      id: "RULE-001",
+      document_ids: ["DOC-001"],
+      rule: "互換性を維持する",
+      requirement: "required",
+      applicability: "公開APIの変更に適用",
+      status: "compliant",
+      evidence: "対象の受け入れ条件を照合",
+      finding_ids: [],
+    },
+  ],
+});
+const useKnowledge = (x, record) => {
+  const source = x.source.bind(x);
+  x.source = (...args) => {
+    const meta = source(...args);
+    if (args[0] === "project-rules")
+      meta.project_knowledge = structuredClone(record);
+    return meta;
+  };
+};
+for (const stage of ["design", "plan_decision", "plan_final"])
+  fixture(`project-rules is required at ${stage}`, (x) => {
+    x.writer("design");
+    if (stage !== "design") {
+      x.review("design");
+      x.tr("advance");
+      x.writer("plan", stage === "plan_decision" ? "needs_input" : "ready");
+    }
+    const result = x.review(stage);
+    const ar = x.store.state().active_review;
+    const missing = x.store.reviewCheck(
+      stage,
+      ar.target,
+      ar.design,
+      ar.review_cycle_id,
+      "ai",
+      result.source_paths.filter((p) => !p.endsWith("project-rules.md")),
+    );
+    assert.equal(missing.status, "incomplete");
+    assert.equal(missing.failure.kind, "execution");
+  });
+
+fixture(
+  "project rules coverage preserves evidence and namespaced finding links",
+  (x) => {
+    const record = knowledgeRecord("https://docs.example.test/design-rules");
+    record.checks[0].status = "non_compliant";
+    record.checks[0].finding_ids = ["G-001"];
+    useKnowledge(x, record);
+    x.writer("design");
+    const result = x.review("design", [x.gate()]);
+    assert.equal(result.status, "changes_required");
+    assert.equal(
+      result.project_knowledge.documents[0].location,
+      record.documents[0].location,
+    );
+    assert.deepEqual(result.project_knowledge.checks[0].finding_ids, [
+      "project-rules:G-001",
+    ]);
+    const ar = x.store.state().active_review;
+    const [meta] = x.store.document(ar.path);
+    const tampered = structuredClone(meta);
+    tampered.project_knowledge.checks[0].evidence = "根拠を差し替える";
+    assert.throws(
+      () => x.store.checkDocumentInputs(tampered),
+      /Aggregate differs/,
+    );
+  },
+);
+
+fixture(
+  "project-rules cannot pass without coverage or with unlinked required problems",
+  (x) => {
+    x.writer("design");
+    x.tr("start_review", { stage: "design" });
+    const base = x.source("project-rules");
+    delete base.project_knowledge;
+    assert.throws(() => f.validateMeta(base), /requires knowledge coverage/);
+    const record = knowledgeRecord("https://docs.example.test/rules");
+    base.project_knowledge = record;
+    for (const status of ["non_compliant", "unverifiable"]) {
+      record.checks[0].status = status;
+      assert.throws(() => f.validateMeta(base), /needs a gate or failure/);
+    }
+    record.checks[0].finding_ids = ["missing"];
+    assert.throws(() => f.validateMeta(base), /Unknown knowledge finding/);
+  },
+);
+
+fixture(
+  "knowledge coverage validates references, unavailable evidence, and partial evaluation",
+  (x) => {
+    x.writer("design");
+    x.tr("start_review", { stage: "design" });
+    const base = x.source("project-rules");
+    const record = knowledgeRecord("https://docs.example.test/rules");
+    base.project_knowledge = record;
+    record.documents.push(structuredClone(record.documents[0]));
+    assert.throws(() => f.validateMeta(base), /Duplicate knowledge document/);
+    record.documents.pop();
+    record.checks[0].document_ids = ["unknown"];
+    assert.throws(() => f.validateMeta(base), /knowledge document reference/);
+    record.checks[0].document_ids = ["DOC-001"];
+    record.documents[0].status = "unavailable";
+    record.documents[0].sha256 = null;
+    assert.throws(
+      () => f.validateMeta(base),
+      /Unavailable document cannot establish compliance/,
+    );
+    record.checks[0].status = "unverifiable";
+    record.completeness = "partial";
+    base.failure = { kind: "execution", reason: "正本にアクセスできない" };
+    base.status = "unable";
+    f.validateMeta(base);
+    // Even optional criteria cannot hide an unfinished review behind passed.
+    record.checks[0].requirement = "recommended";
+    base.failure = null;
+    base.status = "passed";
+    assert.throws(() => f.validateMeta(base), /Partial knowledge review/);
+  },
+);
+
+for (const mutation of ["changed", "deleted"])
+  fixture(
+    `passed review cannot advance after local rules are ${mutation}`,
+    (x) => {
+      const location = path.join(x.root, "project-rules.md");
+      fs.writeFileSync(location, "開発方針");
+      useKnowledge(x, knowledgeRecord(location));
+      x.writer("design");
+      assert.equal(x.review("design").status, "passed");
+      if (mutation === "changed") fs.writeFileSync(location, "新しい開発方針");
+      else fs.unlinkSync(location);
+      assert.throws(() => x.tr("advance"), /Aggregate differs/);
+      assert.equal(x.store.state().phase, "design_review");
+    },
+  );
+
+fixture(
+  "source publish refuses stale local knowledge but accepts external snapshot references",
+  (x) => {
+    const location = path.join(x.root, "project-rules.md");
+    fs.writeFileSync(location, "変更後");
+    x.writer("design");
+    x.tr("start_review", { stage: "design" });
+    const meta = x.source("project-rules");
+    meta.project_knowledge = knowledgeRecord(location, "変更前");
+    const sourcePath = "reviews/design/cycle-0001/sources/project-rules.md";
+    assert.throws(() => x.pub(sourcePath, meta), /Stale knowledge document/);
+    meta.project_knowledge = knowledgeRecord(
+      "https://docs.example.test/unreachable-but-snapshotted",
+    );
+    const [ref] = x.pub(sourcePath, meta);
+    assert.equal(
+      x.store.document(ref.path)[0].project_knowledge.documents[0].version,
+      "v1",
+    );
+  },
+);
+
+fixture("human review retains project knowledge without AI sources", (x) => {
+  x.writer("design");
+  const response = x.event(
+    "interaction.received",
+    {
+      interaction_id: "knowledge-human-mode",
+      prompt_event_id: null,
+      text: "humanで評価",
+    },
+    randomUUID(),
+    "human",
+  );
+  x.tr("set_mode", {
+    stage: "design",
+    mode: "human",
+    reason: "利用者指定",
+    origin_event_id: response.event_id,
+  });
+  const source = x.source.bind(x);
+  const record = knowledgeRecord("https://docs.example.test/team-rules");
+  x.source = (...args) => ({ ...source(...args), project_knowledge: record });
+  const result = x.review("design");
+  assert.equal(result.status, "passed");
+  assert.equal(result.sources.length, 1);
+  assert.match(result.sources[0].path, /human.md$/);
+  assert.deepEqual(result.project_knowledge, record);
+});
+
+fixture(
+  "recommended rule violations remain advisory and permit automatic advance",
+  (x) => {
+    const record = knowledgeRecord("https://docs.example.test/style-guide");
+    record.checks[0].requirement = "recommended";
+    record.checks[0].status = "non_compliant";
+    record.checks[0].evidence = "推奨に対する今回の合理的な逸脱理由";
+    useKnowledge(x, record);
+    x.writer("design");
+    assert.equal(x.review("design").status, "passed");
+    assert.equal(x.tr("advance").phase, "plan");
+  },
+);
+
+fixture(
+  "phase owners persist knowledge in Design Plan and Implement artifacts",
+  (x) => {
+    const record = knowledgeRecord("https://docs.example.test/project-guide");
+    const design = { ...x.artifact("design"), project_knowledge: record };
+    const [designRef] = x.pub("artifacts/design.md", design);
+    const plan = {
+      ...x.artifact("plan", "ready", [designRef]),
+      project_knowledge: record,
+    };
+    const [planRef] = x.pub("artifacts/plan.md", plan);
+    const implement = { ...x.implement(planRef), project_knowledge: record };
+    x.pub("artifacts/implement.md", implement);
+    for (const phase of ["design", "plan", "implement"])
+      assert.deepEqual(
+        x.store.document(`artifacts/${phase}.md`)[0].project_knowledge,
+        record,
+      );
+  },
+);
+
+fixture(
+  "phase templates with knowledge sections can be published without corrupting history",
+  (x) => {
+    let planRef;
+    for (const artifact of ["design", "plan", "implement"]) {
+      const [, templateBody] = f.markdown(
+        fs.readFileSync(
+          `.apm/skills/flow/assets/templates/${artifact}.md`,
+          "utf8",
+        ),
+      );
+      const meta =
+        artifact === "implement"
+          ? x.implement(planRef, "in_progress")
+          : x.artifact(artifact);
+      if (artifact === "implement") meta.commit = null;
+      const result = x.store.publish({
+        request_id: randomUUID(),
+        run_id: "run-001",
+        target_path: `artifacts/${artifact}.md`,
+        expected_revision: 0,
+        expected_sha256: null,
+        document: f.render(meta, templateBody),
+        change: "テンプレートから作成",
+        reason: "知識と変更履歴を保存",
+        sections: ["プロジェクト知識"],
+        references: [],
+      });
+      const [, savedBody] = x.store.document(result.artifact.path);
+      assert.ok(
+        savedBody.indexOf("## プロジェクト知識") <
+          savedBody.indexOf("## 変更履歴"),
+      );
+      assert.match(savedBody, /### revision 1/);
+      if (artifact === "plan") planRef = result.artifact;
+    }
+  },
+);
