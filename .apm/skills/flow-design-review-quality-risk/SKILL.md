@@ -57,6 +57,5 @@ Node.js 22以上が必要。依存はCLIへ同梱済みで、利用側のnpm ins
 
 各成果物はdraftを作り、`publish`で保存して`validate`で確認する。
 固定artifactのrevision、変更履歴、保存、digestはCLIに任せ、直接上書きしない。
-監査は`audit-append`で操作の開始・結果・自動判断を逐一記録する。
-`audit.md`を直接編集しない。単独利用でもFlow stateを必要とせず同じCLIを使える。
+監査は[共通の記録方針](../flow/references/contracts.md#監査の記録方針)に従い、自分の担当事項だけを共通CLIで記録する。
 契約不一致は補完せず報告し、監査の保存障害時は次の操作へ進まない。

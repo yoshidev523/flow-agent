@@ -15,6 +15,7 @@ export const KINDS: Record<string, ContractName> = {
   "flow/phase-feedback-v2": "phase-feedback",
   "flow/flow-state-v2": "flow-state",
   "flow/audit-log-v1": "audit-log",
+  "flow/audit-log-v2": "audit-view",
 };
 export const STAGES = {
   design: ["design_review", "design", "design"],
@@ -360,7 +361,12 @@ export function validateMeta(meta: Fields, body?: string): ContractName {
         "Active review/phase mismatch",
       );
   }
-  if (body !== undefined && kind !== "audit-log" && kind !== "flow-state") {
+  if (
+    body !== undefined &&
+    kind !== "audit-log" &&
+    kind !== "audit-view" &&
+    kind !== "flow-state"
+  ) {
     for (const heading of HEADINGS[meta.artifact ?? kind])
       check(
         body.split("\n").some((line) => line.trimEnd() === "## " + heading),

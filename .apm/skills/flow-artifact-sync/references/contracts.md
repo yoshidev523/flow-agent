@@ -1,4 +1,4 @@
-# Flow 4.2.0 契約
+# Flow 4.3.0 契約
 
 ## 正本
 
@@ -48,6 +48,7 @@ SHA-256は保存完了後の全バイトから計算する。成果物自身のd
 | flow-state | schema_version:flow/flow-state-v2; feature_id:text; run_id:text; state_revision:integer>=1; phase:design/design_review/plan/plan_decision_review/plan_review/implement/completed/replanning; state:running/waiting_for_input/blocked/completed; artifacts:artifact参照map; reviews:review参照map; review_mode:mode map; counters:counter map; cycle_counters:cycle map; active_review:active-review\|null; active_invocation:invocation\|null; waiting:waiting\|null; blocker:text\|null; last_transition_event_id:text; updated_at:timestamp; pending_operation:create/revise/respond/execute/null; pending_feedback:reference\|null; replan:replan\|null（省略可） |
 | audit-event | event_id:E-に続く6桁以上の数字; event_key:text; event_type:イベント一覧の名前; run_id:text; invocation_id:text\|null; occurred_at:timestamp; recorded_at:timestamp; actor:text; caused_by:text[]; data:イベント別object |
 | audit-log | schema_version:flow/audit-log-v1; feature_id:text; created_at:timestamp |
+| audit-view | schema_version:flow/audit-log-v2; feature_id:text; created_at:timestamp |
 | replan | target_phase:design/plan; scope:text; reason:text; prompt_event_id:text; response_event_id:text\|null; checkpoint_event_id:text; approved:boolean; previous_phase:text; before:artifact参照map |
 | checkpoint | checkpoint_id:text; tag:text; commit:SHA; parent:SHA; paths:text[]; artifacts:reference[]; audit_event_id:text; decision_event_ids:text[] |
 | checkpoint-request | request_id:text; checkpoint_id:kebab-case; reason:text; paths:text[]; decision_event_ids:text[] |
@@ -74,6 +75,7 @@ statusと内容の整合性、参照の鮮度、保存pathは各契約の説明�
 flow-spec/YYYYMMDD_feature-name/
 ├── flow-state.yml
 ├── audit.md
+├── .flow/journal.md
 ├── inputs/request.md
 ├── artifacts/{design,plan,implement}.md
 ├── feedback/{design,plan}/feedback-0001.md
@@ -87,7 +89,7 @@ state、feedback、human sourceのownerはFlow。
 他ownerと同時実行せず、同期はstate・reviewを更新しない。
 Design/Planは対応writer、implementはexecutor、観点sourceは担当reviewer、aggregateはhub。
 CLIはownerの代わりに決まった形式で保存するだけで、内容を生成・評価しない。
-監査の物理writerは共通CLIだけ。各componentは自分の行動・判断だけを記録する。
+監査の物理writerは共通CLIだけ。各componentは自分が扱った問題・重要判断・feedback対応・検証結果の要点だけを記録する。
 `.flowctl.lock`は排他制御用であり成果物ではない。draft/requestは一時directoryまたはstdinを使う。
 
 ## phase-artifact-v2
@@ -219,15 +221,51 @@ Flow内のwriterは承認したpending_operation/feedbackだけを使う。
 reviewのpassedは評価時・移行時のdigest一致を必須とする。
 blockedの採用回答変更は人間へ戻す。PlanでDesign/scope変更が必要なら人間承認付き再計画へ進む。
 
-## audit-log-v1
+## audit-log-v2 と内部journal
+
+`audit.md`は`flow/audit-log-v2`の事実履歴。front matterはschema_version/feature_id/created_at。
+CLIが`.flow/journal.md`から決定的に生成する。手動編集・自由な追記は行わない。
+一件は日時・フェーズ・イベント名・元event IDの見出し、事実、必要なら理由・参照だけを持つ。
+フェーズはrunごとのflow.started/flow.transitionedから取得し、単独leafで不明ならstandaloneを示す。
+発生日時はoccurred_atを使い、保存日時・digest・snapshot・run/invocation IDは本文へ展開しない。
+
+```markdown
+## 2026-10-31T14:20:00+09:00 — implement — 決定 (E-000042)
+
+- 事実：必須security検証の失敗により完了を保留する。
+- 理由：未解消のHighが2件残っている。
+- 参照：artifacts/implement.md r18
+```
+
+### 監査の記録方針
+
+記録対象はフェーズ移行、回答待ち・停止・再開、問題と解消、review結果、feedback、
+重要な決定・承認、再計画、タスク単位の検証結果。
+読取・検索・通常command開始、TDDの各Red/Green、説明だけの対話は記録しない。
+詳細は成果物へ残し、監査には要点とpathを示す。判断依頼と原文回答は一度だけ保存し、再利用はevent IDで参照する。
+completed後も新しい課題・変更要求・決定訂正だけを記録する。
+
+review結果はaggregateのpublish、Flowの停止・再開はtransitionから自動生成し、別eventを送らない。
+`review.completed / flow.blocked / flow.resumed`は旧履歴の読取専用とし、audit-appendは拒否する。
+その他の重要な結果はaction.completedへまとめる。通常操作のaction.startedは不要。
+同期全体のaction.startedだけは中断追跡用に保持する。prepared、通常保存、invocation開始/終了、
+checkpointの内部処理はjournalだけへ残し、viewへ展開しない。同じ事実を重複記録しない。
+
+`.flow/journal.md`は復旧・重複実行防止・因果参照の正本であり、従来のaudit-log-v1を使う。
+両fileをGit保存とcheckpointへ含め、共通CLI以外から編集しない。
+CLIはjournalをfsyncした後viewをatomic置換する。欠落・不一致のviewは次操作・検証・再開時に
+自動再生成する。表示の不一致だけで停止せず、復旧用journalの破損・未完了保存は従来どおり検査する。
+旧audit.mdは明示的なaudit-migrateで原本をjournalへ保持して移行し、旧eventを推測で削除しない。
+
+### 内部journalの形式
 
 front matterはschema_version/feature_id/created_atだけ。本文は`# 監査ログ`に続き、
 `## E-000001 — event.type`と1つのyaml blockを追記する。自由な段落を挟まない。
 共通fieldはevent_id/event_key/event_type/run_id/invocation_id/occurred_at/recorded_at/actor/caused_by/data。
 event_keyは送信側の一意key、event_idは記録処理が付ける連番。
 occurred_atは実際の発生時刻、recorded_atは保存時刻。並列の因果関係はcaused_byで表す。
-人間回答のactorはhuman。Flowが原文を記録する。提示/受領をinteraction_idとprompt_event_idで結ぶ。
-記録するのは行動、結論、規則、根拠、前提と観測結果であり内部思考過程ではない。
+人間回答のactorはhuman。Flowが原文を一度記録する。提示/受領をinteraction_idとprompt_event_idで結ぶ。
+記録するのは事実・結論・根拠であり内部思考過程ではない。
 
 ### イベント一覧
 
@@ -273,7 +311,7 @@ flow.transition_aborted、artifact.update_prepared、artifact.updated、artifact
 これらはinit/publish/transition/resume-checkが記録し、audit-appendへの直接送信は拒否する。
 invocation.started/completed/failedとFlow完了時のflow.completedはtransitionが通常自動記録する。
 同じ事実を別のevent_keyで重複記録しない。
-その他のeventは各componentがaudit-appendで記録する。review.mode_changedなどは自動生成されず、
+読取専用eventを除き、その他は各componentがaudit-appendで記録する。review.mode_changedなどは自動生成されず、
 対応するtransitionの結果を確認してcomponentが記録する。復旧時も外部行動の完了を推測しない。
 
 例: 利用者の回答を記録するaudit-appendのrequest。
@@ -292,7 +330,7 @@ data:
   text: Aを採用してください
 ```
 
-CLIがevent_idとrecorded_atを付けてaudit.mdへ追記する。提示に対する回答ではprompt_event_id、
+CLIがevent_idとrecorded_atを付けて`.flow/journal.md`へ追記し、audit.mdを生成する。提示に対する回答ではprompt_event_id、
 interaction_id、run_idが先行するinteraction.presentedと一致することを確認する。
 
 ### 保存と中断
@@ -307,11 +345,11 @@ resume-check --recoverまたは元のtransition requestの再送で、保存済�
 補完eventのoccurred_atは元の遷移時刻、recorded_atは補完時刻とする。外部操作は再実行しない。
 欠落監査を解消するまでは別の保存・監査・状態更新を拒否する。invocation IDは保存済み開始遷移でも使用済みと判定する。
 両方と不一致なら自動修復せず停止する。中止した要求の再実行には新request IDを使う。
-末尾が途中の監査は読み飛ばさず拒否し、原本を保存して人間へ修復を求める。
+末尾が途中のjournalは読み飛ばさず拒否し、原本を保存して人間へ修復を求める。
 外部操作の完了は推測しない。active invocationは実態と証拠を確認して登録または停止する。
 履歴は訂正イベントで補正する。暗号学的な改ざん防止や複数fileの完全transactionを保証しない。
 
-## 再計画とチェックポイント（4.2.0）
+## 再計画とチェックポイント（4.3.0）
 
 request_replanは進行中invocationがないこと、現在参照とcheckpointの一致、現在stateより後の
 checkpoint監査地点、kind replanの提示eventを検証し、phase replanningへ移す。

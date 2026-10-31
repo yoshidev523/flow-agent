@@ -5,7 +5,7 @@ disable-model-invocation: true
 user-invocable: true
 ---
 
-# Flow 4.2.0
+# Flow 4.3.0
 
 ## 起動と責務
 
@@ -148,9 +148,9 @@ Flowは各応答を終える前に、対象タスクの成果物と監査を現�
 質問・承認の回答待ち、blockedによる停止、全体完了、completed後の関連対話にも適用する。
 checkpoint-createの専用commit / local tagとは別に実行する。
 
-1. その応答で行った操作・判断・提示内容の監査を共通CLIで保存し、必要なstate・成果物の保存を終える。
+1. その応答で生じた問題・重要な判断・フィードバック・検証結果の要点を共通CLIで保存し、必要なstate・成果物の保存を終える。
    writerなどが更新中なら完了を待ち、保存commitと同時に対象fileを更新させない。
-2. git statusと差分を確認し、対象feature directoryの`audit.md`、`flow-state.yml`、
+2. git statusと差分を確認し、対象feature directoryの`audit.md`、`.flow/journal.md`、`flow-state.yml`、
    artifacts、inputs、reviews、feedbackの未保存差分をまとめる。
    Flowが起動時に作成・補完した`.gitattributes`も対象に含める。
    lockなどの一時file、機密、別タスク・利用者の無関係な変更、実装途中のcodeは含めない。
@@ -164,18 +164,15 @@ checkpoint-createの専用commit / local tagとは別に実行する。
 
 この保存commitと、そのための差分確認・stage・結果確認は監査への追記対象から除外し、
 Git履歴を証跡とする。成功・失敗を記録するためにaudit.mdや他の成果物を再更新しない。
-実装commit、checkpoint操作、push・PR作成など他の操作は従来どおり監査へ記録する。
+重要な実装結果やpush・PR作成の結果は記録する。checkpoint内部処理はjournalだけへ残す。
 pushやtagの作成はこの手順に含めず、pushは利用者の明示依頼がある場合だけ行う。
 
 ## 監査と所有
 
-対象タスクの要求・成果物・判断に関係するAIの操作・判断、利用者への提示と原文回答、
-feedbackへの対応をaudit-appendで逐一記録する。応答終了前の保存commit関連操作だけは上記の例外とする。
-completed後の質問・調査・説明訂正・追加要望も対象。
-説明や調査だけならcompletedを維持し、成果物変更が必要なら人間承認付き再計画へ進む。
-通常会話へ切り離して関連対話を省略しない。補記は再構成・補記であることと根拠を明示し、
-元の発言日時が不明なら推測せず、occurred_atには補記操作の実測日時を使う。
-判断は結論、適用規則、根拠、前提を記録し、内部思考過程を記録しない。
+監査の対象・形式・記録経路は[共通の記録方針](references/contracts.md#監査の記録方針)に従う。
+Flowは利用者の判断依頼と回答、feedbackとの対応を記録する。
+completed後に成果物変更が必要なら人間承認付き再計画へ進む。
+補記は根拠と補記であることを明示し、元日時を推測せず、occurred_atには実測日時を使う。
 state更新、成果物保存、監査への追記は共通CLIだけを使う。監査保存障害では次操作へ進まない。
 新しい中継request/result成果物を設けず、既存artifactの参照で接続する。
 
