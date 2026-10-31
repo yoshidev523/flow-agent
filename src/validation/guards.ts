@@ -24,9 +24,9 @@ export const STAGES = {
 } as const;
 export type Stage = keyof typeof STAGES;
 export const EXPECTED: Record<Stage, string[]> = {
-  design: ["requirements", "quality-risk"],
-  plan_decision: ["decision-quality"],
-  plan_final: ["task-readiness"],
+  design: ["requirements", "quality-risk", "project-rules"],
+  plan_decision: ["decision-quality", "project-rules"],
+  plan_final: ["task-readiness", "project-rules"],
 };
 export const HEADINGS: Record<string, string[]> = {
   design: [
@@ -136,6 +136,75 @@ export function validateMeta(meta: Fields, body?: string): ContractName {
   const kind = KINDS[meta.schema_version];
   check(kind, "Unsupported schema_version (no implicit migration)");
   schemaCheck(kind, meta);
+  const knowledge = meta.project_knowledge;
+  if (knowledge) {
+    if (kind === "review-source")
+      check(
+        ["project-rules", "human"].includes(meta.source_id),
+        "Knowledge coverage belongs to project-rules or human source",
+      );
+    uniqueIds(knowledge.documents, "knowledge document");
+    uniqueIds(knowledge.checks, "knowledge check");
+    const documents = new Map<string, Fields>(
+      knowledge.documents.map((d: Fields) => [d.id, d]),
+    );
+    for (const d of knowledge.documents)
+      check(
+        (d.status === "available") === (d.sha256 !== null),
+        "Knowledge document status/digest mismatch",
+      );
+    for (const c of knowledge.checks) {
+      check(
+        new Set(c.document_ids).size === c.document_ids.length &&
+          c.document_ids.every((id: string) => documents.has(id)),
+        "Unknown or duplicate knowledge document reference",
+      );
+      check(
+        c.status !== "compliant" ||
+          c.document_ids.every(
+            (id: string) => documents.get(id)?.status === "available",
+          ),
+        "Unavailable document cannot establish compliance",
+      );
+      check(
+        new Set(c.finding_ids).size === c.finding_ids.length,
+        "Duplicate knowledge finding reference",
+      );
+      if (kind === "review-source" || kind === "phase-review") {
+        check(
+          c.finding_ids.every((id: string) =>
+            meta.findings.some((f: Fields) => f.id === id),
+          ),
+          "Unknown knowledge finding reference",
+        );
+        if (
+          !meta.failure &&
+          c.requirement === "required" &&
+          ["non_compliant", "unverifiable"].includes(c.status)
+        )
+          check(
+            c.finding_ids.some((id: string) =>
+              meta.findings.some(
+                (f: Fields) => f.id === id && f.classification === "gate",
+              ),
+            ),
+            "Required rule problem needs a gate or failure",
+          );
+      } else
+        check(!c.finding_ids.length, "Writer cannot reference review findings");
+    }
+    if ((kind === "review-source" || kind === "phase-review") && !meta.failure)
+      check(
+        knowledge.completeness === "complete",
+        "Partial knowledge review requires failure",
+      );
+  }
+  if (
+    kind === "review-source" &&
+    meta.source_id === "project-rules" &&
+    !meta.failure
+  )
+    check(knowledge, "Project rules source requires knowledge coverage");
   if (kind === "phase-artifact") {
     for (const [key, label] of [
       ["questions", "question"],

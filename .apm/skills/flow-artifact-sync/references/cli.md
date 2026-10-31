@@ -187,3 +187,11 @@ completedでもaudit-appendは利用できる。新しい課題・変更要求�
 occurred_atは補記操作の実測日時、recorded_atはCLIが付ける。元日時を推測しない。
 
 checkpoint.preparedが未完了なら他のmutationを拒否する。resume-checkはcheckpoint-recoverを案内し、Git操作を再実行しない。
+
+## プロジェクト知識の照合
+
+review-checkは各stageでproject-rules sourceも必須とする。戻り値のproject_knowledgeがある場合は
+aggregateへそのまま保存する。findingsだけでなく確認済み項目も機械結果と一致させる。
+ローカル文書の欠落・digest不一致は契約不一致として旧reviewの利用を拒否する。
+外部URIの再取得は行わないため、呼出側が集約・phase移行前にconnectorで鮮度を確認する。
+詳細は[project-knowledge.md](project-knowledge.md)を参照する。

@@ -9,7 +9,7 @@
 `apm.lock.yaml`で管理します。
 
 機能ごとの実行成果物は`flow-spec/YYYYMMDD_feature/`へ保存します。
-Flow 4.3.0では`flow-state.yml`、事実履歴の`audit.md`、復旧用の`.flow/journal.md`、固定pathの
+Flow 4.4.0では`flow-state.yml`、事実履歴の`audit.md`、復旧用の`.flow/journal.md`、固定pathの
 `artifacts/design.md`、`artifacts/plan.md`、`artifacts/implement.md`を使います。
 固定成果物はrevisionと変更履歴を更新し、revision別fileは作りません。
 レビューは`reviews/{design,plan-decision,plan-final}/cycle-0001/`へsourceとreview.md、
@@ -67,6 +67,7 @@ flow_consumer_dir="$flow_verify_root/consumer"
 
 for skill_name in \
   flow flow-artifact-sync flow-design flow-plan flow-implement \
+  flow-project-knowledge flow-project-rules-review \
   flow-design-review flow-design-review-requirements \
   flow-design-review-quality-risk \
   flow-plan-decision-review flow-plan-review-decision-quality \
@@ -80,6 +81,7 @@ do
 done
 for agent_name in \
   flow-designer flow-planner flow-implementer \
+  flow-project-rules-reviewer \
   flow-design-reviewer flow-design-requirements-reviewer \
   flow-design-quality-risk-reviewer \
   flow-plan-decision-reviewer flow-plan-decision-quality-reviewer \
@@ -146,15 +148,28 @@ APMは自己package installを循環依存として扱うため、独立consumer
 Flow
 ├── phase writer
 ├── decision review hub (Plan needs_input only)
-│   └── decision-quality reviewer
+│   ├── decision-quality reviewer
+│   └── project-rules reviewer
 └── final review hub
     ├── perspective reviewer 1
-    └── perspective reviewer 2 (Design only)
+    ├── perspective reviewer 2 (Design only)
+    └── project-rules reviewer
 ```
 
 Human modeではperspective reviewerを起動せず、human source 1件をhubが集約します。
 子agentを起動できない環境ではhubが`incomplete`を返し、Flowが規定のretryまたは
 human modeへの切替を行います。
+
+## プロジェクト知識
+
+Design・Plan・Implementは適用範囲のAGENTS.mdと参照文書を確認し、project_knowledgeへ
+出典・digest・適用結果を記録します。参照・保存先はprojectの文書運用に従い、別repositoryや
+外部文書serviceも対象です。AGENTS.mdは入口を保ち、代替正本やルールの複製台帳を作りません。
+flow-project-knowledgeは把握・更新提案・採用済み文書更新、project-rules reviewerは独立評価を担当します。
+明示された必須ルールと推奨・仮説・例外を区別し、後者だけでgateを作りません。
+Flowは確認結果をMarkdownとチャットで知らせ、非同期feedbackの影響から通常修正または
+人間承認付き再計画へ接続します。知識更新は判断が固まった時点と完了時の未提示候補から提案し、
+今回の修正への同意を恒久ルールの採用へ読み替えません。詳細HOWは同梱references/project-knowledge.mdです。
 
 ## 永続契約と成果物所有
 
@@ -226,7 +241,7 @@ agent定義はfront matter後を「あなたは〜です。」で始め、「主
 履歴には確立済みのcommit規約がないため、命令形で対象を明確にした短い件名を使います。
 PRには目的、変更file、検証結果または未実施理由を記載し、関連Issueがあればlinkします。
 
-## Flow 4.3.0 の機械処理
+## Flow 4.4.0 の機械処理
 
 HOWは`.apm/skills/flow/references/`、schemaの正本は`src/contracts/`のZod定義です。
 実行処理はTypeScriptで実装し、依存を含む`scripts/flowctl.js`をFlow skillへ同梱します。

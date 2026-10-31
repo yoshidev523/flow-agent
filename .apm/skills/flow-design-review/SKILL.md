@@ -13,18 +13,19 @@ writer修正、利用者対話、Flow state、phase移行を扱わない。
 
 ## 入力
 
-feature directory、review cycle ID、mode、対象path・revision・digest、出力path。
+feature directory、review cycle ID、mode、対象path・revision・digest、出力path、対象projectと対象範囲。
 対象Designのstatusは`ready`。対象参照を開始時・集約直前に確認する。
 sourceとaggregateの`design`はnullとし、別のDesign入力を要求しない。
 
 ## Source収集と集約
 
-AI modeでは`flow-design-requirements-reviewer、flow-design-quality-risk-reviewer`を直接起動し、同一cycleの固有sourceを作らせる。
-Designの2観点は並列実行する。子agentを起動できなければincomplete/executionとして記録する。
+AI modeでは`flow-design-requirements-reviewer、flow-design-quality-risk-reviewer、flow-project-rules-reviewer`を直接起動し、同一cycleの固有sourceを作らせる。
+Designの3観点は並列実行する。子agentを起動できなければincomplete/executionとして記録する。
+[プロジェクト知識の共通手順](../flow/references/project-knowledge.md)に従い、正本の鮮度を集約前に確認する。
 Human modeではFlowが作ったsources/human.mdだけを読む。AI reviewerを起動しない。
 
 review-checkへ必要な全source pathを渡す。欠落sourceのpathも省略しない。
-CLIが検証したstatus・sources・source_paths・findings・failure・judgmentsを変更せずaggregateへ使う。
+CLIが検証したstatus・sources・source_paths・findings・failure・judgments・project_knowledgeを変更せずaggregateへ使う。
 sourceの意味を変えず本文を整理する。同じ指摘の説明はまとめられるが、機械的なfindingを削除しない。
 blockedではjudgmentsを利用者へそのまま提示できる本文へ整える。
 判断は質問、背景、2〜3選択肢、影響、推奨と理由、回答形式を持つ。

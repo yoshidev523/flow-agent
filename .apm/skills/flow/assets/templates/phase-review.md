@@ -18,6 +18,7 @@ sources: []
 source_paths:
 - reviews/design/cycle-0001/sources/requirements.md
 - reviews/design/cycle-0001/sources/quality-risk.md
+- reviews/design/cycle-0001/sources/project-rules.md
 judgments: []
 ---
 # 成果物
@@ -36,3 +37,11 @@ judgments: []
 
 ## 失敗情報
 実施内容。
+
+## プロジェクト知識
+
+project_knowledgeと対応する出典・適用範囲・確認結果・根拠・例外を記す。
+
+## 知識の更新候補
+
+候補がある場合に根拠とともに記す。未採用の候補は必須ルールやgateにしない。

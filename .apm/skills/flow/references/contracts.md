@@ -1,4 +1,4 @@
-# Flow 4.3.0 契約
+# Flow 4.4.0 契約
 
 ## 正本
 
@@ -6,14 +6,15 @@ repositoryの`src/contracts/`に置くZod定義が機械契約の正本。
 成果物と監査の入出力形式はこの文書とtemplateで参照する。CLIはZodを内蔵する。
 契約の変更時はZod定義・この文書・templateを同時に更新する。
 field間の整合性・状態遷移・file参照の検査は別のguardで実施する。
-全fieldを必須とし、nullable fieldはnullを明記する。未知field、重複YAML key、旧schema、
+project_knowledge以外のfieldを必須とし、nullable fieldはnullを明記する。未知field、重複YAML key、旧schema、
 別名status、並行する承認状態を拒否する。日時はtimezone付きISO 8601。
 pathはfeature directoryからの相対pathで、絶対path、親directory参照、外へのsymlinkを拒否する。
+project_knowledgeのlocationは正本文書の絶対pathまたはURIとし、成果物参照のpathとは区別する。
 SHA-256は保存完了後の全バイトから計算する。成果物自身のdigestを自身へ埋め込まない。
 
 ## 型と必須フィールド
 
-次の表はfront matterとFlow stateの入力項目を列挙する。すべて必須で、省略や暗黙の補完はしない。
+次の表はfront matterとFlow stateの入力項目を列挙する。project_knowledge以外は必須で、省略や暗黙の補完はしない。
 `text`は空でない文字列、`boolean`はtrue/false、`integer`は安全に表現できる整数、
 `timestamp`はtimezone付きISO 8601文字列、`sha256`は小文字16進64桁。
 `T[]`は型Tの配列で、空配列は明記する。`T|null`は値がない場合にnullを明記する。
@@ -35,10 +36,10 @@ SHA-256は保存完了後の全バイトから計算する。成果物自身のd
 | judgment | id:text; question:text; background:text; options:option[2..3]; recommendation:text; reason:text; answer_format:text |
 | finding/gate | id:text; classification:gate; resolution:revise/human_decision; decision_refs:text[]; target:text; problem:text; evidence:text; instruction:text; completion:text; judgment:judgment\|null |
 | finding/scope_candidate | id:text; classification:scope_candidate; decision_refs:text[]; proposal:text; evidence:text; impact:text; recommendation:text |
-| phase-artifact | schema_version:flow/phase-artifact-v2; artifact:design/plan; revision:integer>=1; status:needs_input/ready; producer:text; invocation_id:text; operation:create/revise/respond; updated_at:timestamp; inputs:reference[]; questions:question[]; feedback_results:feedback-result[]; tasks:task[]; verification_plan:verification-plan[]; handoff_checks:handoff-check[] |
-| implement-artifact | schema_version:flow/implement-artifact-v2; artifact:implement; revision:integer>=1; status:in_progress/blocked/completed; producer:flow-implement/flow-artifact-sync; invocation_id:text; operation:execute; updated_at:timestamp; plan:reference; tasks:task-progress[]; verifications:verification[]; blocker:text\|null; commit:小文字16進40〜64桁\|null |
-| review-source | phase:design/plan; review_stage:design/decision/final; review_cycle_id:cycle ID; target:reference; design:reference\|null; findings:finding[]; failure:failure\|null; schema_version:flow/review-source-v2; revision:1; source_id:text; source_kind:ai/human; status:passed/changes_required/blocked/unable; created_at:timestamp |
-| phase-review | phase:design/plan; review_stage:design/decision/final; review_cycle_id:cycle ID; target:reference; design:reference\|null; findings:finding[]; failure:failure\|null; schema_version:flow/phase-review-v2; revision:1; mode:ai/human; status:passed/changes_required/blocked/incomplete; sources:reference[]; judgments:judgment[]; created_at:timestamp; source_paths:text[]（重複不可） |
+| phase-artifact | schema_version:flow/phase-artifact-v2; artifact:design/plan; revision:integer>=1; status:needs_input/ready; producer:text; invocation_id:text; operation:create/revise/respond; updated_at:timestamp; inputs:reference[]; questions:question[]; feedback_results:feedback-result[]; tasks:task[]; verification_plan:verification-plan[]; handoff_checks:handoff-check[]; project_knowledge:project-knowledge（省略可） |
+| implement-artifact | schema_version:flow/implement-artifact-v2; artifact:implement; revision:integer>=1; status:in_progress/blocked/completed; producer:flow-implement/flow-artifact-sync; invocation_id:text; operation:execute; updated_at:timestamp; plan:reference; tasks:task-progress[]; verifications:verification[]; blocker:text\|null; commit:小文字16進40〜64桁\|null; project_knowledge:project-knowledge（省略可） |
+| review-source | phase:design/plan; review_stage:design/decision/final; review_cycle_id:cycle ID; target:reference; design:reference\|null; findings:finding[]; failure:failure\|null; schema_version:flow/review-source-v2; revision:1; source_id:text; source_kind:ai/human; status:passed/changes_required/blocked/unable; created_at:timestamp; project_knowledge:project-knowledge（省略可） |
+| phase-review | phase:design/plan; review_stage:design/decision/final; review_cycle_id:cycle ID; target:reference; design:reference\|null; findings:finding[]; failure:failure\|null; schema_version:flow/phase-review-v2; revision:1; mode:ai/human; status:passed/changes_required/blocked/incomplete; sources:reference[]; judgments:judgment[]; created_at:timestamp; source_paths:text[]（重複不可）; project_knowledge:project-knowledge（省略可） |
 | feedback-item | id:text; kind:change/answer; target:text; instruction:text; evidence:text; completion:text |
 | phase-feedback | schema_version:flow/phase-feedback-v2; revision:1; phase:design/plan; target:reference; operation:revise/respond; created_at:timestamp; items:feedback-item[1..] |
 | counter | automatic_revision:0/1; execution_retry:0/1; human_retry:0/1 |
@@ -145,7 +146,8 @@ Designはdesign:null。Planは入力Design参照が必須。
 cycle IDはdesign-cycle-0001、plan-decision-cycle-0001、plan-final-cycle-0001。
 cycle番号はstageごとに増やし、再試行・mode変更でも再利用しない。
 
-AIの必要sourceはDesignがrequirementsとquality-risk、decisionがdecision-quality、finalがtask-readiness。
+AIの必要sourceはDesignがrequirements・quality-risk・project-rules、decisionがdecision-quality・project-rules、
+finalがtask-readiness・project-rules。
 Humanはhuman 1件だけ。同cycleで混在させない。
 
 findingはgate/scope_candidate。
@@ -163,12 +165,32 @@ aggregateはphase/review_stage/review_cycle_id/target/design/findings/failureを
 schema_version、revision、mode、status、sources参照、source_paths、judgments、created_atを持つ。
 source_idとsource_kindはaggregateへ持ち込まない。
 source_pathsには欠落・不正sourceも含めた必要path全部を保持し、sourcesには検証済みsourceだけを保持する。
-review-checkがstatus、参照、findings、failure、judgmentsを算出する。
+review-checkがstatus、参照、findings、failure、judgments、project_knowledgeを算出する。
 sourceのfinding IDとjudgment IDはsource-id:IDへ名前空間化する。
 契約不一致/欠落/unableがあればincomplete、その後blocked、changes_required、passedの順。
 複数sourceで契約不一致と実行障害が混在する場合はcontractを優先する。sourceの読込順で分類を変えない。
 本文の重複説明を整理できるが機械的なfindingsと結論は削除・変更しない。
 各cycleのsourceとaggregateは一度だけpublishし、上書きしない。
+
+## プロジェクト知識の適用記録
+
+phase-artifact、implement-artifact、review-source、phase-reviewは追加field project_knowledgeを持てる。
+既存v2では省略可能で、省略を適合と読み替えない。新規・改訂writer/executorは記録し、
+project-rules sourceはfailureなしなら必須。他のAI sourceは保持せず、human sourceは保持できる。
+
+| field | 型・内容 |
+| --- | --- |
+| project-knowledge | discovery:text; completeness:complete/partial; documents:knowledge-document[]; checks:knowledge-check[] |
+| knowledge-document | id:text; location:絶対pathまたはURI; scope:text; status:available/unavailable; sha256:SHA-256/null; version:text/null; reason:text |
+| knowledge-check | id:text; document_ids:text[1..]; rule:text; requirement:required/recommended/context/assumption/exception; applicability:text; status:compliant/non_compliant/not_applicable/unverifiable; evidence:text; finding_ids:text[] |
+
+IDはdocuments/checksごとに一意。document_ids/finding_idsは重複不可で存在する参照だけを使う。
+availableはdigest必須、unavailableはnull。未取得文書でcompliantとしない。
+writer/executorのfinding_idsは空。reviewの必須項目のnon_compliant/unverifiableはgateまたはfailureが必要。
+reviewのpartialはfailure必須。aggregateはsourceの記録を保持し、finding_idsをsource-id:IDへ名前空間化する。
+CLIはsource保存・集約・passed利用時にローカル文書のdigestを再照合する。外部文書は呼出側が
+connectorで現在版を照合する。正本・通知・非同期feedback・知識更新のHOWは
+[project-knowledge.md](project-knowledge.md)に従う。新しいphase境界契約は追加しない。
 
 ## phase-feedback-v2
 
@@ -349,7 +371,7 @@ resume-check --recoverまたは元のtransition requestの再送で、保存済�
 外部操作の完了は推測しない。active invocationは実態と証拠を確認して登録または停止する。
 履歴は訂正イベントで補正する。暗号学的な改ざん防止や複数fileの完全transactionを保証しない。
 
-## 再計画とチェックポイント（4.3.0）
+## 再計画とチェックポイント（4.4.0）
 
 request_replanは進行中invocationがないこと、現在参照とcheckpointの一致、現在stateより後の
 checkpoint監査地点、kind replanの提示eventを検証し、phase replanningへ移す。

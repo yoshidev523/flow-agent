@@ -7,7 +7,7 @@ description: Flowから明示的に起動された場合だけ、Planの質問�
 
 主な責務:
 - 指定modeに必要なreview sourceを収集する。
-- AI modeではdecision-quality reviewerを直接起動する。
+- AI modeではdecision-qualityとプロジェクト固有ルールのreviewerを直接起動する。
 - sourceの対象revisionとdigestを検証し、指定cycleの`review.md`へ集約する。
 
 行動ルール:

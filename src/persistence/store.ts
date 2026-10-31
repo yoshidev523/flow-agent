@@ -373,6 +373,7 @@ export class Store extends Files {
       findings: Fields[] = [],
       seen = new Set<string>();
     let failure: Fields | null = null;
+    let projectKnowledge: Fields | undefined;
     for (const sourcePath of paths) {
       if (!fs.existsSync(this.path(sourcePath))) {
         if (!failure || failure.kind !== "contract")
@@ -403,6 +404,7 @@ export class Store extends Files {
             !seen.has(sm.source_id),
           "Unexpected source owner/mode",
         );
+        if (!sm.failure) this.checkKnowledgeDocuments(sm);
         seen.add(sm.source_id);
         sources.push(sr);
         if (sm.failure && (!failure || sm.failure.kind === "contract"))
@@ -419,6 +421,13 @@ export class Store extends Files {
           if (f.judgment) f.judgment.id = sm.source_id + ":" + f.judgment.id;
           findings.push(f);
         }
+        if (sm.project_knowledge) {
+          projectKnowledge = structuredClone(sm.project_knowledge);
+          for (const c of projectKnowledge!.checks)
+            c.finding_ids = c.finding_ids.map(
+              (id: string) => sm.source_id + ":" + id,
+            );
+        }
       } catch (e) {
         if (!(e instanceof FlowError)) throw e;
         failure = { kind: "contract", reason: e.message };
@@ -430,6 +439,7 @@ export class Store extends Files {
     if (design) this.reference(design);
     return {
       ...base,
+      ...(projectKnowledge ? { project_knowledge: projectKnowledge } : {}),
       status: failure ? "incomplete" : findingStatus(findings),
       sources,
       source_paths: paths,
@@ -437,6 +447,21 @@ export class Store extends Files {
       failure,
       judgments: findings.filter((f) => f.judgment).map((f) => f.judgment),
     };
+  }
+  checkKnowledgeDocuments(meta: Fields): void {
+    for (const d of meta.project_knowledge?.documents ?? []) {
+      if (d.status !== "available" || !path.isAbsolute(d.location)) continue;
+      check(
+        fs.existsSync(d.location) && fs.statSync(d.location).isFile(),
+        "Missing knowledge document: " + d.location,
+        true,
+      );
+      check(
+        digest(fs.readFileSync(d.location)) === d.sha256,
+        "Stale knowledge document: " + d.location,
+        true,
+      );
+    }
   }
   checkDocumentInputs(meta: Fields, publishing = false): void {
     const kind = KINDS[meta.schema_version];
@@ -519,6 +544,7 @@ export class Store extends Files {
         "Wrong feedback target",
       );
     } else if (kind === "review-source" && meta.failure === null) {
+      this.checkKnowledgeDocuments(meta);
       const [target] = this.reference(meta.target);
       check(
         target.status ===
@@ -557,6 +583,7 @@ export class Store extends Files {
         "findings",
         "failure",
         "judgments",
+        "project_knowledge",
       ])
         check(
           equal(meta[key], result[key]),
@@ -1029,6 +1056,7 @@ export class Store extends Files {
         equal(result.design, active.design),
       "Review target mismatch",
     );
+    if (result.status === "passed") this.checkDocumentInputs(result);
     this.reference(active.target);
     if (active.design) this.reference(active.design);
     return result;

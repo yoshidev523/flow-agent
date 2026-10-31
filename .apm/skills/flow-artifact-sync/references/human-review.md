@@ -39,3 +39,10 @@ Human reviewが必要です。
 利用者指定で最初からhuman modeの場合など、直前のAI reviewや自動修正が存在しない項目は
 `該当なし`と明記する。review再試行上限による切替では、findingの代わりにaggregateの
 失敗情報と、成果物内容の評価が未完了であることを提示する。
+
+## プロジェクト固有ルール
+
+適用するAGENTS.mdと正本文書、確認済み・未確認の項目と根拠も提示する。
+人間に適合／不適合／対象外／確認不能と理由を確認してもらい、human sourceの
+project_knowledgeへ正規化する。確認していない項目を適合として補完しない。
+AI reviewerは起動しない。文書の鮮度とアクセス不能はproject-knowledge.mdに従う。

@@ -5,7 +5,7 @@ disable-model-invocation: true
 user-invocable: true
 ---
 
-# Flow 4.3.0
+# Flow 4.4.0
 
 ## 起動と責務
 
@@ -63,17 +63,17 @@ review_mode.planはdecision/finalへ共通適用する。1 cycleでAIとhumanを
 
 1. 新規はinit、再開はresume-check。未完了invocationは実態確認前に再実行しない。
 2. pending_operationがnullで現在成果物がある場合はwriterを再起動せず、statusに応じた質問・reviewへ進む。
-   作成・修正が必要な場合だけstart_invocationでwriterを予約し、指定操作と自分の入出力だけを渡して起動する。
+   作成・修正が必要な場合だけstart_invocationでwriterを予約し、指定操作、自分の入出力、対象project・対象範囲だけを渡して起動する。
    Design/Plan writerへreviewやstateを渡さない。publish結果をfinish_invocationで登録する。
 3. Design needs_inputはwriterの質問をそのまま提示する。interaction.presentedを記録しwait。
    人間回答の原文をinteraction.received、対応をfeedback.createdとして監査へ残す。
    正規化feedbackをpublishのfeedback/{phase}/nextで保存し、answer後にrespondを起動する。
-4. Design readyはstart_review design。AI hubは2観点を直接起動し、human modeはFlowがsourceを作る。
+4. Design readyはstart_review design。AI hubはproject-rulesを含む3観点を直接起動し、human modeはFlowがsourceを作る。
    hubのpublish結果を登録し、passedならcheckpoint-create後にadvanceでPlanへ進む。
 5. PlanはDesign参照を保持する。needs_inputはstart_review plan_decision、readyはplan_final。
    decision passedをcheckpointへ保存してから未回答質問を提示し、回答採用時もcheckpointへ保存する。
    回答後はrespondでPlanへ戻る。
-6. final passedをcheckpointへ保存してからadvanceしexecutorへPlanだけを渡す。
+6. final passedをcheckpointへ保存してからadvanceしexecutorへPlanと対象project・対象範囲を渡す。
    completedを検証してadvanceで全体完了とし、完了stateをcheckpointへ保存する。
 
 ## Review結果への対応
@@ -89,6 +89,32 @@ review_mode.planはdecision/finalへ共通適用する。1 cycleでAIとhumanを
 
 自動修正後のreviewは既知gateの解消、現在要件への回帰、必須制約に反する新たな重大riskを確認する。
 周辺改善を新gateへ昇格させない。
+
+## プロジェクト知識と非同期feedback
+
+[プロジェクト知識の共通手順](references/project-knowledge.md)を読む。
+各工程は適用範囲のAGENTS.mdとprojectの正本文書を使い、writer/executorは自分の成果物へ
+適用結果を保存する。Flowは対象project・対象範囲を明示し、成果物本文やreviewの結論を編集しない。
+AI reviewでは全stageのhubがproject-rules reviewerも起動する。Human modeでは起動せず、
+人間に同じルール確認を依頼してhuman sourceへ正規化する。
+
+review登録後・phase移行前に、主要ルールの確認結果、例外、未確認事項、Markdownへのlinkを
+チャットへ表示する。passedの通知だけでは回答待ちにしない。Implement結果も同じ形式で知らせる。
+phase移行前はローカル文書のCLI検証に加え、外部正本の現在版を対応connectorで照合する。
+変更や必須資料の確認不能があれば旧reviewを使わず、共通手順の再評価・停止・再計画を使う。
+
+新しい人間feedbackは現在成果物への影響を確認する。説明補足、現在工程の修正、Designまたは
+Planへの再計画、将来の文書更新候補を区別する。過去の通知への返信も現在のrevisionと照合する。
+進行中の操作を安全な区切りで保存してから切り替え、上流変更は人間承認付き再計画へ接続する。
+戻り先・修正範囲の明示承認が既にあれば再利用し、単なる感想を承認へ変換しない。
+
+feedbackによる修正・判断が固まったとき、再利用できる知識があれば
+[flow-project-knowledge](../flow-project-knowledge/SKILL.md)へ更新提案を依頼する。
+工程完了・全体完了時も成果物の未提示候補を確認し、候補がある場合だけまとめて表示する。
+正本への具体的な差分と採用範囲をチャットへ示し、提案・採否の要点を既存actionイベントで記録する。
+文書更新の採否待ちだけで通常進行を止めない。今回の修正への同意を恒久ルールの採用と扱わない。
+恒久化が承認済みなら知識スキルがprojectの文書運用に従って更新し、現在タスクへの影響を返す。
+必要な再計画・再reviewを行い、旧reviewや完了証拠を新しい正本への適合証拠にしない。
 
 ## Human modeと追加scope
 
@@ -179,7 +205,7 @@ state更新、成果物保存、監査への追記は共通CLIだけを使う。
 ```text
 Flow
 ├── phase writer
-├── decision review hub -> decision-quality reviewer
+├── decision review hub -> decision-quality / project-rules reviewers
 └── final review hub -> perspective reviewers
 ```
 

@@ -1,6 +1,6 @@
 ---
 name: flow-plan-review
-description: Flowからの明示委譲、または利用者による`$flow-plan-review`（Claudeでは`/flow-plan-review`）の明示呼び出し時だけ、完成Planのtask-readinessに対するAIまたは人間review sourceを集約し、指定cycleのreview.mdへ保存するローカルハブ。通常のレビュー依頼から暗黙に起動しない。
+description: Flowからの明示委譲、または利用者による`$flow-plan-review`（Claudeでは`/flow-plan-review`）の明示呼び出し時だけ、完成Planのtask-readinessとproject固有ルールに対するAIまたは人間review sourceを集約し、指定cycleのreview.mdへ保存するローカルハブ。通常のレビュー依頼から暗黙に起動しない。
 ---
 
 # flow-plan-review
@@ -13,18 +13,19 @@ writer修正、利用者対話、Flow state、phase移行を扱わない。
 
 ## 入力
 
-feature directory、review cycle ID、mode、対象path・revision・digest、出力path。
+feature directory、review cycle ID、mode、対象path・revision・digest、出力path、対象projectと対象範囲。
 Plan reviewでは入力Designの参照も必須。
 対象planのstatusは`ready`。対象とDesign参照を開始時・集約直前に確認する。
 
 ## Source収集と集約
 
-AI modeでは`flow-plan-task-readiness-reviewer`を直接起動し、同一cycleの固有sourceを作らせる。
-指定した1観点だけを起動する。子agentを起動できなければincomplete/executionとして記録する。
+AI modeでは`flow-plan-task-readiness-reviewer、flow-project-rules-reviewer`を直接起動し、同一cycleの固有sourceを作らせる。
+汎用観点とproject-rulesの2観点を並列実行する。子agentを起動できなければincomplete/executionとして記録する。
+[プロジェクト知識の共通手順](../flow/references/project-knowledge.md)に従い、正本の鮮度を集約前に確認する。
 Human modeではFlowが作ったsources/human.mdだけを読む。AI reviewerを起動しない。
 
 review-checkへ必要な全source pathを渡す。欠落sourceのpathも省略しない。
-CLIが検証したstatus・sources・source_paths・findings・failure・judgmentsを変更せずaggregateへ使う。
+CLIが検証したstatus・sources・source_paths・findings・failure・judgments・project_knowledgeを変更せずaggregateへ使う。
 sourceの意味を変えず本文を整理する。同じ指摘の説明はまとめられるが、機械的なfindingを削除しない。
 blockedではjudgmentsを利用者へそのまま提示できる本文へ整える。
 判断は質問、背景、2〜3選択肢、影響、推奨と理由、回答形式を持つ。

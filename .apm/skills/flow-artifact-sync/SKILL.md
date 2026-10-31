@@ -32,6 +32,14 @@ Node.js 22以上だけが必要。CLI、契約、templateはこのskillに同梱
 Flow stateが存在する場合は、並行操作の有無を確認するためにだけ参照できる。
 phaseやcompletedを同期の禁止条件にしない。active invocationがあれば変更前に停止する。
 
+## プロジェクト知識
+
+同梱の[共通手順](references/project-knowledge.md)から正本・適用記録・鮮度確認の部分を読む。
+適用範囲のAGENTS.mdと参照文書をprojectの文書運用に沿って確認し、同期対象の知識適用と
+project_knowledgeを再照合する。別repository・外部serviceも対象とし、代替正本を作らない。
+他skillを起動せず、このskill自身が更新ownerとして適用結果と未確認事項を反映する。
+知識の恒久化や文書更新を同期範囲へ勝手に追加しない。候補は本文へ残して呼出側へ返す。
+
 ## 反映
 
 同期中はこのskillを複数成果物の更新ownerとする。producerは`flow-artifact-sync`。

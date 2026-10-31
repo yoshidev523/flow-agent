@@ -45,6 +45,22 @@ Planのpath・revision・digest、target path、feature directory、監査用run
 既存規約への軽微な調整はPlanの意味を変えない範囲で判断でき、その理由を監査へ残す。
 completedは再開しない。push・PR作成は明示依頼時だけ。
 
+## プロジェクト知識の適用
+
+対象projectと対象範囲は呼出側の指定を使い、単独利用では対象コードと作業directoryから確認する。
+
+[flow-project-knowledge](../flow-project-knowledge/SKILL.md)の把握手順で、適用範囲のAGENTS.mdと
+参照先を確認する。参照先は別repository・外部文書serviceも含み、projectの文書運用を守る。
+[共通手順](../flow/references/project-knowledge.md)に従い、project_knowledgeへ出典・版・digest・
+適用範囲と照合結果を記録し、本文の「プロジェクト知識」で根拠・例外・未確認事項を説明する。
+実際の対象fileの規約を適用し、検証結果・逸脱理由を記録する。
+必須ルールと推奨・仮説を混同せず、評価前の把握を適合としない。Planの意味を変えない軽微な調整だけを自律判断し、Plan外の変更はblockedで呼出側へ返す。
+
+再利用できる暗黙知やfeedbackは本文の「知識の更新候補」へ根拠とともに残す。
+自分で恒久ルールを採用・文書更新したり、利用者へ直接提案したりしない。Flowまたは単独利用の
+呼出側が判断の確定後に知識スキルへ更新提案を依頼する。候補だけでstatusを変更しない。
+最終報告には規約の適用結果・例外・確認不能事項と成果物linkを含める。
+
 ## 共通契約と機械処理
 
 実行前に隣接するFlow skillの`../flow/references/contracts.md`と

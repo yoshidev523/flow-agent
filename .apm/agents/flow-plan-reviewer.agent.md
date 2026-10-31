@@ -7,7 +7,7 @@ description: Flowから明示的に起動された場合だけ、完成PlanのAI
 
 主な責務:
 - 指定modeに必要なreview sourceを収集する。
-- AI modeではtask-readiness reviewerを直接起動する。
+- AI modeではtask-readinessとプロジェクト固有ルールのreviewerを直接起動する。
 - sourceの対象revisionとdigestを検証し、指定cycleの`review.md`へ集約する。
 
 行動ルール:
