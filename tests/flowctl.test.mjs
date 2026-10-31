@@ -615,7 +615,7 @@ fixture("five processes append contiguous unique audit records", async (x) => {
 });
 fixture("truncated audit blocks writes", (x) => {
   fs.appendFileSync(
-    x.store.path("audit.md"),
+    x.store.path(".flow/journal.md"),
     "\n## E-000002 — action.started\n",
   );
   assert.throws(
@@ -1774,9 +1774,10 @@ fixture(
       false,
     );
     assert.ok(
-      run("show", checkpoint.commit + ":spec/feature/audit.md").includes(
-        checkpoint.audit_event_id,
-      ),
+      run(
+        "show",
+        checkpoint.commit + ":spec/feature/.flow/journal.md",
+      ).includes(checkpoint.audit_event_id),
     );
     assert.deepEqual(f.createCheckpoint(x.store, request), checkpoint);
     assert.throws(
@@ -2170,3 +2171,169 @@ fixture(
     );
   },
 );
+
+fixture(
+  "監査は事実の履歴と復旧journalを分離し、呼出しや保存の内部処理を表示しない",
+  (x) => {
+    x.writer("design");
+    const view = fs.readFileSync(x.store.path("audit.md"), "utf8");
+    const journal = fs.readFileSync(x.store.path(".flow/journal.md"), "utf8");
+    assert.match(view, /schema_version: flow\/audit-log-v2/);
+    assert.match(view, /— design — 開始/);
+    assert.doesNotMatch(
+      view,
+      /state_revision|sha256|invocation_id|prepared|```yaml/,
+    );
+    assert.match(journal, /flow.transition_prepared/);
+    assert.match(journal, /artifact.update_prepared/);
+    assert.equal((view.match(/^## /gm) ?? []).length, 1);
+    x.store.validateAudit();
+  },
+);
+
+fixture(
+  "重要な決定・問題・再開と検証結果を発生時刻とフェーズ付きで残す",
+  (x) => {
+    const decision = x.event("decision.made", {
+      decision: "実機検証を保留する",
+      rule_id: "verification",
+      reason: "接続端末がない",
+      evidence: ["artifacts/implement.md"],
+      assumptions: ["端末を接続して再検証する"],
+    });
+    x.tr("block", { reason: "接続端末がない", resume_condition: "端末の接続" });
+    x.tr("resume", { reason: "端末を接続した", evidence: [] });
+    x.event("action.completed", {
+      action: "実機検証",
+      result: "保存と再起動の検証に成功",
+      evidence: ["artifacts/implement.md"],
+    });
+    const view = fs.readFileSync(x.store.path("audit.md"), "utf8");
+    assert.ok(view.includes(decision.occurred_at));
+    assert.match(view, /— design — 決定/);
+    assert.match(view, /接続端末がない/);
+    assert.match(view, /再開条件：端末の接続/);
+    assert.match(view, /— design — 再開/);
+    assert.match(view, /保存と再起動の検証に成功/);
+    assert.match(view, /artifacts\/implement.md/);
+  },
+);
+
+fixture("aggregateのレビュー結果を一度だけ表示する", (x) => {
+  x.writer("design");
+  x.review("design");
+  x.event("review.completed", {
+    review: x.store.state().reviews.design,
+    status: "passed",
+  });
+  const view = fs.readFileSync(x.store.path("audit.md"), "utf8");
+  assert.equal((view.match(/— レビュー結果 /g) ?? []).length, 1);
+  assert.match(view, /— design_review — レビュー結果/);
+  assert.match(view, /事実：passed/);
+  assert.match(view, /reviews\/design\/cycle-0001\/review.md r1/);
+});
+
+fixture("view生成の中断は次操作を止め、外部行動を繰り返さず復旧する", (x) => {
+  const atomic = x.store.atomic.bind(x.store);
+  x.store.atomic = (name, data) => {
+    if (name === "audit.md") throw new Error("view disk failure");
+    atomic(name, data);
+  };
+  assert.throws(
+    () =>
+      x.event(
+        "action.completed",
+        {
+          action: "外部操作",
+          result: "完了済み",
+          evidence: [],
+        },
+        "view-failure",
+      ),
+    /view disk failure/,
+  );
+  x.store.atomic = atomic;
+  const count = x.store.events()[1].length;
+  assert.throws(() => x.store.validateAudit(), /missing or stale/);
+  assert.throws(
+    () => x.event("action.started", { action: "next", detail: "next" }),
+    /missing or stale/,
+  );
+  x.store.resumeCheck(true);
+  x.event(
+    "action.completed",
+    { action: "外部操作", result: "完了済み", evidence: [] },
+    "view-failure",
+  );
+  assert.equal(x.store.events()[1].length, count);
+  assert.equal(
+    (
+      fs
+        .readFileSync(x.store.path("audit.md"), "utf8")
+        .match(/事実：完了済み/g) ?? []
+    ).length,
+    1,
+  );
+});
+
+fixture("旧監査は明示的に移行し、原本・event ID・stateを保持する", (x) => {
+  x.writer("design");
+  const journal = x.store.path(".flow/journal.md");
+  const original = fs.readFileSync(journal);
+  const state = fs.readFileSync(x.store.path("flow-state.yml"));
+  const events = x.store.events()[1];
+  fs.writeFileSync(x.store.path("audit.md"), original);
+  fs.unlinkSync(journal);
+  assert.throws(
+    () => x.event("action.started", { action: "next", detail: "next" }),
+    /audit-migrate/,
+  );
+  const result = runCli(["--root", x.root, "audit-migrate"]);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.deepEqual(fs.readFileSync(journal), original);
+  assert.deepEqual(fs.readFileSync(x.store.path("flow-state.yml")), state);
+  assert.deepEqual(x.store.events()[1], events);
+  const view = fs.readFileSync(x.store.path("audit.md"));
+  assert.equal(runCli(["--root", x.root, "audit-migrate"]).status, 0);
+  assert.deepEqual(fs.readFileSync(x.store.path("audit.md")), view);
+  assert.deepEqual(fs.readFileSync(journal), original);
+  x.store.resumeCheck();
+});
+
+fixture("旧監査の破損は移行前に検出し、原本を上書きしない", (x) => {
+  const journal = x.store.path(".flow/journal.md");
+  const original =
+    fs.readFileSync(journal, "utf8") + "\n## E-000002 — action.started\n";
+  fs.writeFileSync(x.store.path("audit.md"), original);
+  fs.unlinkSync(journal);
+  assert.throws(() => x.store.migrateAudit(), /Truncated or malformed/);
+  assert.equal(fs.existsSync(journal), false);
+  assert.equal(fs.readFileSync(x.store.path("audit.md"), "utf8"), original);
+});
+
+fixture("移行中断後は保存済み原本から再開する", (x) => {
+  const journal = x.store.path(".flow/journal.md");
+  const original = fs.readFileSync(journal);
+  fs.writeFileSync(x.store.path("audit.md"), original);
+  fs.unlinkSync(journal);
+  const atomic = x.store.atomic.bind(x.store);
+  x.store.atomic = (name, data) => {
+    atomic(name, data);
+    if (name === ".flow/journal.md") throw new Error("migration interruption");
+  };
+  assert.throws(() => x.store.migrateAudit(), /migration interruption/);
+  x.store.atomic = atomic;
+  x.store.migrateAudit();
+  assert.deepEqual(fs.readFileSync(journal), original);
+  x.store.validateAudit();
+});
+
+fixture("viewの消失は復旧できるがjournalの消失は推測で補完しない", (x) => {
+  fs.unlinkSync(x.store.path("audit.md"));
+  assert.throws(() => x.store.resumeCheck(), /missing or stale/);
+  x.store.resumeCheck(true);
+  x.store.validateAudit();
+  fs.unlinkSync(x.store.path(".flow/journal.md"));
+  assert.throws(() => x.store.resumeCheck(true), /Missing .flow\/journal.md/);
+  assert.throws(() => x.store.migrateAudit(), f.FlowError);
+});

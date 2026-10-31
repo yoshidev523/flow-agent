@@ -9,7 +9,7 @@
 `apm.lock.yaml`で管理します。
 
 機能ごとの実行成果物は`flow-spec/YYYYMMDD_feature/`へ保存します。
-Flow 4.2.0では`flow-state.yml`、追記型の`audit.md`、固定pathの
+Flow 4.2.0では`flow-state.yml`、事実履歴の`audit.md`、復旧用の`.flow/journal.md`、固定pathの
 `artifacts/design.md`、`artifacts/plan.md`、`artifacts/implement.md`を使います。
 固定成果物はrevisionと変更履歴を更新し、revision別fileは作りません。
 レビューは`reviews/{design,plan-decision,plan-final}/cycle-0001/`へsourceとreview.md、
@@ -177,7 +177,7 @@ Flow内部状態は`flow-state-v2`として`flow-state.yml`へ保存します。
 
 - Flow: `flow-state.yml`、feedback、human source
 - 同期skill: 明示された同期中のDesign・Plan・Implementと同期用feedback（通常writerと同時実行しない）
-- 共通CLI: ownerに代わる保存と、排他的な`audit.md`追記。直接編集しません。
+- 共通CLI: ownerに代わる保存と、排他的な`.flow/journal.md`追記と`audit.md`生成。直接編集しません。
 - phase writer: 自分のphase artifact
 - perspective reviewer: 自分のsource
 - review hub: 自分のaggregate artifact
@@ -234,9 +234,13 @@ HOWは`.apm/skills/flow/references/`、schemaの正本は`src/contracts/`のZod�
 JSON Schemaの生成・配布は行いません。
 保存にはpublish、状態更新にはtransition、監査にはaudit-appendを使います。
 旧契約は読み替えず、同じrequest IDの再送は重複実行しません。
-変更履歴は各固定artifactへ、行動・判断・利用者対話はaudit.mdへ残します。
+変更履歴は各固定artifactへ、フェーズ移行・問題・feedback・決定・検証結果の要点はaudit.mdへ残します。
+通常の読取・検索・command開始・TDD各段階・説明だけの応答は記録しません。
+復旧と重複実行防止の正本は`.flow/journal.md`とし、CLIが`audit.md`を生成します。
+両fileをGit保存とcheckpointへ含め、直接編集しません。
+旧audit-log-v1は明示的な`audit-migrate`で原本をjournalへ保持して移行します。
 各agentは自分のイベントを共通記録処理へ渡し、監査を直接編集しません。
-完了後でも同じタスクに関係する対話・調査・判断訂正を監査へ追記します。
+完了後も新しい課題・変更要求・判断訂正だけを監査へ記録します。
 checkpointは専用Git commitとlocal tagで保存し、復帰用branch作成とFlowの再開を分けます。
 監査/保存の中断はresume-checkで検出し、外部操作を自動で再実行しません。
 Planの質問への回答待ちはplan_decision_reviewに置き、planには置きません。

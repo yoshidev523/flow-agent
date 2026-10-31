@@ -37,6 +37,19 @@ node {flowctl} --root {feature_dir} validate audit.md
 消費済みfeedbackは保存時の変更前digestを監査へ照合する。
 過去cycleのreviewやfeedbackは現在参照と一致しないことがあるため、歴史資料として構造検証する。
 flow-state.ymlの--referencesはresume-check相当。
+validate audit.mdは内部journalと生成済みviewの一致も検証する。
+
+## audit-migrate
+
+```sh
+node {flowctl} --root {feature_dir} audit-migrate
+```
+
+旧audit-log-v1のaudit.mdを検証し、原本を`.flow/journal.md`へ保持して
+簡潔なaudit-log-v2のaudit.mdを生成する。明示的な操作だけで移行し、stateや成果物は変更しない。
+途中中断は同じcommandを再送する。journalがある場合は原本を上書きせずviewだけを再生成する。
+旧eventの意味を推測して削除しないため、過去の通常操作は残る。新規記録から対象を絞る。
+両fileをGitへ保存する。hagu等の別projectの履歴へ一括適用しない。
 
 ## publish
 
@@ -79,7 +92,9 @@ dataは[contracts.mdの監査イベント契約](contracts.md#イベント一覧
 CLI専用の予約eventはflow.started、flow.transition_prepared、flow.transitioned、
 flow.transition_aborted、artifact.update_prepared、artifact.updated、artifact.update_aborted。
 これらはaudit-appendへ直接送信できない。invocation.*はtransitionが通常自動記録する。
-その他の行動は、操作前にstarted、実施後にcompletedを記録する。
+通常操作のstarted/completedは送らない。タスク単位の重要な結果だけをaction.completedへまとめる。
+読取・検索・TDD各段階・説明だけの対話は記録対象外。問題・決定・feedback・検証結果を残す。
+同期全体のaction.startedは中断追跡用として例外的に保持する。
 AIの自動判断はdecision.made、人間の提示/回答はinteraction.presented/receivedを使う。
 feedback.createdでは原文イベントとitem IDの対応を記録する。
 
@@ -126,7 +141,8 @@ node {flowctl} --root {feature_dir} resume-check
 node {flowctl} --root {feature_dir} resume-check --recover
 ```
 
-stateと監査snapshot、現在の参照、未完了preparedを検査する。
+stateと内部journalのsnapshot、現在の参照、未完了prepared、audit.mdの一致を検査する。
+--recoverは欠落・不一致のviewをjournalから再生成する。journal自体の破損は自動修復しない。
 --recoverは保存の前後digestが一致する場合だけ監査を補完する。
 保存済みtransitionの付随監査eventの欠落も検出し、--recoverまたは元のtransition request再送で補完する。
 欠落がある間は別のmutationを拒否する。補完ではstate revisionを増やさない。
@@ -160,18 +176,18 @@ checkpoint-restoreはrequest_id、checkpoint_id、branch。指定commitへ新し
 
 ## 応答終了前の保存commit
 
-Flowは各応答の終了前に、監査・state・成果物を保存した後、対象feature directoryの成果物と
+Flowは各応答の終了前に、監査・state・成果物を保存した後、対象feature directoryのaudit.md・.flow/journal.md・成果物と
 起動時に補完した`.gitattributes`を現在のbranchへ通常commitする。回答待ち・停止・完了後も対象。
 対象はFlow自身のタスクに限定し、無関係な変更や一時fileを混入させない。保存失敗は応答で報告する。
 この手順はFlowの責務で、独立したleafやflow-artifact-syncの単独実行には適用しない。
 これはFlowが行うGit操作であり、CLI commandやcheckpointの副作用としては追加しない。
 この保存commitと付随する差分確認・stage・結果確認は監査対象から除外し、Git履歴を証跡とする。
-保存結果をaudit.mdや成果物へ追記しない。実装commitとcheckpoint操作は引き続き監査対象とする。
+保存結果をaudit.mdや成果物へ追記しない。重要な実装結果は記録し、checkpoint内部処理はjournalだけへ残す。
 
 ## 完了後の監査
 
-completedでもaudit-appendは利用できる。タスクに関係する質問・調査・訂正を記録し、説明だけなら
-stateを変更しない。過去の対話の補記では再構成であること、証拠、元日時の不明をdataに明示する。
+completedでもaudit-appendは利用できる。新しい課題・変更要求・決定訂正を記録する。
+説明や調査だけの対話は記録せずstateを変更しない。過去の対話の補記では再構成であること、証拠、元日時の不明をdataに明示する。
 occurred_atは補記操作の実測日時、recorded_atはCLIが付ける。元日時を推測しない。
 
 checkpoint.preparedが未完了なら他のmutationを拒否する。resume-checkはcheckpoint-recoverを案内し、Git操作を再実行しない。

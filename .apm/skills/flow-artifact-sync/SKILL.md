@@ -40,8 +40,9 @@ expected_revision・expected_sha256で他の変更を検出し、revisionと変�
 原文、元の判断、変更前後の参照を監査と変更履歴で辿れるようにする。
 
 - Design/Planの変更は、このskill自身が現在の対象参照を指定した`phase-feedback-v2`を作り、
-  `publish`する。変更原文を`interaction.received`（prompt_event_id:null）へ記録し、
-  `feedback.created`で原文eventとitem IDを結ぶ。他スキルへの委譲は行わない。
+  `publish`する。変更原文が記録済みなら元event IDを参照し、未記録の入力だけ
+  `interaction.received`（prompt_event_id:null）へ一度記録する。
+  `feedback.created`で元eventとitem IDを結び、原文を再転記しない。他スキルへの委譲は行わない。
 - 合意済み変更は`revise`とchange feedbackを使い、feedback_resultsへ反映結果を記録する。
   回答の反映が必要なら`respond`とanswer feedbackを使う。採用済み回答を勝手に変えない。
 - 上流から順に反映する。Planは本文の要件・タスク・完了条件・検証を再照合し、
@@ -76,7 +77,9 @@ Flowからの再計画では、呼出側が人間承認を記録して同期を�
 actorは常に`flow-artifact-sync`、actionは`artifact-sync:{同期ID}`。
 終了eventのcaused_byへ開始eventと更新eventを指定し、resultへ実際の結果、
 evidenceへ変更前後の参照・根拠event IDを入れる。変更不要・停止・部分反映も記録する。
-`publish`の保存イベントは自動記録されるため重複追加しない。新しいevent型は不要。
+同期の開始eventは中断検出用の内部記録で、`audit.md`には結果だけを示す。
+通常の読取・検索・各file保存の開始/終了は追加しない。`publish`の自動記録を重複させない。
+詳細は成果物を参照し、新しい問題・重要判断・部分反映・停止は要点を残す。新しいevent型は不要。
 
 監査保存障害では次操作へ進まない。複数fileの同期は一括transactionではないため、
 中断時は保存済み範囲を照合し、部分反映を報告する。成功や外部操作の完了を推測しない。

@@ -7410,15 +7410,9 @@ var require_dist = __commonJS({
 // src/cli.ts
 var import_node_fs5 = __toESM(require("node:fs"), 1);
 
-// src/persistence/store.ts
-var import_node_fs3 = __toESM(require("node:fs"), 1);
-var import_node_path2 = __toESM(require("node:path"), 1);
-
-// src/persistence/files.ts
-var import_node_fs = __toESM(require("node:fs"), 1);
-var import_node_path = __toESM(require("node:path"), 1);
+// src/format.ts
 var import_node_crypto = require("node:crypto");
-var import_promises = require("node:timers/promises");
+var import_yaml = __toESM(require_dist(), 1);
 
 // src/errors.ts
 var FlowError = class extends Error {
@@ -7439,7 +7433,252 @@ function requireCondition(ok, message, condition = false) {
     );
 }
 
+// src/format.ts
+function utf8(data) {
+  return new TextDecoder("utf-8", { fatal: true }).decode(data);
+}
+function load(text2) {
+  try {
+    const doc = (0, import_yaml.parseDocument)(text2, {
+      uniqueKeys: true,
+      stringKeys: false,
+      version: "1.1",
+      customTags: (tags) => tags.map((tag) => {
+        if (typeof tag === "string") return tag;
+        if (tag.tag === "tag:yaml.org,2002:timestamp")
+          return { ...tag, resolve: (value2) => value2 };
+        if (tag.format === "EXP" && tag.test)
+          return {
+            ...tag,
+            test: /^[-+]?(?:[0-9][0-9_]*(?:\.[0-9_]*)?|\.[0-9_]+)[eE][-+]?[0-9]+$/
+          };
+        return tag;
+      })
+    });
+    if (doc.errors.length)
+      throw new Error(doc.errors.map((e) => e.message).join("; "));
+    (0, import_yaml.visit)(doc, {
+      Map(_key, node2) {
+        for (const pair of node2.items)
+          requireCondition(
+            (0, import_yaml.isScalar)(pair.key) && typeof pair.key.value === "string",
+            "YAML mapping keys must be strings"
+          );
+      }
+    });
+    const value = doc.toJS({ maxAliasCount: 100 });
+    const visit2 = (v, seen = /* @__PURE__ */ new Set()) => {
+      if (v === null || typeof v === "string" || typeof v === "boolean") return;
+      if (typeof v === "number") {
+        requireCondition(Number.isFinite(v), "Non-finite YAML number");
+        return;
+      }
+      requireCondition(
+        typeof v === "object" && v !== void 0 && !(v instanceof Date),
+        "Non-JSON YAML value"
+      );
+      requireCondition(!seen.has(v), "Cyclic YAML value");
+      seen.add(v);
+      if (Array.isArray(v)) v.forEach((x) => visit2(x, seen));
+      else for (const x of Object.values(v)) visit2(x, seen);
+      seen.delete(v);
+    };
+    visit2(value);
+    return value;
+  } catch (e) {
+    throw new FlowError("Invalid YAML: " + e.message);
+  }
+}
+function dump(value) {
+  return (0, import_yaml.stringify)(value, {
+    lineWidth: 0,
+    version: "1.1",
+    aliasDuplicateObjects: false
+  });
+}
+function now() {
+  return (/* @__PURE__ */ new Date()).toISOString().replace(/\.\d{3}Z$/, "+00:00");
+}
+function digest(data) {
+  return (0, import_node_crypto.createHash)("sha256").update(data).digest("hex");
+}
+function canonical(value) {
+  if (Array.isArray(value)) return "[" + value.map(canonical).join(",") + "]";
+  if (value && typeof value === "object")
+    return "{" + Object.entries(value).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([k, v]) => JSON.stringify(k) + ":" + canonical(v)).join(",") + "}";
+  return JSON.stringify(value);
+}
+function equal(a, b) {
+  return canonical(a) === canonical(b);
+}
+function fingerprint(value) {
+  return digest(canonical(value));
+}
+function object(value) {
+  requireCondition(
+    value && typeof value === "object" && !Array.isArray(value),
+    "Request must be a mapping"
+  );
+  return value;
+}
+function markdown(text2) {
+  requireCondition(text2.startsWith("---\n"), "Markdown requires YAML front matter");
+  const end = text2.indexOf("\n---\n", 4);
+  requireCondition(end !== -1, "Missing front matter terminator");
+  return [object(load(text2.slice(4, end))), text2.slice(end + 5)];
+}
+function render(meta3, body) {
+  return "---\n" + dump(meta3) + "---\n" + body.replace(/^\n+/, "");
+}
+
+// src/persistence/audit.ts
+var JOURNAL = ".flow/journal.md";
+function auditView(meta3, events) {
+  const phases = /* @__PURE__ */ new Map();
+  const byId = new Map(events.map((event) => [event.event_id, event]));
+  const reviews = /* @__PURE__ */ new Set();
+  const entries = [];
+  const text2 = (value) => String(value).replace(/\s+/g, " ").trim();
+  const ref = (value) => value ? `${value.path} r${value.revision}` : "";
+  for (const event of events) {
+    const d = event.data;
+    let phase = phases.get(event.run_id) ?? "standalone";
+    let title = "", fact = "", reason = "", references = [];
+    switch (event.event_type) {
+      case "flow.started":
+        phase = d.state.phase;
+        title = "\u958B\u59CB";
+        fact = "\u8981\u6C42\u3092\u53D7\u9818\u3057\u3001Flow\u3092\u958B\u59CB\u3057\u305F\u3002";
+        references = [d.request_path];
+        break;
+      case "flow.transitioned": {
+        phase = d.to_phase;
+        const prepared = byId.get(d.prepared_event_id)?.data;
+        if (d.from_phase !== d.to_phase) {
+          title = "\u30D5\u30A7\u30FC\u30BA\u79FB\u884C";
+          fact = `${d.from_phase} \u2192 ${d.to_phase}`;
+        } else if (d.from_state !== d.to_state && [d.from_state, d.to_state].some(
+          (s) => ["blocked", "waiting"].includes(s)
+        )) {
+          title = d.to_state === "blocked" ? "\u505C\u6B62" : d.to_state === "waiting" ? "\u56DE\u7B54\u5F85\u3061" : "\u518D\u958B";
+          fact = `${d.from_state} \u2192 ${d.to_state}`;
+        }
+        reason = prepared?.arguments?.reason ?? "";
+        if (prepared?.arguments?.resume_condition)
+          fact += `\u3002\u518D\u958B\u6761\u4EF6\uFF1A${prepared.arguments.resume_condition}`;
+        references = d.evidence.map(ref);
+        break;
+      }
+      case "invocation.started":
+        if (phase === "standalone") {
+          const inferred = /flow-(design|plan|implement)(?:$|-)/.exec(
+            d.component
+          )?.[1];
+          if (inferred) phase = inferred;
+        }
+        break;
+      case "invocation.failed":
+        title = "\u5B9F\u884C\u969C\u5BB3";
+        fact = d.reason;
+        references = d.evidence;
+        break;
+      case "artifact.updated": {
+        const prepared = byId.get(d.prepared_event_id)?.data;
+        if (d.artifact.path.startsWith("reviews/") && d.artifact.path.endsWith("/review.md")) {
+          title = "\u30EC\u30D3\u30E5\u30FC\u7D50\u679C";
+          fact = prepared?.new_status ?? "\u4FDD\u5B58\u6E08\u307F";
+          references = [ref(d.artifact)];
+          reviews.add(ref(d.artifact));
+        }
+        break;
+      }
+      case "action.completed":
+        title = d.action;
+        fact = d.result;
+        references = d.evidence;
+        break;
+      case "decision.made":
+        title = "\u6C7A\u5B9A";
+        fact = d.decision;
+        reason = d.reason;
+        references = d.evidence;
+        if (d.assumptions.length)
+          reason += ` \u524D\u63D0\uFF1A${d.assumptions.join("\u3001")}`;
+        break;
+      case "interaction.presented":
+        title = "\u5224\u65AD\u4F9D\u983C";
+        fact = d.text;
+        references = [ref(d.target)];
+        break;
+      case "interaction.received":
+        title = "\u5229\u7528\u8005\u30D5\u30A3\u30FC\u30C9\u30D0\u30C3\u30AF";
+        fact = d.text;
+        break;
+      case "feedback.created":
+        title = "\u30D5\u30A3\u30FC\u30C9\u30D0\u30C3\u30AF\u767B\u9332";
+        fact = "\u5909\u66F4\u30FB\u56DE\u7B54\u3092\u6210\u679C\u7269\u3078\u6E21\u3059\u30D5\u30A3\u30FC\u30C9\u30D0\u30C3\u30AF\u3068\u3057\u3066\u4FDD\u5B58\u3057\u305F\u3002";
+        references = [ref(d.feedback), ...d.origin_event_ids];
+        break;
+      case "review.completed":
+        if (!reviews.has(ref(d.review))) {
+          title = "\u30EC\u30D3\u30E5\u30FC\u7D50\u679C";
+          fact = d.status;
+          references = [ref(d.review)];
+        }
+        break;
+      case "review.mode_changed":
+        title = "\u30EC\u30D3\u30E5\u30FC\u65B9\u5F0F\u5909\u66F4";
+        fact = `${d.stage}: ${d.from} \u2192 ${d.to}`;
+        reason = d.reason;
+        break;
+      case "retry.scheduled":
+        title = "\u518D\u8A66\u884C";
+        fact = `${d.stage}: ${d.counter} ${d.used}\u56DE`;
+        reason = d.reason;
+        break;
+      case "flow.blocked":
+        title = "\u554F\u984C\u30FB\u8AB2\u984C";
+        fact = `${d.reason}\u3002\u518D\u958B\u6761\u4EF6\uFF1A${d.resume_condition}`;
+        break;
+      case "flow.resumed":
+        title = "\u518D\u958B";
+        fact = d.reason;
+        references = d.evidence;
+        break;
+      case "artifact.update_aborted":
+      case "flow.transition_aborted":
+        title = "\u4FDD\u5B58\u4E2D\u65AD";
+        fact = d.reason;
+        references = [d.prepared_event_id];
+        break;
+    }
+    phases.set(event.run_id, phase);
+    if (!title) continue;
+    entries.push(
+      `
+## ${text2(event.occurred_at)} \u2014 ${text2(phase)} \u2014 ${text2(title)} (${event.event_id})
+
+- \u4E8B\u5B9F\uFF1A${text2(fact)}
+` + (reason ? `- \u7406\u7531\uFF1A${text2(reason)}
+` : "") + (references.length ? `- \u53C2\u7167\uFF1A${references.map(text2).join("\u3001")}
+` : "")
+    );
+  }
+  return render(
+    { ...meta3, schema_version: "flow/audit-log-v2" },
+    "# \u76E3\u67FB\u30ED\u30B0\n" + entries.join("")
+  );
+}
+
+// src/persistence/store.ts
+var import_node_fs3 = __toESM(require("node:fs"), 1);
+var import_node_path2 = __toESM(require("node:path"), 1);
+
 // src/persistence/files.ts
+var import_node_fs = __toESM(require("node:fs"), 1);
+var import_node_path = __toESM(require("node:path"), 1);
+var import_node_crypto2 = require("node:crypto");
+var import_promises = require("node:timers/promises");
 var Files = class {
   root;
   constructor(root) {
@@ -7467,7 +7706,7 @@ var Files = class {
     import_node_fs.default.mkdirSync(this.root, { recursive: true });
     const lock = import_node_path.default.join(this.root, ".flowctl.lock");
     const gate = import_node_path.default.join(this.root, ".flowctl.lock.recovery");
-    const token = `${process.pid}-${(0, import_node_crypto.randomUUID)()}`;
+    const token = `${process.pid}-${(0, import_node_crypto2.randomUUID)()}`;
     const deadline = Date.now() + 3e4;
     while (true) {
       let gated = false, acquired = false;
@@ -7546,7 +7785,7 @@ var Files = class {
   atomic(name, data) {
     const target = this.path(name);
     import_node_fs.default.mkdirSync(import_node_path.default.dirname(target), { recursive: true });
-    const tmp = import_node_path.default.join(import_node_path.default.dirname(target), ".flowctl-" + (0, import_node_crypto.randomUUID)());
+    const tmp = import_node_path.default.join(import_node_path.default.dirname(target), ".flowctl-" + (0, import_node_crypto2.randomUUID)());
     let fd;
     try {
       fd = import_node_fs.default.openSync(tmp, "wx", 384);
@@ -7569,106 +7808,6 @@ var Files = class {
     }
   }
 };
-
-// src/format.ts
-var import_node_crypto2 = require("node:crypto");
-var import_yaml = __toESM(require_dist(), 1);
-function utf8(data) {
-  return new TextDecoder("utf-8", { fatal: true }).decode(data);
-}
-function load(text2) {
-  try {
-    const doc = (0, import_yaml.parseDocument)(text2, {
-      uniqueKeys: true,
-      stringKeys: false,
-      version: "1.1",
-      customTags: (tags) => tags.map((tag) => {
-        if (typeof tag === "string") return tag;
-        if (tag.tag === "tag:yaml.org,2002:timestamp")
-          return { ...tag, resolve: (value2) => value2 };
-        if (tag.format === "EXP" && tag.test)
-          return {
-            ...tag,
-            test: /^[-+]?(?:[0-9][0-9_]*(?:\.[0-9_]*)?|\.[0-9_]+)[eE][-+]?[0-9]+$/
-          };
-        return tag;
-      })
-    });
-    if (doc.errors.length)
-      throw new Error(doc.errors.map((e) => e.message).join("; "));
-    (0, import_yaml.visit)(doc, {
-      Map(_key, node2) {
-        for (const pair of node2.items)
-          requireCondition(
-            (0, import_yaml.isScalar)(pair.key) && typeof pair.key.value === "string",
-            "YAML mapping keys must be strings"
-          );
-      }
-    });
-    const value = doc.toJS({ maxAliasCount: 100 });
-    const visit2 = (v, seen = /* @__PURE__ */ new Set()) => {
-      if (v === null || typeof v === "string" || typeof v === "boolean") return;
-      if (typeof v === "number") {
-        requireCondition(Number.isFinite(v), "Non-finite YAML number");
-        return;
-      }
-      requireCondition(
-        typeof v === "object" && v !== void 0 && !(v instanceof Date),
-        "Non-JSON YAML value"
-      );
-      requireCondition(!seen.has(v), "Cyclic YAML value");
-      seen.add(v);
-      if (Array.isArray(v)) v.forEach((x) => visit2(x, seen));
-      else for (const x of Object.values(v)) visit2(x, seen);
-      seen.delete(v);
-    };
-    visit2(value);
-    return value;
-  } catch (e) {
-    throw new FlowError("Invalid YAML: " + e.message);
-  }
-}
-function dump(value) {
-  return (0, import_yaml.stringify)(value, {
-    lineWidth: 0,
-    version: "1.1",
-    aliasDuplicateObjects: false
-  });
-}
-function now() {
-  return (/* @__PURE__ */ new Date()).toISOString().replace(/\.\d{3}Z$/, "+00:00");
-}
-function digest(data) {
-  return (0, import_node_crypto2.createHash)("sha256").update(data).digest("hex");
-}
-function canonical(value) {
-  if (Array.isArray(value)) return "[" + value.map(canonical).join(",") + "]";
-  if (value && typeof value === "object")
-    return "{" + Object.entries(value).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([k, v]) => JSON.stringify(k) + ":" + canonical(v)).join(",") + "}";
-  return JSON.stringify(value);
-}
-function equal(a, b) {
-  return canonical(a) === canonical(b);
-}
-function fingerprint(value) {
-  return digest(canonical(value));
-}
-function object(value) {
-  requireCondition(
-    value && typeof value === "object" && !Array.isArray(value),
-    "Request must be a mapping"
-  );
-  return value;
-}
-function markdown(text2) {
-  requireCondition(text2.startsWith("---\n"), "Markdown requires YAML front matter");
-  const end = text2.indexOf("\n---\n", 4);
-  requireCondition(end !== -1, "Missing front matter terminator");
-  return [object(load(text2.slice(4, end))), text2.slice(end + 5)];
-}
-function render(meta3, body) {
-  return "---\n" + dump(meta3) + "---\n" + body.replace(/^\n+/, "");
-}
 
 // node_modules/zod/v4/classic/external.js
 var external_exports = {};
@@ -27701,6 +27840,9 @@ var AuditLogSchema = external_exports.strictObject({
   feature_id: text,
   created_at: timestamp
 });
+var AuditViewSchema = AuditLogSchema.extend({
+  schema_version: external_exports.literal("flow/audit-log-v2")
+});
 var contracts = {
   reference: ReferenceSchema,
   option: OptionSchema,
@@ -27725,6 +27867,7 @@ var contracts = {
   "flow-state": FlowStateSchema,
   "audit-event": AuditEventSchema,
   "audit-log": AuditLogSchema,
+  "audit-view": AuditViewSchema,
   "verification-plan": VerificationPlanSchema,
   "handoff-check": HandoffCheckSchema,
   replan: ReplanSchema,
@@ -27876,7 +28019,8 @@ var KINDS = {
   "flow/phase-review-v2": "phase-review",
   "flow/phase-feedback-v2": "phase-feedback",
   "flow/flow-state-v2": "flow-state",
-  "flow/audit-log-v1": "audit-log"
+  "flow/audit-log-v1": "audit-log",
+  "flow/audit-log-v2": "audit-view"
 };
 var STAGES = {
   design: ["design_review", "design", "design"],
@@ -28183,7 +28327,7 @@ function validateMeta(meta3, body) {
         "Active review/phase mismatch"
       );
   }
-  if (body !== void 0 && kind !== "audit-log" && kind !== "flow-state") {
+  if (body !== void 0 && kind !== "audit-log" && kind !== "audit-view" && kind !== "flow-state") {
     for (const heading of HEADINGS[meta3.artifact ?? kind])
       requireCondition(
         body.split("\n").some((line) => line.trimEnd() === "## " + heading),
@@ -29080,9 +29224,15 @@ var Store = class extends Files {
     return meta3;
   }
   events() {
-    const p = this.path("audit.md");
-    requireCondition(import_node_fs3.default.existsSync(p), "Missing audit.md");
-    const [meta3, body] = markdown(utf8(import_node_fs3.default.readFileSync(p)));
+    const p = this.path(JOURNAL);
+    requireCondition(
+      import_node_fs3.default.existsSync(p),
+      "Missing .flow/journal.md; legacy audit.md requires audit-migrate"
+    );
+    return this.parseEvents(utf8(import_node_fs3.default.readFileSync(p)));
+  }
+  parseEvents(raw) {
+    const [meta3, body] = markdown(raw);
     schemaCheck("audit-log", meta3);
     requireCondition(body.startsWith("# \u76E3\u67FB\u30ED\u30B0\n"), "Invalid audit heading");
     const tail = body.slice("# \u76E3\u67FB\u30ED\u30B0\n".length), pattern = /\n## (E-[0-9]{6,}) — ([a-z_.]+)\n\n```yaml\n([\s\S]*?)\n```\n/y;
@@ -29093,7 +29243,7 @@ var Store = class extends Files {
       const m = pattern.exec(tail);
       requireCondition(
         m,
-        "Truncated or malformed audit record; preserve and inspect audit.md"
+        "Truncated or malformed audit record; preserve and inspect .flow/journal.md"
       );
       const e = object(load(m[3]));
       schemaCheck("audit-event", e);
@@ -29148,6 +29298,7 @@ var Store = class extends Files {
             equal(old[k], event[k]),
             "Idempotency key reused for different event"
           );
+        this.syncAudit();
         return old;
       }
     requireCondition(
@@ -29160,13 +29311,14 @@ var Store = class extends Files {
 \`\`\`yaml
 ${dump(event)}\`\`\`
 `;
-    const fd = import_node_fs3.default.openSync(this.path("audit.md"), "a");
+    const fd = import_node_fs3.default.openSync(this.path(JOURNAL), "a");
     try {
       import_node_fs3.default.writeFileSync(fd, record2);
       import_node_fs3.default.fsyncSync(fd);
     } finally {
       import_node_fs3.default.closeSync(fd);
     }
+    this.syncAudit();
     return event;
   }
   pending() {
@@ -29264,6 +29416,7 @@ ${dump(event)}\`\`\`
     ];
   }
   consistent(replayingRequestId) {
+    this.validateAudit();
     const checkpointEvents = this.events()[1];
     requireCondition(
       checkpointEvents.filter((e) => e.event_type === "checkpoint.prepared").every(
@@ -29513,19 +29666,51 @@ ${dump(event)}\`\`\`
         );
     }
   }
+  syncAudit() {
+    const [meta3, events] = this.events();
+    const expected = auditView(meta3, events);
+    if (!import_node_fs3.default.existsSync(this.path("audit.md")) || utf8(import_node_fs3.default.readFileSync(this.path("audit.md"))) !== expected)
+      this.atomic("audit.md", expected);
+  }
+  validateAudit() {
+    const [meta3, events] = this.events();
+    requireCondition(
+      import_node_fs3.default.existsSync(this.path("audit.md")) && utf8(import_node_fs3.default.readFileSync(this.path("audit.md"))) === auditView(meta3, events),
+      "Audit view is missing or stale; run resume-check --recover",
+      true
+    );
+    return events.length;
+  }
+  migrateAudit() {
+    if (!import_node_fs3.default.existsSync(this.path(JOURNAL))) {
+      const original = import_node_fs3.default.readFileSync(this.path("audit.md"));
+      const [meta3] = markdown(utf8(original));
+      schemaCheck("audit-log", meta3);
+      this.parseEvents(utf8(original));
+      this.atomic(JOURNAL, original);
+    }
+    this.syncAudit();
+    return { events: this.validateAudit(), journal: JOURNAL };
+  }
   ensureAudit() {
-    if (!import_node_fs3.default.existsSync(this.path("audit.md")))
-      this.atomic(
-        "audit.md",
-        render(
-          {
-            schema_version: "flow/audit-log-v1",
-            feature_id: import_node_path2.default.basename(this.root),
-            created_at: now()
-          },
-          "# \u76E3\u67FB\u30ED\u30B0\n"
-        )
-      );
+    if (import_node_fs3.default.existsSync(this.path(JOURNAL))) return;
+    requireCondition(
+      !import_node_fs3.default.existsSync(this.path("audit.md")),
+      "Legacy audit.md requires explicit audit-migrate",
+      true
+    );
+    this.atomic(
+      JOURNAL,
+      render(
+        {
+          schema_version: "flow/audit-log-v1",
+          feature_id: import_node_path2.default.basename(this.root),
+          created_at: now()
+        },
+        "# \u76E3\u67FB\u30ED\u30B0\n"
+      )
+    );
+    this.syncAudit();
   }
   replay(request) {
     const [, events] = this.events(), prepared = events.find(
@@ -29593,7 +29778,7 @@ ${dump(event)}\`\`\`
       );
     }
     requireCondition(
-      kind && kind !== "flow-state" && kind !== "audit-log",
+      kind && kind !== "flow-state" && kind !== "audit-log" && kind !== "audit-view",
       "publish only accepts phase documents"
     );
     let old = null, oldBody = "", before = null;
@@ -29754,7 +29939,7 @@ ${dump(event)}\`\`\`
       "Invalid init request"
     );
     requireCondition(
-      !import_node_fs3.default.existsSync(this.path("flow-state.yml")) && !import_node_fs3.default.existsSync(this.path("audit.md")),
+      !import_node_fs3.default.existsSync(this.path("flow-state.yml")) && !import_node_fs3.default.existsSync(this.path("audit.md")) && !import_node_fs3.default.existsSync(this.path(JOURNAL)),
       "Feature already initialized",
       true
     );
@@ -29798,7 +29983,7 @@ ${dump(event)}\`\`\`
     );
     this.atomic("inputs/request.md", "# \u958B\u59CB\u8981\u6C42\n\n" + request.text + "\n");
     this.atomic(
-      "audit.md",
+      JOURNAL,
       render(
         {
           schema_version: "flow/audit-log-v1",
@@ -29916,6 +30101,8 @@ ${dump(event)}\`\`\`
   }
   resumeCheck(recover = false) {
     let [, events] = this.events();
+    if (recover) this.syncAudit();
+    else this.validateAudit();
     const standalone = !events.some((e) => e.event_type === "flow.started");
     if (!import_node_fs3.default.existsSync(this.path("flow-state.yml")) && !standalone) {
       const started = events.filter((e) => e.event_type === "flow.started");
@@ -30368,7 +30555,7 @@ var help = `flowctl 4.2.0 \u2014 Flow persistence and contract guards
 Usage: node flowctl.js --root FEATURE COMMAND [OPTIONS]
 Commands: init, publish, transition, audit-append, review-check --request FILE|-
           validate PATH [--references]
-          resume-check [--recover]
+          resume-check [--recover], audit-migrate
           checkpoint-create, checkpoint-recover, checkpoint-restore --request FILE|-
 Options: --version, --help
 `;
@@ -30400,12 +30587,17 @@ async function main(argv = process.argv.slice(2)) {
           argv.every((x) => x === "--references") && argv.length <= 1,
           "Invalid validate arguments"
         );
-        if (name === "audit.md") return { events: store.events()[1].length };
+        if (name === JOURNAL) return { events: store.events()[1].length };
+        if (name === "audit.md") return { events: store.validateAudit() };
         if (name === "flow-state.yml")
           return argv.includes("--references") ? store.resumeCheck() : store.state();
         const [meta3, , ref] = store.document(name);
         if (argv.includes("--references")) store.checkDocumentInputs(meta3);
         return { artifact: ref, status: meta3.status ?? null };
+      }
+      if (command === "audit-migrate") {
+        requireCondition(argv.length === 0, "Invalid audit-migrate arguments");
+        return store.migrateAudit();
       }
       if (command === "resume-check") {
         requireCondition(

@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { JOURNAL } from "./persistence/audit.js";
 import { Store } from "./persistence/store.js";
 import { load, object, equal, utf8 } from "./format.js";
 import { FlowError, requireCondition as check } from "./errors.js";
@@ -8,7 +9,7 @@ import {
   recoverCheckpoint,
   restoreCheckpoint,
 } from "./checkpoints.js";
-const help = `flowctl 4.2.0 — Flow persistence and contract guards\nUsage: node flowctl.js --root FEATURE COMMAND [OPTIONS]\nCommands: init, publish, transition, audit-append, review-check --request FILE|-\n          validate PATH [--references]\n          resume-check [--recover]\n          checkpoint-create, checkpoint-recover, checkpoint-restore --request FILE|-\nOptions: --version, --help\n`;
+const help = `flowctl 4.2.0 — Flow persistence and contract guards\nUsage: node flowctl.js --root FEATURE COMMAND [OPTIONS]\nCommands: init, publish, transition, audit-append, review-check --request FILE|-\n          validate PATH [--references]\n          resume-check [--recover], audit-migrate\n          checkpoint-create, checkpoint-recover, checkpoint-restore --request FILE|-\nOptions: --version, --help\n`;
 async function main(argv = process.argv.slice(2)): Promise<number> {
   try {
     if (argv.includes("--version")) {
@@ -37,7 +38,8 @@ async function main(argv = process.argv.slice(2)): Promise<number> {
           argv.every((x) => x === "--references") && argv.length <= 1,
           "Invalid validate arguments",
         );
-        if (name === "audit.md") return { events: store.events()[1].length };
+        if (name === JOURNAL) return { events: store.events()[1].length };
+        if (name === "audit.md") return { events: store.validateAudit() };
         if (name === "flow-state.yml")
           return argv.includes("--references")
             ? store.resumeCheck()
@@ -45,6 +47,10 @@ async function main(argv = process.argv.slice(2)): Promise<number> {
         const [meta, , ref] = store.document(name);
         if (argv.includes("--references")) store.checkDocumentInputs(meta);
         return { artifact: ref, status: meta.status ?? null };
+      }
+      if (command === "audit-migrate") {
+        check(argv.length === 0, "Invalid audit-migrate arguments");
+        return store.migrateAudit();
       }
       if (command === "resume-check") {
         check(

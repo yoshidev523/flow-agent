@@ -32,6 +32,7 @@ import {
   type EventType,
 } from "../contracts/index.js";
 import { transition } from "../transitions.js";
+import { JOURNAL, auditView } from "./audit.js";
 export const eventId = (n: number) => "E-" + String(n).padStart(6, "0");
 export class Store extends Files {
   document(name: string): [Fields, string, ArtifactRef] {
@@ -63,9 +64,15 @@ export class Store extends Files {
     return meta as FlowState;
   }
   events(): [Fields, AuditEvent[]] {
-    const p = this.path("audit.md");
-    check(fs.existsSync(p), "Missing audit.md");
-    const [meta, body] = markdown(utf8(fs.readFileSync(p)));
+    const p = this.path(JOURNAL);
+    check(
+      fs.existsSync(p),
+      "Missing .flow/journal.md; legacy audit.md requires audit-migrate",
+    );
+    return this.parseEvents(utf8(fs.readFileSync(p)));
+  }
+  private parseEvents(raw: string): [Fields, AuditEvent[]] {
+    const [meta, body] = markdown(raw);
     schemaCheck("audit-log", meta);
     check(body.startsWith("# 監査ログ\n"), "Invalid audit heading");
     const tail = body.slice("# 監査ログ\n".length),
@@ -80,7 +87,7 @@ export class Store extends Files {
       const m = pattern.exec(tail);
       check(
         m,
-        "Truncated or malformed audit record; preserve and inspect audit.md",
+        "Truncated or malformed audit record; preserve and inspect .flow/journal.md",
       );
       const e = object(load(m[3])) as AuditEvent;
       schemaCheck("audit-event", e);
@@ -144,6 +151,7 @@ export class Store extends Files {
             equal(old[k], event[k]),
             "Idempotency key reused for different event",
           );
+        this.syncAudit();
         return old;
       }
     check(
@@ -151,13 +159,14 @@ export class Store extends Files {
       "Unknown causal event",
     );
     const record = `\n## ${event.event_id} — ${eventType}\n\n\`\`\`yaml\n${dump(event)}\`\`\`\n`;
-    const fd = fs.openSync(this.path("audit.md"), "a");
+    const fd = fs.openSync(this.path(JOURNAL), "a");
     try {
       fs.writeFileSync(fd, record);
       fs.fsyncSync(fd);
     } finally {
       fs.closeSync(fd);
     }
+    this.syncAudit();
     return event as AuditEvent;
   }
   pending(): AuditEvent[] {
@@ -270,6 +279,7 @@ export class Store extends Files {
     ];
   }
   consistent(replayingRequestId?: string): void {
+    this.validateAudit();
     const checkpointEvents = this.events()[1];
     check(
       checkpointEvents
@@ -554,19 +564,57 @@ export class Store extends Files {
         );
     }
   }
+  syncAudit(): void {
+    const [meta, events] = this.events();
+    const expected = auditView(meta, events);
+    if (
+      !fs.existsSync(this.path("audit.md")) ||
+      utf8(fs.readFileSync(this.path("audit.md"))) !== expected
+    )
+      this.atomic("audit.md", expected);
+  }
+  validateAudit(): number {
+    const [meta, events] = this.events();
+    check(
+      fs.existsSync(this.path("audit.md")) &&
+        utf8(fs.readFileSync(this.path("audit.md"))) ===
+          auditView(meta, events),
+      "Audit view is missing or stale; run resume-check --recover",
+      true,
+    );
+    return events.length;
+  }
+  migrateAudit(): Fields {
+    if (!fs.existsSync(this.path(JOURNAL))) {
+      const original = fs.readFileSync(this.path("audit.md"));
+      const [meta] = markdown(utf8(original));
+      schemaCheck("audit-log", meta);
+      // Validate the entire legacy stream before creating a journal or replacing the view.
+      this.parseEvents(utf8(original));
+      this.atomic(JOURNAL, original);
+    }
+    this.syncAudit();
+    return { events: this.validateAudit(), journal: JOURNAL };
+  }
   ensureAudit(): void {
-    if (!fs.existsSync(this.path("audit.md")))
-      this.atomic(
-        "audit.md",
-        render(
-          {
-            schema_version: "flow/audit-log-v1",
-            feature_id: path.basename(this.root),
-            created_at: now(),
-          },
-          "# 監査ログ\n",
-        ),
-      );
+    if (fs.existsSync(this.path(JOURNAL))) return;
+    check(
+      !fs.existsSync(this.path("audit.md")),
+      "Legacy audit.md requires explicit audit-migrate",
+      true,
+    );
+    this.atomic(
+      JOURNAL,
+      render(
+        {
+          schema_version: "flow/audit-log-v1",
+          feature_id: path.basename(this.root),
+          created_at: now(),
+        },
+        "# 監査ログ\n",
+      ),
+    );
+    this.syncAudit();
   }
   replay(request: Fields): Fields | null {
     const [, events] = this.events(),
@@ -647,7 +695,10 @@ export class Store extends Files {
       );
     }
     check(
-      kind && kind !== "flow-state" && kind !== "audit-log",
+      kind &&
+        kind !== "flow-state" &&
+        kind !== "audit-log" &&
+        kind !== "audit-view",
       "publish only accepts phase documents",
     );
     let old: Fields | null = null,
@@ -826,7 +877,8 @@ export class Store extends Files {
     );
     check(
       !fs.existsSync(this.path("flow-state.yml")) &&
-        !fs.existsSync(this.path("audit.md")),
+        !fs.existsSync(this.path("audit.md")) &&
+        !fs.existsSync(this.path(JOURNAL)),
       "Feature already initialized",
       true,
     );
@@ -870,7 +922,7 @@ export class Store extends Files {
     );
     this.atomic("inputs/request.md", "# 開始要求\n\n" + request.text + "\n");
     this.atomic(
-      "audit.md",
+      JOURNAL,
       render(
         {
           schema_version: "flow/audit-log-v1",
@@ -993,6 +1045,8 @@ export class Store extends Files {
   }
   resumeCheck(recover = false): Fields {
     let [, events] = this.events();
+    if (recover) this.syncAudit();
+    else this.validateAudit();
     const standalone = !events.some((e) => e.event_type === "flow.started");
     if (!fs.existsSync(this.path("flow-state.yml")) && !standalone) {
       const started = events.filter((e) => e.event_type === "flow.started");

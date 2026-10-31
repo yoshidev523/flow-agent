@@ -29,7 +29,7 @@ Planのpath・revision・digest、target path、feature directory、監査用run
    内容不足や契約不一致なら実装せず、渡されたPlan参照と停止理由をblocked成果物へ残す。
    参照自体が欠落・不正で契約を作れない場合は推測せず、監査と最終報告へ停止理由を残す。
 3. 再開時はimplementのPlan参照と現在のPlanが一致することを確認する。
-4. タスクの依存順に実装し、監査へ操作開始・結果・裁量判断を逐一記録する。
+4. タスクの依存順に実装する。監査はタスク単位の検証結果、問題・課題と重要な決定へ絞る。
 5. checkpointsでtasks、verifications、blockerを更新し、publishする。
 6. Plan外の公開API、責務、入出力、error、範囲、検証条件の変更が必要ならblockedで停止する。
    矛盾・崩れた前提の証拠、影響、通常修正で解決できない理由、必要な変更をblockerと本文へ記録し、
@@ -57,6 +57,9 @@ Node.js 22以上が必要。依存はCLIへ同梱済みで、利用側のnpm ins
 
 各成果物はdraftを作り、`publish`で保存して`validate`で確認する。
 固定artifactのrevision、変更履歴、保存、digestはCLIに任せ、直接上書きしない。
-監査は`audit-append`で操作の開始・結果・自動判断を逐一記録する。
-`audit.md`を直接編集しない。単独利用でもFlow stateを必要とせず同じCLIを使える。
+監査は`audit-append`で、問題・課題、重要な決定、feedbackへの対応、タスク単位の検証結果だけを記録する。
+通常の読取・検索・command開始・TDDの各Red/Green・説明だけの応答は記録しない。
+保存・呼出し・review結果の自動記録を重複追加せず、詳細は成果物へ残してpathを参照する。
+`action.completed`は重要な結果をまとめる場合だけ使い、通常操作の`action.started`は不要。
+`audit.md`と`.flow/journal.md`を直接編集しない。単独利用でもFlow stateを必要とせず同じCLIを使える。
 契約不一致は補完せず報告し、監査の保存障害時は次の操作へ進まない。

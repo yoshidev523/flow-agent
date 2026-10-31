@@ -403,6 +403,10 @@ export const AuditLogSchema = z.strictObject({
   created_at: timestamp,
 });
 
+export const AuditViewSchema = AuditLogSchema.extend({
+  schema_version: z.literal("flow/audit-log-v2"),
+});
+
 export const contracts = {
   reference: ReferenceSchema,
   option: OptionSchema,
@@ -427,6 +431,7 @@ export const contracts = {
   "flow-state": FlowStateSchema,
   "audit-event": AuditEventSchema,
   "audit-log": AuditLogSchema,
+  "audit-view": AuditViewSchema,
   "verification-plan": VerificationPlanSchema,
   "handoff-check": HandoffCheckSchema,
   replan: ReplanSchema,
