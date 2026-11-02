@@ -5,7 +5,7 @@ disable-model-invocation: true
 user-invocable: true
 ---
 
-# Flow 4.4.0
+# Flow 4.5.0
 
 ## 起動と責務
 
@@ -108,12 +108,22 @@ Planへの再計画、将来の文書更新候補を区別する。過去の通�
 進行中の操作を安全な区切りで保存してから切り替え、上流変更は人間承認付き再計画へ接続する。
 戻り先・修正範囲の明示承認が既にあれば再利用し、単なる感想を承認へ変換しない。
 
-feedbackによる修正・判断が固まったとき、再利用できる知識があれば
-[flow-project-knowledge](../flow-project-knowledge/SKILL.md)へ更新提案を依頼する。
-工程完了・全体完了時も成果物の未提示候補を確認し、候補がある場合だけまとめて表示する。
+決定事項の確定、人間feedbackの受領、AIレビュー指摘の登録ごとに、安全な区切りで
+`flow-project-knowledge-agent`へ更新判断・乖離チェックを明示委譲する。
+Flow自身が更新候補なしと判断して委譲を省略しない。同じ契機の複数指摘はまとめて渡せる。
+対象project・範囲、契機と根拠、現在の成果物参照、関連する実装差分・文書参照を渡す。
+専用agentは[flow-project-knowledge](../flow-project-knowledge/SKILL.md)で判断し、Flow stateや
+review判定を変更しない。Human modeでもこの委譲は行い、reviewerの起動とは分ける。
+修正・判断が未確定なら暫定結果を表示し、確定後は変更範囲を再委譲して最終案を提示する。
+工程完了・全体完了時も未確認の候補・実装変更があれば追加確認を委譲し、未報告の結果を補う。
+Flowは返却されたルール・ナレッジへの反映要否と理由、実装・文書の乖離と同期要否、
+未確認事項をチャットへ表示する。更新不要・提案なしでも理由を表示し、報告済みの内容は繰り返さない。
+子agent起動不能・確認不能は理由と未確認範囲を表示し、更新不要と扱わない。
+任意の文書更新候補だけで進行を止めず、必須要件への影響は通常修正・再評価・人間承認付き再計画へ接続する。
 正本への具体的な差分と採用範囲をチャットへ示し、提案・採否の要点を既存actionイベントで記録する。
 文書更新の採否待ちだけで通常進行を止めない。今回の修正への同意を恒久ルールの採用と扱わない。
-恒久化が承認済みなら知識スキルがprojectの文書運用に従って更新し、現在タスクへの影響を返す。
+恒久化・文書同期の内容と範囲が承認済みなら、専用agentへ採用済み更新を委譲する。
+専用agentは知識スキルでprojectの文書運用に従って更新し、現在タスクへの影響を返す。
 必要な再計画・再reviewを行い、旧reviewや完了証拠を新しい正本への適合証拠にしない。
 
 ## Human modeと追加scope
@@ -205,6 +215,7 @@ state更新、成果物保存、監査への追記は共通CLIだけを使う。
 ```text
 Flow
 ├── phase writer
+├── flow-project-knowledge-agent -> flow-project-knowledge
 ├── decision review hub -> decision-quality / project-rules reviewers
 └── final review hub -> perspective reviewers
 ```

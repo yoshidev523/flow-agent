@@ -27,7 +27,7 @@ do
   test -f "$flow_consumer_dir/.claude/skills/$skill_name/SKILL.md"
 done
 for agent_name in flow-designer flow-planner flow-implementer flow-design-reviewer \
-  flow-project-rules-reviewer \
+  flow-project-knowledge-agent flow-project-rules-reviewer \
   flow-design-requirements-reviewer flow-design-quality-risk-reviewer \
   flow-plan-decision-reviewer flow-plan-decision-quality-reviewer flow-plan-reviewer flow-plan-task-readiness-reviewer
 do
