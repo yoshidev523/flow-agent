@@ -1,3 +1,4 @@
+import { codeSnapshot } from "./code-review.js";
 import fs from "node:fs";
 import { JOURNAL } from "./persistence/audit.js";
 import { Store } from "./persistence/store.js";
@@ -9,11 +10,11 @@ import {
   recoverCheckpoint,
   restoreCheckpoint,
 } from "./checkpoints.js";
-const help = `flowctl 4.5.0 — Flow persistence and contract guards\nUsage: node flowctl.js --root FEATURE COMMAND [OPTIONS]\nCommands: init, publish, transition, audit-append, review-check --request FILE|-\n          validate PATH [--references]\n          resume-check [--recover], audit-migrate\n          checkpoint-create, checkpoint-recover, checkpoint-restore --request FILE|-\nOptions: --version, --help\n`;
+const help = `flowctl 4.6.0 — Flow persistence and contract guards\nUsage: node flowctl.js --root FEATURE COMMAND [OPTIONS]\nCommands: init, publish, transition, audit-append, code-snapshot, review-check --request FILE|-\n          validate PATH [--references]\n          resume-check [--recover], audit-migrate\n          checkpoint-create, checkpoint-recover, checkpoint-restore --request FILE|-\nOptions: --version, --help\n`;
 async function main(argv = process.argv.slice(2)): Promise<number> {
   try {
     if (argv.includes("--version")) {
-      console.log("flowctl 4.5.0");
+      console.log("flowctl 4.6.0");
       return 0;
     }
     if (argv.includes("--help") || argv.includes("-h")) {
@@ -66,6 +67,7 @@ async function main(argv = process.argv.slice(2)): Promise<number> {
           "transition",
           "audit-append",
           "review-check",
+          "code-snapshot",
           "checkpoint-create",
           "checkpoint-recover",
           "checkpoint-restore",
@@ -85,6 +87,7 @@ async function main(argv = process.argv.slice(2)): Promise<number> {
         return recoverCheckpoint(store, request);
       if (command === "checkpoint-restore")
         return restoreCheckpoint(store, request);
+      if (command === "code-snapshot") return codeSnapshot(store.root, request);
       if (command === "init") return store.initialize(request);
       if (command === "publish") return store.publish(request);
       if (command === "transition") return store.transition(request);

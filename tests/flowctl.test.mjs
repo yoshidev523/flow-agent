@@ -40,7 +40,11 @@ const task = () => ({
 class Fixture {
   constructor(t) {
     this.root = fs.mkdtempSync(path.join(os.tmpdir(), "flow-v4-node-test-"));
-    t.after(() => fs.rmSync(this.root, { recursive: true, force: true }));
+    t.after(() => {
+      fs.rmSync(this.root, { recursive: true, force: true });
+      if (this.repository)
+        fs.rmSync(this.repository, { recursive: true, force: true });
+    });
     this.store = new f.Store(this.root);
     this.store.initialize({
       request_id: "init",
@@ -148,6 +152,9 @@ class Fixture {
       review_cycle_id: ar.review_cycle_id,
       target: ar.target,
       design: ar.design,
+      ...(ar.stage === "implement"
+        ? { code: this.store.reference(ar.target)[0].code }
+        : {}),
       source_id: sourceId,
       source_kind: ar.mode,
       ...(sourceId === "project-rules"
@@ -210,6 +217,7 @@ class Fixture {
         design: "flow-design-review",
         plan_decision: "flow-plan-decision-review",
         plan_final: "flow-plan-review",
+        implement: "flow-implement-review",
       }[stage],
       operation: "review",
       inputs: [ar.target],
@@ -301,6 +309,39 @@ class Fixture {
     );
   }
   implement(plan, status = "completed", invocation = "inv-x") {
+    if (!this.code) {
+      this.repository = fs.mkdtempSync(
+        path.join(os.tmpdir(), "flow-code-review-"),
+      );
+      this.git = (...args) => {
+        const r = spawnSync("git", ["-C", this.repository, ...args], {
+          encoding: "utf8",
+        });
+        assert.equal(r.status, 0, r.stderr);
+        return r.stdout.trim();
+      };
+      this.git("init", "-q");
+      this.git("config", "user.email", "test@example.test");
+      this.git("config", "user.name", "Test");
+      fs.writeFileSync(
+        path.join(this.repository, "app.js"),
+        "export const value = 0;\n",
+      );
+      this.git("add", ".");
+      this.git("commit", "-qm", "baseline");
+      this.baseCommit = this.git("rev-parse", "HEAD");
+      fs.writeFileSync(
+        path.join(this.repository, "app.js"),
+        "export const value = 1;\n",
+      );
+      this.git("add", ".");
+      this.git("commit", "-qm", "implement");
+      this.code = f.codeSnapshot(this.root, {
+        repository: this.repository,
+        base_commit: this.baseCommit,
+        head_commit: this.git("rev-parse", "HEAD"),
+      });
+    }
     return {
       schema_version: "flow/implement-artifact-v2",
       artifact: "implement",
@@ -322,7 +363,8 @@ class Fixture {
         },
       ],
       blocker: null,
-      commit: "a".repeat(40),
+      commit: this.code.head_commit,
+      code: this.code,
     };
   }
 }
@@ -350,6 +392,8 @@ fixture("full AI workflow completes and remains terminal", (x) => {
     x.implement(plan, "completed", id),
   );
   x.tr("finish_invocation", { invocation_id: id, outputs: [impl] });
+  assert.throws(() => x.tr("advance"), /requires passed Implement review/);
+  x.review("implement");
   assert.equal(x.tr("advance").state, "completed");
   x.store.resumeCheck();
   assert.throws(() => x.tr("advance"), f.FlowError);
@@ -1239,6 +1283,7 @@ for (const action of [
             invocation_id: invocation,
             outputs: [ref],
           });
+          x.review("implement");
           args = {};
           expectedType = "flow.completed";
         } else {
@@ -1574,6 +1619,7 @@ fixture(
       x.implement(plan, "completed", invocation),
     );
     x.tr("finish_invocation", { invocation_id: invocation, outputs: [old] });
+    x.review("implement");
     x.tr("advance");
     const state = fs.readFileSync(x.store.path("flow-state.yml"), "utf8");
     assert.throws(() => x.pub(old.path, x.implement(plan)), /terminal/);
@@ -1582,6 +1628,9 @@ fixture(
     meta.blocker = "Planの変更により再検証が必要";
     assert.throws(() => x.pub(old.path, meta), /invalidate/);
     meta.commit = null;
+    delete meta.code;
+    delete meta.feedback;
+    delete meta.feedback_results;
     meta.tasks.forEach((t) => (t.status = "pending"));
     meta.verifications.forEach((v) => (v.status = "not_run"));
     const [updated] = x.pub(old.path, meta);
@@ -1847,6 +1896,7 @@ fixture(
       invocation_id: invocation,
       outputs: [implement],
     });
+    x.review("implement");
     x.tr("advance");
     const before = fs.readFileSync(x.store.path("flow-state.yml"), "utf8");
     x.event(
@@ -1898,6 +1948,7 @@ fixture(
       invocation_id: invocation,
       outputs: [implement],
     });
+    x.review("implement");
     x.tr("advance");
     checkpointRepository(x, t);
     const counters = structuredClone(x.store.state().counters),
@@ -1910,6 +1961,9 @@ fixture(
     meta.producer = "flow-artifact-sync";
     meta.blocker = "再検証待ち";
     meta.commit = null;
+    delete meta.code;
+    delete meta.feedback;
+    delete meta.feedback_results;
     meta.tasks.forEach((t) => (t.status = "pending"));
     meta.verifications.forEach((v) => (v.status = "not_run"));
     const [implementNew] = x.pub("artifacts/implement.md", meta);
@@ -1924,6 +1978,7 @@ fixture(
       design: null,
       plan_decision: null,
       plan_final: null,
+      implement: null,
     });
     x.store.resumeCheck();
     x.review("design");
@@ -1935,7 +1990,7 @@ fixture(
       x.store.state().cycle_counters.plan_final,
       cycles.plan_final + 1,
     );
-    assert.throws(() => x.tr("advance"), /not completed/);
+    assert.throws(() => x.tr("advance"), /requires passed Implement review/);
   },
 );
 
@@ -2661,5 +2716,198 @@ fixture(
       assert.match(savedBody, /### revision 1/);
       if (artifact === "plan") planRef = result.artifact;
     }
+  },
+);
+
+function completedImplementation(x) {
+  x.writer("design");
+  x.review("design");
+  x.tr("advance");
+  const plan = x.writer("plan");
+  x.review("plan_final");
+  x.tr("advance");
+  const invocation_id = randomUUID();
+  x.tr("start_invocation", {
+    invocation_id,
+    component: "flow-implement",
+    operation: "execute",
+    inputs: [plan],
+  });
+  const [ref] = x.pub(
+    "artifacts/implement.md",
+    x.implement(plan, "completed", invocation_id),
+  );
+  x.tr("finish_invocation", { invocation_id, outputs: [ref] });
+  return { plan, ref };
+}
+
+fixture(
+  "Implement review fixes code then requires a new cycle before completion",
+  (x) => {
+    const { plan, ref } = completedImplementation(x);
+    x.review("implement", [x.gate()]);
+    assert.throws(() => x.tr("advance"), /did not pass/);
+    const feedback = x.feedback("implement", "revise", [
+      "correctness:G-001",
+      "maintainability:G-001",
+      "project-rules:G-001",
+    ]);
+    x.tr("revise", { feedback_path: feedback.path });
+    assert.equal(x.store.state().pending_operation, "execute");
+    assert.equal(x.store.state().counters.implement.automatic_revision, 1);
+    const invocation_id = randomUUID();
+    x.tr("start_invocation", {
+      invocation_id,
+      component: "flow-implement",
+      operation: "execute",
+      inputs: [plan, feedback],
+    });
+    fs.writeFileSync(
+      path.join(x.repository, "app.js"),
+      "export const value = 2;\n",
+    );
+    x.git("add", ".");
+    x.git("commit", "-qm", "correct implementation");
+    x.code = f.codeSnapshot(x.root, {
+      repository: x.repository,
+      base_commit: x.baseCommit,
+      head_commit: x.git("rev-parse", "HEAD"),
+    });
+    const meta = {
+      ...x.implement(plan, "completed", invocation_id),
+      feedback,
+      feedback_results: [
+        { id: "F-001", result: "applied", location: "app.js" },
+        { id: "F-002", result: "applied", location: "app.js" },
+        { id: "F-003", result: "applied", location: "app.js" },
+      ],
+    };
+    const shifted = {
+      ...meta,
+      code: { ...meta.code, base_commit: meta.code.head_commit },
+    };
+    assert.throws(() => x.pub(ref.path, shifted), /baseline cannot change/);
+    const dropped = { ...meta };
+    delete dropped.code;
+    assert.throws(() => x.pub(ref.path, dropped), /baseline cannot change/);
+    const [updated] = x.pub(ref.path, meta);
+    x.tr("finish_invocation", { invocation_id, outputs: [updated] });
+    assert.throws(() => x.pub(ref.path, meta), /terminal/);
+    x.review("implement", [x.gate()]);
+    assert.equal(x.store.state().cycle_counters.implement, 2);
+    assert.throws(
+      () => x.tr("revise", { feedback_path: feedback.path }),
+      /Automatic revision exhausted/,
+    );
+    x.tr("set_mode", {
+      stage: "implement",
+      mode: "human",
+      reason: "revision limit",
+      origin_event_id: null,
+    });
+    x.review("implement");
+    assert.equal(x.tr("advance").state, "completed");
+  },
+);
+
+fixture(
+  "Implement review refuses dirty, untracked and committed code changes after evaluation",
+  (x) => {
+    completedImplementation(x);
+    x.review("implement");
+    const file = path.join(x.repository, "app.js");
+    fs.writeFileSync(file, "changed\n");
+    assert.throws(() => x.tr("advance"), /Uncommitted code/);
+    x.git("add", ".");
+    fs.writeFileSync(file, "export const value = 1;\n");
+    assert.throws(() => x.tr("advance"), /Uncommitted code/);
+    x.git("reset", "--quiet", "HEAD");
+    const extra = path.join(x.repository, "new.js");
+    fs.writeFileSync(extra, "new\n");
+    assert.throws(() => x.tr("advance"), /Uncommitted code/);
+    x.git("add", ".");
+    x.git("commit", "-qm", "new code after review");
+    assert.throws(() => x.tr("advance"), /Code changed/);
+  },
+);
+
+fixture(
+  "Implement review missing sources retries once then switches to human",
+  (x) => {
+    completedImplementation(x);
+    const first = x.review("implement", [], null, true);
+    assert.equal(first.status, "incomplete");
+    assert.equal(first.failure.kind, "execution");
+    x.tr("retry");
+    x.review("implement", [], null, true);
+    assert.throws(() => x.tr("retry"), /exhausted/);
+    x.tr("set_mode", {
+      stage: "implement",
+      mode: "human",
+      reason: "reviewers unavailable",
+      origin_event_id: null,
+    });
+    const result = x.review("implement");
+    assert.equal(result.sources.length, 1);
+    assert.equal(x.store.state().cycle_counters.implement, 3);
+    assert.equal(x.tr("advance").state, "completed");
+  },
+);
+
+fixture("Implement human decision cannot bypass approved replanning", (x) => {
+  const { ref } = completedImplementation(x);
+  x.review("implement", [x.gate(true)]);
+  const prompt = x.event("interaction.presented", {
+    interaction_id: "upstream-change",
+    kind: "review_decision",
+    target: ref,
+    question_ids: ["correctness:D-001"],
+    text: "change Plan",
+  });
+  assert.throws(
+    () =>
+      x.tr("wait", {
+        kind: "review_decision",
+        prompt_event_id: prompt.event_id,
+      }),
+    /approved replanning/,
+  );
+  assert.throws(() => x.tr("advance"), /did not pass/);
+});
+
+fixture("Implement source binds code snapshot", (x) => {
+  completedImplementation(x);
+  x.tr("start_review", { stage: "implement" });
+  const source = x.source("correctness");
+  source.code.tree_sha256 = "0".repeat(64);
+  assert.throws(
+    () => x.pub("reviews/implement/cycle-0001/sources/correctness.md", source),
+    /snapshot mismatch/,
+  );
+});
+
+fixture(
+  "code snapshot allows feature-only commits but detects source and tracked deletion",
+  (x) => {
+    // Place the feature within the repository to exercise metadata exclusion.
+    x.implement(x.artifact("plan"));
+    const feature = path.join(x.repository, "flow-spec", "test");
+    fs.mkdirSync(feature, { recursive: true });
+    const request = {
+      repository: x.repository,
+      base_commit: x.baseCommit,
+      head_commit: x.code.head_commit,
+    };
+    const before = f.codeSnapshot(feature, request);
+    fs.writeFileSync(path.join(feature, "implement.md"), "metadata\n");
+    x.git("add", ".");
+    x.git("commit", "-qm", "save metadata");
+    assert.deepEqual(f.codeSnapshot(feature, request), before);
+    fs.unlinkSync(path.join(x.repository, "app.js"));
+    assert.throws(() => f.codeSnapshot(feature, request), /Uncommitted/);
+    assert.throws(
+      () => f.codeSnapshot(x.repository, request),
+      /must not be repository root/,
+    );
   },
 );

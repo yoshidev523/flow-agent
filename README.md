@@ -1,4 +1,4 @@
-# flow-agent 4.5.0
+# flow-agent 4.6.0
 
 Codex / Claude Codeで仕様駆動開発を進めるためのエージェントパッケージです。
 Design、Review、Plan、Implementを順に実行し、判断と成果物を`flow-spec/`配下に保存します。
@@ -46,7 +46,7 @@ CLI・契約・templateを同梱し、更新した実装記録は再検証待ち
 ## 共通CLI
 
 Node.js 22以上だけで実行できます。Zod・YAML処理を含む単一のJavaScriptを同梱しているため、
-利用側のnpm install・ビルド・Pythonは不要です。チェックポイント操作にはGitと既存のGit repositoryが必要です。
+利用側のnpm install・ビルド・Pythonは不要です。チェックポイントとImplementレビューのコード固定にはGitと既存のGit repositoryが必要です。
 配置後の`flow-skill-dir`は通常`.agents/skills/flow`または`.claude/skills/flow`です。
 
 ```sh
@@ -72,3 +72,9 @@ TypeScriptの正本は`src/`、Zod契約は`src/contracts/`、build処理は`scr
 開発側でのみnpm依存を導入し、配布用CLIを再生成します。
 配布用CLIはES Modules・CommonJSのどちらのprojectでも実行できます。
 macOS上のローカルfile systemで検証しています。排他制御の詳細はCLI文書を参照してください。
+
+### Implementレビュー
+
+実装・必須検証・commit後に`flow-implement-reviewer`がcorrectness、maintainability、project-rulesの
+独立評価を集約する。レビュー通過後にFlow全体を完了する。コードsnapshotで評価後の変更を検出する。
+具体的な開発手法・手順はproject規約に従い、保守性は最終コードを評価する。任意改善は追加scope候補として分ける。

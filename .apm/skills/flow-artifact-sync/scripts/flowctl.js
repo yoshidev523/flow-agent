@@ -154,17 +154,17 @@ var require_visit = __commonJS({
     visit2.BREAK = BREAK;
     visit2.SKIP = SKIP;
     visit2.REMOVE = REMOVE;
-    function visit_(key, node2, visitor, path4) {
-      const ctrl = callVisitor(key, node2, visitor, path4);
+    function visit_(key, node2, visitor, path5) {
+      const ctrl = callVisitor(key, node2, visitor, path5);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path4, ctrl);
-        return visit_(key, ctrl, visitor, path4);
+        replaceNode(key, path5, ctrl);
+        return visit_(key, ctrl, visitor, path5);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node2)) {
-          path4 = Object.freeze(path4.concat(node2));
+          path5 = Object.freeze(path5.concat(node2));
           for (let i = 0; i < node2.items.length; ++i) {
-            const ci = visit_(i, node2.items[i], visitor, path4);
+            const ci = visit_(i, node2.items[i], visitor, path5);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -175,13 +175,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node2)) {
-          path4 = Object.freeze(path4.concat(node2));
-          const ck = visit_("key", node2.key, visitor, path4);
+          path5 = Object.freeze(path5.concat(node2));
+          const ck = visit_("key", node2.key, visitor, path5);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node2.key = null;
-          const cv = visit_("value", node2.value, visitor, path4);
+          const cv = visit_("value", node2.value, visitor, path5);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -202,17 +202,17 @@ var require_visit = __commonJS({
     visitAsync.BREAK = BREAK;
     visitAsync.SKIP = SKIP;
     visitAsync.REMOVE = REMOVE;
-    async function visitAsync_(key, node2, visitor, path4) {
-      const ctrl = await callVisitor(key, node2, visitor, path4);
+    async function visitAsync_(key, node2, visitor, path5) {
+      const ctrl = await callVisitor(key, node2, visitor, path5);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path4, ctrl);
-        return visitAsync_(key, ctrl, visitor, path4);
+        replaceNode(key, path5, ctrl);
+        return visitAsync_(key, ctrl, visitor, path5);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node2)) {
-          path4 = Object.freeze(path4.concat(node2));
+          path5 = Object.freeze(path5.concat(node2));
           for (let i = 0; i < node2.items.length; ++i) {
-            const ci = await visitAsync_(i, node2.items[i], visitor, path4);
+            const ci = await visitAsync_(i, node2.items[i], visitor, path5);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -223,13 +223,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node2)) {
-          path4 = Object.freeze(path4.concat(node2));
-          const ck = await visitAsync_("key", node2.key, visitor, path4);
+          path5 = Object.freeze(path5.concat(node2));
+          const ck = await visitAsync_("key", node2.key, visitor, path5);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node2.key = null;
-          const cv = await visitAsync_("value", node2.value, visitor, path4);
+          const cv = await visitAsync_("value", node2.value, visitor, path5);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -256,23 +256,23 @@ var require_visit = __commonJS({
       }
       return visitor;
     }
-    function callVisitor(key, node2, visitor, path4) {
+    function callVisitor(key, node2, visitor, path5) {
       if (typeof visitor === "function")
-        return visitor(key, node2, path4);
+        return visitor(key, node2, path5);
       if (identity.isMap(node2))
-        return visitor.Map?.(key, node2, path4);
+        return visitor.Map?.(key, node2, path5);
       if (identity.isSeq(node2))
-        return visitor.Seq?.(key, node2, path4);
+        return visitor.Seq?.(key, node2, path5);
       if (identity.isPair(node2))
-        return visitor.Pair?.(key, node2, path4);
+        return visitor.Pair?.(key, node2, path5);
       if (identity.isScalar(node2))
-        return visitor.Scalar?.(key, node2, path4);
+        return visitor.Scalar?.(key, node2, path5);
       if (identity.isAlias(node2))
-        return visitor.Alias?.(key, node2, path4);
+        return visitor.Alias?.(key, node2, path5);
       return void 0;
     }
-    function replaceNode(key, path4, node2) {
-      const parent = path4[path4.length - 1];
+    function replaceNode(key, path5, node2) {
+      const parent = path5[path5.length - 1];
       if (identity.isCollection(parent)) {
         parent.items[key] = node2;
       } else if (identity.isPair(parent)) {
@@ -884,10 +884,10 @@ var require_Collection = __commonJS({
     var createNode = require_createNode();
     var identity = require_identity();
     var Node = require_Node();
-    function collectionFromPath(schema, path4, value) {
+    function collectionFromPath(schema, path5, value) {
       let v = value;
-      for (let i = path4.length - 1; i >= 0; --i) {
-        const k = path4[i];
+      for (let i = path5.length - 1; i >= 0; --i) {
+        const k = path5[i];
         if (typeof k === "number" && Number.isInteger(k) && k >= 0) {
           const a = [];
           a[k] = v;
@@ -906,7 +906,7 @@ var require_Collection = __commonJS({
         sourceObjects: /* @__PURE__ */ new Map()
       });
     }
-    var isEmptyPath = (path4) => path4 == null || typeof path4 === "object" && !!path4[Symbol.iterator]().next().done;
+    var isEmptyPath = (path5) => path5 == null || typeof path5 === "object" && !!path5[Symbol.iterator]().next().done;
     var Collection = class extends Node.NodeBase {
       constructor(type, schema) {
         super(type);
@@ -936,11 +936,11 @@ var require_Collection = __commonJS({
        * be a Pair instance or a `{ key, value }` object, which may not have a key
        * that already exists in the map.
        */
-      addIn(path4, value) {
-        if (isEmptyPath(path4))
+      addIn(path5, value) {
+        if (isEmptyPath(path5))
           this.add(value);
         else {
-          const [key, ...rest] = path4;
+          const [key, ...rest] = path5;
           const node2 = this.get(key, true);
           if (identity.isCollection(node2))
             node2.addIn(rest, value);
@@ -954,8 +954,8 @@ var require_Collection = __commonJS({
        * Removes a value from the collection.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path4) {
-        const [key, ...rest] = path4;
+      deleteIn(path5) {
+        const [key, ...rest] = path5;
         if (rest.length === 0)
           return this.delete(key);
         const node2 = this.get(key, true);
@@ -969,8 +969,8 @@ var require_Collection = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path4, keepScalar) {
-        const [key, ...rest] = path4;
+      getIn(path5, keepScalar) {
+        const [key, ...rest] = path5;
         const node2 = this.get(key, true);
         if (rest.length === 0)
           return !keepScalar && identity.isScalar(node2) ? node2.value : node2;
@@ -988,8 +988,8 @@ var require_Collection = __commonJS({
       /**
        * Checks if the collection includes a value with the key `key`.
        */
-      hasIn(path4) {
-        const [key, ...rest] = path4;
+      hasIn(path5) {
+        const [key, ...rest] = path5;
         if (rest.length === 0)
           return this.has(key);
         const node2 = this.get(key, true);
@@ -999,8 +999,8 @@ var require_Collection = __commonJS({
        * Sets a value in this collection. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path4, value) {
-        const [key, ...rest] = path4;
+      setIn(path5, value) {
+        const [key, ...rest] = path5;
         if (rest.length === 0) {
           this.set(key, value);
         } else {
@@ -3515,9 +3515,9 @@ var require_Document = __commonJS({
           this.contents.add(value);
       }
       /** Adds a value to the document. */
-      addIn(path4, value) {
+      addIn(path5, value) {
         if (assertCollection(this.contents))
-          this.contents.addIn(path4, value);
+          this.contents.addIn(path5, value);
       }
       /**
        * Create a new `Alias` node, ensuring that the target `node` has the required anchor.
@@ -3592,14 +3592,14 @@ var require_Document = __commonJS({
        * Removes a value from the document.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path4) {
-        if (Collection.isEmptyPath(path4)) {
+      deleteIn(path5) {
+        if (Collection.isEmptyPath(path5)) {
           if (this.contents == null)
             return false;
           this.contents = null;
           return true;
         }
-        return assertCollection(this.contents) ? this.contents.deleteIn(path4) : false;
+        return assertCollection(this.contents) ? this.contents.deleteIn(path5) : false;
       }
       /**
        * Returns item at `key`, or `undefined` if not found. By default unwraps
@@ -3614,10 +3614,10 @@ var require_Document = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path4, keepScalar) {
-        if (Collection.isEmptyPath(path4))
+      getIn(path5, keepScalar) {
+        if (Collection.isEmptyPath(path5))
           return !keepScalar && identity.isScalar(this.contents) ? this.contents.value : this.contents;
-        return identity.isCollection(this.contents) ? this.contents.getIn(path4, keepScalar) : void 0;
+        return identity.isCollection(this.contents) ? this.contents.getIn(path5, keepScalar) : void 0;
       }
       /**
        * Checks if the document includes a value with the key `key`.
@@ -3628,10 +3628,10 @@ var require_Document = __commonJS({
       /**
        * Checks if the document includes a value at `path`.
        */
-      hasIn(path4) {
-        if (Collection.isEmptyPath(path4))
+      hasIn(path5) {
+        if (Collection.isEmptyPath(path5))
           return this.contents !== void 0;
-        return identity.isCollection(this.contents) ? this.contents.hasIn(path4) : false;
+        return identity.isCollection(this.contents) ? this.contents.hasIn(path5) : false;
       }
       /**
        * Sets a value in this document. For `!!set`, `value` needs to be a
@@ -3648,13 +3648,13 @@ var require_Document = __commonJS({
        * Sets a value in this document. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path4, value) {
-        if (Collection.isEmptyPath(path4)) {
+      setIn(path5, value) {
+        if (Collection.isEmptyPath(path5)) {
           this.contents = value;
         } else if (this.contents == null) {
-          this.contents = Collection.collectionFromPath(this.schema, Array.from(path4), value);
+          this.contents = Collection.collectionFromPath(this.schema, Array.from(path5), value);
         } else if (assertCollection(this.contents)) {
-          this.contents.setIn(path4, value);
+          this.contents.setIn(path5, value);
         }
       }
       /**
@@ -5382,15 +5382,15 @@ var require_cst_scalar = __commonJS({
       }
       return null;
     }
-    function createScalarToken(value, context) {
-      const { implicitKey = false, indent, inFlow = false, offset = -1, type = "PLAIN" } = context;
+    function createScalarToken(value, context2) {
+      const { implicitKey = false, indent, inFlow = false, offset = -1, type = "PLAIN" } = context2;
       const source = stringifyString.stringifyString({ type, value }, {
         implicitKey,
         indent: indent > 0 ? " ".repeat(indent) : "",
         inFlow,
         options: { blockQuote: true, lineWidth: -1 }
       });
-      const end = context.end ?? [
+      const end = context2.end ?? [
         { type: "newline", offset: -1, indent, source: "\n" }
       ];
       switch (source[0]) {
@@ -5414,8 +5414,8 @@ var require_cst_scalar = __commonJS({
           return { type: "scalar", offset, indent, source, end };
       }
     }
-    function setScalarValue(token, value, context = {}) {
-      let { afterKey = false, implicitKey = false, inFlow = false, type } = context;
+    function setScalarValue(token, value, context2 = {}) {
+      let { afterKey = false, implicitKey = false, inFlow = false, type } = context2;
       let indent = "indent" in token ? token.indent : null;
       if (afterKey && typeof indent === "number")
         indent += 2;
@@ -5615,9 +5615,9 @@ var require_cst_visit = __commonJS({
     visit2.BREAK = BREAK;
     visit2.SKIP = SKIP;
     visit2.REMOVE = REMOVE;
-    visit2.itemAtPath = (cst, path4) => {
+    visit2.itemAtPath = (cst, path5) => {
       let item = cst;
-      for (const [field, index] of path4) {
+      for (const [field, index] of path5) {
         const tok = item?.[field];
         if (tok && "items" in tok) {
           item = tok.items[index];
@@ -5626,23 +5626,23 @@ var require_cst_visit = __commonJS({
       }
       return item;
     };
-    visit2.parentCollection = (cst, path4) => {
-      const parent = visit2.itemAtPath(cst, path4.slice(0, -1));
-      const field = path4[path4.length - 1][0];
+    visit2.parentCollection = (cst, path5) => {
+      const parent = visit2.itemAtPath(cst, path5.slice(0, -1));
+      const field = path5[path5.length - 1][0];
       const coll = parent?.[field];
       if (coll && "items" in coll)
         return coll;
       throw new Error("Parent collection not found");
     };
-    function _visit(path4, item, visitor) {
-      let ctrl = visitor(item, path4);
+    function _visit(path5, item, visitor) {
+      let ctrl = visitor(item, path5);
       if (typeof ctrl === "symbol")
         return ctrl;
       for (const field of ["key", "value"]) {
         const token = item[field];
         if (token && "items" in token) {
           for (let i = 0; i < token.items.length; ++i) {
-            const ci = _visit(Object.freeze(path4.concat([[field, i]])), token.items[i], visitor);
+            const ci = _visit(Object.freeze(path5.concat([[field, i]])), token.items[i], visitor);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -5653,10 +5653,10 @@ var require_cst_visit = __commonJS({
             }
           }
           if (typeof ctrl === "function" && field === "key")
-            ctrl = ctrl(item, path4);
+            ctrl = ctrl(item, path5);
         }
       }
-      return typeof ctrl === "function" ? ctrl(item, path4) : ctrl;
+      return typeof ctrl === "function" ? ctrl(item, path5) : ctrl;
     }
     exports2.visit = visit2;
   }
@@ -6958,14 +6958,14 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs6 = this.flowScalar(this.type);
+              const fs7 = this.flowScalar(this.type);
               if (atNextItem || it.value) {
-                map2.items.push({ start, key: fs6, sep: [] });
+                map2.items.push({ start, key: fs7, sep: [] });
                 this.onKeyLine = true;
               } else if (it.sep) {
-                this.stack.push(fs6);
+                this.stack.push(fs7);
               } else {
-                Object.assign(it, { key: fs6, sep: [] });
+                Object.assign(it, { key: fs7, sep: [] });
                 this.onKeyLine = true;
               }
               return;
@@ -7093,13 +7093,13 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs6 = this.flowScalar(this.type);
+              const fs7 = this.flowScalar(this.type);
               if (!it || it.value)
-                fc.items.push({ start: [], key: fs6, sep: [] });
+                fc.items.push({ start: [], key: fs7, sep: [] });
               else if (it.sep)
-                this.stack.push(fs6);
+                this.stack.push(fs7);
               else
-                Object.assign(it, { key: fs6, sep: [] });
+                Object.assign(it, { key: fs7, sep: [] });
               return;
             }
             case "flow-map-end":
@@ -7407,408 +7407,10 @@ var require_dist = __commonJS({
   }
 });
 
-// src/cli.ts
-var import_node_fs5 = __toESM(require("node:fs"), 1);
-
-// src/format.ts
-var import_node_crypto = require("node:crypto");
-var import_yaml = __toESM(require_dist(), 1);
-
-// src/errors.ts
-var FlowError = class extends Error {
-  constructor(message, code = "contract", exitCode = 3) {
-    super(message);
-    this.code = code;
-    this.exitCode = exitCode;
-  }
-  code;
-  exitCode;
-};
-function requireCondition(ok, message, condition = false) {
-  if (!ok)
-    throw new FlowError(
-      message,
-      condition ? "condition" : "contract",
-      condition ? 2 : 3
-    );
-}
-
-// src/format.ts
-function utf8(data) {
-  return new TextDecoder("utf-8", { fatal: true }).decode(data);
-}
-function load(text2) {
-  try {
-    const doc = (0, import_yaml.parseDocument)(text2, {
-      uniqueKeys: true,
-      stringKeys: false,
-      version: "1.1",
-      customTags: (tags) => tags.map((tag) => {
-        if (typeof tag === "string") return tag;
-        if (tag.tag === "tag:yaml.org,2002:timestamp")
-          return { ...tag, resolve: (value2) => value2 };
-        if (tag.format === "EXP" && tag.test)
-          return {
-            ...tag,
-            test: /^[-+]?(?:[0-9][0-9_]*(?:\.[0-9_]*)?|\.[0-9_]+)[eE][-+]?[0-9]+$/
-          };
-        return tag;
-      })
-    });
-    if (doc.errors.length)
-      throw new Error(doc.errors.map((e) => e.message).join("; "));
-    (0, import_yaml.visit)(doc, {
-      Map(_key, node2) {
-        for (const pair of node2.items)
-          requireCondition(
-            (0, import_yaml.isScalar)(pair.key) && typeof pair.key.value === "string",
-            "YAML mapping keys must be strings"
-          );
-      }
-    });
-    const value = doc.toJS({ maxAliasCount: 100 });
-    const visit2 = (v, seen = /* @__PURE__ */ new Set()) => {
-      if (v === null || typeof v === "string" || typeof v === "boolean") return;
-      if (typeof v === "number") {
-        requireCondition(Number.isFinite(v), "Non-finite YAML number");
-        return;
-      }
-      requireCondition(
-        typeof v === "object" && v !== void 0 && !(v instanceof Date),
-        "Non-JSON YAML value"
-      );
-      requireCondition(!seen.has(v), "Cyclic YAML value");
-      seen.add(v);
-      if (Array.isArray(v)) v.forEach((x) => visit2(x, seen));
-      else for (const x of Object.values(v)) visit2(x, seen);
-      seen.delete(v);
-    };
-    visit2(value);
-    return value;
-  } catch (e) {
-    throw new FlowError("Invalid YAML: " + e.message);
-  }
-}
-function dump(value) {
-  return (0, import_yaml.stringify)(value, {
-    lineWidth: 0,
-    version: "1.1",
-    aliasDuplicateObjects: false
-  });
-}
-function now() {
-  return (/* @__PURE__ */ new Date()).toISOString().replace(/\.\d{3}Z$/, "+00:00");
-}
-function digest(data) {
-  return (0, import_node_crypto.createHash)("sha256").update(data).digest("hex");
-}
-function canonical(value) {
-  if (Array.isArray(value)) return "[" + value.map(canonical).join(",") + "]";
-  if (value && typeof value === "object")
-    return "{" + Object.entries(value).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([k, v]) => JSON.stringify(k) + ":" + canonical(v)).join(",") + "}";
-  return JSON.stringify(value);
-}
-function equal(a, b) {
-  return canonical(a) === canonical(b);
-}
-function fingerprint(value) {
-  return digest(canonical(value));
-}
-function object(value) {
-  requireCondition(
-    value && typeof value === "object" && !Array.isArray(value),
-    "Request must be a mapping"
-  );
-  return value;
-}
-function markdown(text2) {
-  requireCondition(text2.startsWith("---\n"), "Markdown requires YAML front matter");
-  const end = text2.indexOf("\n---\n", 4);
-  requireCondition(end !== -1, "Missing front matter terminator");
-  return [object(load(text2.slice(4, end))), text2.slice(end + 5)];
-}
-function render(meta3, body) {
-  return "---\n" + dump(meta3) + "---\n" + body.replace(/^\n+/, "");
-}
-
-// src/persistence/audit.ts
-var JOURNAL = ".flow/journal.md";
-function auditView(meta3, events) {
-  const phases = /* @__PURE__ */ new Map();
-  const byId = new Map(events.map((event) => [event.event_id, event]));
-  const reviews = /* @__PURE__ */ new Set();
-  const entries = [];
-  const text2 = (value) => String(value).replace(/\s+/g, " ").trim();
-  const ref = (value) => value ? `${value.path} r${value.revision}` : "";
-  for (const event of events) {
-    const d = event.data;
-    let phase = phases.get(event.run_id) ?? "standalone";
-    let title = "", fact = "", reason = "", references = [];
-    switch (event.event_type) {
-      case "flow.started":
-        phase = d.state.phase;
-        title = "\u958B\u59CB";
-        fact = "\u8981\u6C42\u3092\u53D7\u9818\u3057\u3001Flow\u3092\u958B\u59CB\u3057\u305F\u3002";
-        references = [d.request_path];
-        break;
-      case "flow.transitioned": {
-        phase = d.to_phase;
-        const prepared = byId.get(d.prepared_event_id)?.data;
-        if (d.from_phase !== d.to_phase) {
-          title = "\u30D5\u30A7\u30FC\u30BA\u79FB\u884C";
-          fact = `${d.from_phase} \u2192 ${d.to_phase}`;
-        } else if (d.from_state !== d.to_state && [d.from_state, d.to_state].some(
-          (s) => ["blocked", "waiting"].includes(s)
-        )) {
-          title = d.to_state === "blocked" ? "\u505C\u6B62" : d.to_state === "waiting" ? "\u56DE\u7B54\u5F85\u3061" : "\u518D\u958B";
-          fact = `${d.from_state} \u2192 ${d.to_state}`;
-        }
-        reason = prepared?.arguments?.reason ?? "";
-        if (prepared?.arguments?.resume_condition)
-          fact += `\u3002\u518D\u958B\u6761\u4EF6\uFF1A${prepared.arguments.resume_condition}`;
-        references = d.evidence.map(ref);
-        break;
-      }
-      case "invocation.started":
-        if (phase === "standalone") {
-          const inferred = /flow-(design|plan|implement)(?:$|-)/.exec(
-            d.component
-          )?.[1];
-          if (inferred) phase = inferred;
-        }
-        break;
-      case "invocation.failed":
-        title = "\u5B9F\u884C\u969C\u5BB3";
-        fact = d.reason;
-        references = d.evidence;
-        break;
-      case "artifact.updated": {
-        const prepared = byId.get(d.prepared_event_id)?.data;
-        if (d.artifact.path.startsWith("reviews/") && d.artifact.path.endsWith("/review.md")) {
-          title = "\u30EC\u30D3\u30E5\u30FC\u7D50\u679C";
-          fact = prepared?.new_status ?? "\u4FDD\u5B58\u6E08\u307F";
-          references = [ref(d.artifact)];
-          reviews.add(ref(d.artifact));
-        }
-        break;
-      }
-      case "action.completed":
-        title = d.action;
-        fact = d.result;
-        references = d.evidence;
-        break;
-      case "decision.made":
-        title = "\u6C7A\u5B9A";
-        fact = d.decision;
-        reason = d.reason;
-        references = d.evidence;
-        if (d.assumptions.length)
-          reason += ` \u524D\u63D0\uFF1A${d.assumptions.join("\u3001")}`;
-        break;
-      case "interaction.presented":
-        title = "\u5224\u65AD\u4F9D\u983C";
-        fact = d.text;
-        references = [ref(d.target)];
-        break;
-      case "interaction.received":
-        title = "\u5229\u7528\u8005\u30D5\u30A3\u30FC\u30C9\u30D0\u30C3\u30AF";
-        fact = d.text;
-        break;
-      case "feedback.created":
-        title = "\u30D5\u30A3\u30FC\u30C9\u30D0\u30C3\u30AF\u767B\u9332";
-        fact = "\u5909\u66F4\u30FB\u56DE\u7B54\u3092\u6210\u679C\u7269\u3078\u6E21\u3059\u30D5\u30A3\u30FC\u30C9\u30D0\u30C3\u30AF\u3068\u3057\u3066\u4FDD\u5B58\u3057\u305F\u3002";
-        references = [ref(d.feedback), ...d.origin_event_ids];
-        break;
-      // Read-only legacy events: new reviews and block/resume use publish/transition.
-      case "review.completed":
-        if (!reviews.has(ref(d.review))) {
-          title = "\u30EC\u30D3\u30E5\u30FC\u7D50\u679C";
-          fact = d.status;
-          references = [ref(d.review)];
-        }
-        break;
-      case "review.mode_changed":
-        title = "\u30EC\u30D3\u30E5\u30FC\u65B9\u5F0F\u5909\u66F4";
-        fact = `${d.stage}: ${d.from} \u2192 ${d.to}`;
-        reason = d.reason;
-        break;
-      case "retry.scheduled":
-        title = "\u518D\u8A66\u884C";
-        fact = `${d.stage}: ${d.counter} ${d.used}\u56DE`;
-        reason = d.reason;
-        break;
-      case "flow.blocked":
-        title = "\u554F\u984C\u30FB\u8AB2\u984C";
-        fact = `${d.reason}\u3002\u518D\u958B\u6761\u4EF6\uFF1A${d.resume_condition}`;
-        break;
-      case "flow.resumed":
-        title = "\u518D\u958B";
-        fact = d.reason;
-        references = d.evidence;
-        break;
-      case "artifact.update_aborted":
-      case "flow.transition_aborted":
-        title = "\u4FDD\u5B58\u4E2D\u65AD";
-        fact = d.reason;
-        references = [d.prepared_event_id];
-        break;
-    }
-    phases.set(event.run_id, phase);
-    if (!title) continue;
-    entries.push(
-      `
-## ${text2(event.occurred_at)} \u2014 ${text2(phase)} \u2014 ${text2(title)} (${event.event_id})
-
-- \u4E8B\u5B9F\uFF1A${text2(fact)}
-` + (reason ? `- \u7406\u7531\uFF1A${text2(reason)}
-` : "") + (references.length ? `- \u53C2\u7167\uFF1A${references.map(text2).join("\u3001")}
-` : "")
-    );
-  }
-  return render(
-    { ...meta3, schema_version: "flow/audit-log-v2" },
-    "# \u76E3\u67FB\u30ED\u30B0\n" + entries.join("")
-  );
-}
-
-// src/persistence/store.ts
-var import_node_fs3 = __toESM(require("node:fs"), 1);
-var import_node_path2 = __toESM(require("node:path"), 1);
-
-// src/persistence/files.ts
+// src/code-review.ts
 var import_node_fs = __toESM(require("node:fs"), 1);
 var import_node_path = __toESM(require("node:path"), 1);
-var import_node_crypto2 = require("node:crypto");
-var import_promises = require("node:timers/promises");
-var Files = class {
-  root;
-  constructor(root) {
-    this.root = this.resolveExisting(import_node_path.default.resolve(root));
-  }
-  resolveExisting(p) {
-    if (import_node_fs.default.existsSync(p)) return import_node_fs.default.realpathSync(p);
-    const parent = import_node_path.default.dirname(p);
-    return parent === p ? p : import_node_path.default.join(this.resolveExisting(parent), import_node_path.default.basename(p));
-  }
-  path(name) {
-    requireCondition(typeof name === "string" && name.length, "Missing relative path");
-    requireCondition(
-      !import_node_path.default.isAbsolute(name) && !name.split(/[\\/]/).includes(".."),
-      "Paths must be feature-relative"
-    );
-    const resolved = this.resolveExisting(import_node_path.default.join(this.root, name));
-    requireCondition(
-      resolved !== this.root && resolved.startsWith(this.root + import_node_path.default.sep),
-      "Path escapes feature directory"
-    );
-    return resolved;
-  }
-  async locked(fn) {
-    import_node_fs.default.mkdirSync(this.root, { recursive: true });
-    const lock = import_node_path.default.join(this.root, ".flowctl.lock");
-    const gate = import_node_path.default.join(this.root, ".flowctl.lock.recovery");
-    const token = `${process.pid}-${(0, import_node_crypto2.randomUUID)()}`;
-    const deadline = Date.now() + 3e4;
-    while (true) {
-      let gated = false, acquired = false;
-      try {
-        try {
-          import_node_fs.default.mkdirSync(gate);
-          gated = true;
-        } catch (e) {
-          if (e.code !== "EEXIST") throw e;
-        }
-        if (gated) {
-          try {
-            const fd = import_node_fs.default.openSync(lock, "wx", 384);
-            try {
-              import_node_fs.default.writeFileSync(fd, token);
-              import_node_fs.default.fsyncSync(fd);
-            } finally {
-              import_node_fs.default.closeSync(fd);
-            }
-            acquired = true;
-          } catch (e) {
-            if (e.code !== "EEXIST") throw e;
-            requireCondition(
-              import_node_fs.default.lstatSync(lock).isFile(),
-              "Legacy or invalid .flowctl.lock; inspect and remove it when no CLI is running",
-              true
-            );
-            const owner = import_node_fs.default.readFileSync(lock, "utf8"), pid = Number(owner.split("-")[0]);
-            requireCondition(Number.isInteger(pid) && pid > 0, "Invalid lock owner", true);
-            let alive = true;
-            try {
-              process.kill(pid, 0);
-            } catch (err) {
-              if (err.code === "ESRCH")
-                alive = false;
-              else if (err.code !== "EPERM")
-                throw err;
-            }
-            if (!alive) {
-              import_node_fs.default.unlinkSync(lock);
-              const fd = import_node_fs.default.openSync(lock, "wx", 384);
-              try {
-                import_node_fs.default.writeFileSync(fd, token);
-                import_node_fs.default.fsyncSync(fd);
-              } finally {
-                import_node_fs.default.closeSync(fd);
-              }
-              acquired = true;
-            }
-          }
-        }
-      } catch (e) {
-        if (e.code !== "ENOENT") throw e;
-      } finally {
-        if (gated) import_node_fs.default.rmdirSync(gate);
-      }
-      if (acquired) break;
-      if (Date.now() >= deadline)
-        throw new FlowError(
-          "Feature lock is busy, or acquisition was interrupted; inspect .flowctl.lock.recovery before retrying",
-          "condition",
-          2
-        );
-      await (0, import_promises.setTimeout)(25);
-    }
-    try {
-      return await fn();
-    } finally {
-      requireCondition(
-        import_node_fs.default.readFileSync(lock, "utf8") === token,
-        "Feature lock ownership changed"
-      );
-      import_node_fs.default.unlinkSync(lock);
-    }
-  }
-  atomic(name, data) {
-    const target = this.path(name);
-    import_node_fs.default.mkdirSync(import_node_path.default.dirname(target), { recursive: true });
-    const tmp = import_node_path.default.join(import_node_path.default.dirname(target), ".flowctl-" + (0, import_node_crypto2.randomUUID)());
-    let fd;
-    try {
-      fd = import_node_fs.default.openSync(tmp, "wx", 384);
-      import_node_fs.default.writeFileSync(fd, data);
-      import_node_fs.default.fsyncSync(fd);
-      import_node_fs.default.closeSync(fd);
-      fd = void 0;
-      import_node_fs.default.renameSync(tmp, target);
-      if (process.platform !== "win32") {
-        const directory = import_node_fs.default.openSync(import_node_path.default.dirname(target), "r");
-        try {
-          import_node_fs.default.fsyncSync(directory);
-        } finally {
-          import_node_fs.default.closeSync(directory);
-        }
-      }
-    } finally {
-      if (fd !== void 0) import_node_fs.default.closeSync(fd);
-      if (import_node_fs.default.existsSync(tmp)) import_node_fs.default.unlinkSync(tmp);
-    }
-  }
-};
+var import_node_child_process = require("node:child_process");
 
 // node_modules/zod/v4/classic/external.js
 var external_exports = {};
@@ -8004,7 +7606,7 @@ __export(external_exports, {
   nullable: () => nullable,
   nullish: () => nullish2,
   number: () => number2,
-  object: () => object2,
+  object: () => object,
   optional: () => optional,
   output: () => output,
   overwrite: () => _overwrite,
@@ -8626,10 +8228,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path4) {
-  if (!path4)
+function getElementAtPath(obj, path5) {
+  if (!path5)
     return obj;
-  return path4.reduce((acc, key) => acc?.[key], obj);
+  return path5.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -8969,11 +8571,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path4, issues) {
+function prefixIssues(path5, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path4);
+    iss.path.unshift(path5);
     return iss;
   });
 }
@@ -9423,16 +9025,16 @@ function flattenError(error62, mapper = (issue2) => issue2.message) {
 }
 function formatError(error62, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error63, path4 = []) => {
+  const processError = (error63, path5 = []) => {
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path4, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path5, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path4, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path5, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path4, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path5, ...issue2.path]);
       } else {
-        const fullpath = [...path4, ...issue2.path];
+        const fullpath = [...path5, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -9471,17 +9073,17 @@ function formatError(error62, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error62, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error63, path4 = []) => {
+  const processError = (error63, path5 = []) => {
     var _a3;
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path4, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path5, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path4, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path5, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path4, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path5, ...issue2.path]);
       } else {
-        const fullpath = [...path4, ...issue2.path];
+        const fullpath = [...path5, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -9520,8 +9122,8 @@ function treeifyError(error62, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path4 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path4) {
+  const path5 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path5) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -24875,7 +24477,7 @@ __export(schemas_exports2, {
   nullable: () => nullable,
   nullish: () => nullish2,
   number: () => number2,
-  object: () => object2,
+  object: () => object,
   optional: () => optional,
   partialRecord: () => partialRecord,
   pipe: () => pipe,
@@ -25869,7 +25471,7 @@ var ZodObject = /* @__PURE__ */ $constructor("ZodObject", (inst, def) => {
     return util_exports.required(ZodNonOptional, this, args[0]);
   }
 });
-function object2(shape, params) {
+function object(shape, params) {
   const def = {
     type: "object",
     shape: shape ?? {},
@@ -26623,13 +26225,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path4 = ref.slice(1).split("/").filter(Boolean);
-  if (path4.length === 0) {
+  const path5 = ref.slice(1).split("/").filter(Boolean);
+  if (path5.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path4[0] === defsKey) {
-    const key = path4[1] === void 0 ? void 0 : decodeJSONPointerSegment(path4[1]);
+  if (path5[0] === defsKey) {
+    const key = path5[1] === void 0 ? void 0 : decodeJSONPointerSegment(path5[1]);
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -27638,6 +27240,12 @@ var PhaseArtifactSchema = external_exports.strictObject({
   handoff_checks: external_exports.array(HandoffCheckSchema),
   project_knowledge: ProjectKnowledgeSchema.optional()
 });
+var CodeSnapshotSchema = external_exports.strictObject({
+  repository: text,
+  base_commit: external_exports.string().regex(/^[0-9a-f]{40,64}$/),
+  head_commit: external_exports.string().regex(/^[0-9a-f]{40,64}$/),
+  tree_sha256: external_exports.string().regex(/^[0-9a-f]{64}$/)
+});
 var ImplementArtifactSchema = external_exports.strictObject({
   schema_version: external_exports.literal("flow/implement-artifact-v2"),
   artifact: external_exports.literal("implement"),
@@ -27648,6 +27256,9 @@ var ImplementArtifactSchema = external_exports.strictObject({
   operation: external_exports.literal("execute"),
   updated_at: timestamp,
   plan: ReferenceSchema,
+  code: CodeSnapshotSchema.optional(),
+  feedback: ReferenceSchema.optional(),
+  feedback_results: external_exports.array(FeedbackResultSchema).optional(),
   tasks: external_exports.array(TaskProgressSchema),
   verifications: external_exports.array(VerificationSchema),
   blocker: text.nullable(),
@@ -27655,11 +27266,16 @@ var ImplementArtifactSchema = external_exports.strictObject({
   project_knowledge: ProjectKnowledgeSchema.optional()
 });
 var ReviewSourceSchema = external_exports.strictObject({
-  phase: external_exports.enum(["design", "plan"]),
-  review_stage: external_exports.enum(["design", "decision", "final"]),
-  review_cycle_id: external_exports.string().regex(new RegExp("^(design|plan-decision|plan-final)-cycle-[0-9]{4,}$")),
+  phase: external_exports.enum(["design", "plan", "implement"]),
+  review_stage: external_exports.enum(["design", "decision", "final", "implement"]),
+  review_cycle_id: external_exports.string().regex(
+    new RegExp(
+      "^(design|plan-decision|plan-final|implement)-cycle-[0-9]{4,}$"
+    )
+  ),
   target: ReferenceSchema,
   design: ReferenceSchema.nullable(),
+  code: CodeSnapshotSchema.optional(),
   findings: external_exports.array(FindingSchema),
   failure: FailureSchema.nullable(),
   schema_version: external_exports.literal("flow/review-source-v2"),
@@ -27671,11 +27287,16 @@ var ReviewSourceSchema = external_exports.strictObject({
   created_at: timestamp
 });
 var PhaseReviewSchema = external_exports.strictObject({
-  phase: external_exports.enum(["design", "plan"]),
-  review_stage: external_exports.enum(["design", "decision", "final"]),
-  review_cycle_id: external_exports.string().regex(new RegExp("^(design|plan-decision|plan-final)-cycle-[0-9]{4,}$")),
+  phase: external_exports.enum(["design", "plan", "implement"]),
+  review_stage: external_exports.enum(["design", "decision", "final", "implement"]),
+  review_cycle_id: external_exports.string().regex(
+    new RegExp(
+      "^(design|plan-decision|plan-final|implement)-cycle-[0-9]{4,}$"
+    )
+  ),
   target: ReferenceSchema,
   design: ReferenceSchema.nullable(),
+  code: CodeSnapshotSchema.optional(),
   findings: external_exports.array(FindingSchema),
   failure: FailureSchema.nullable(),
   schema_version: external_exports.literal("flow/phase-review-v2"),
@@ -27702,7 +27323,7 @@ var FeedbackItemSchema = external_exports.strictObject({
 var PhaseFeedbackSchema = external_exports.strictObject({
   schema_version: external_exports.literal("flow/phase-feedback-v2"),
   revision: external_exports.literal(1),
-  phase: external_exports.enum(["design", "plan"]),
+  phase: external_exports.enum(["design", "plan", "implement"]),
   target: ReferenceSchema,
   operation: external_exports.enum(["revise", "respond"]),
   created_at: timestamp,
@@ -27714,7 +27335,7 @@ var CounterSchema = external_exports.strictObject({
   human_retry: external_exports.number().int().min(0).max(1)
 });
 var ActiveReviewSchema = external_exports.strictObject({
-  stage: external_exports.enum(["design", "plan_decision", "plan_final"]),
+  stage: external_exports.enum(["design", "plan_decision", "plan_final", "implement"]),
   review_cycle_id: text,
   mode: external_exports.enum(["ai", "human"]),
   target: ReferenceSchema,
@@ -27795,6 +27416,7 @@ var FlowStateSchema = external_exports.strictObject({
     "plan_decision_review",
     "plan_review",
     "implement",
+    "implement_review",
     "completed",
     "replanning"
   ]),
@@ -27807,21 +27429,25 @@ var FlowStateSchema = external_exports.strictObject({
   reviews: external_exports.strictObject({
     design: ReferenceSchema.nullable(),
     plan_decision: ReferenceSchema.nullable(),
-    plan_final: ReferenceSchema.nullable()
+    plan_final: ReferenceSchema.nullable(),
+    implement: ReferenceSchema.nullable()
   }),
   review_mode: external_exports.strictObject({
     design: external_exports.enum(["ai", "human"]),
-    plan: external_exports.enum(["ai", "human"])
+    plan: external_exports.enum(["ai", "human"]),
+    implement: external_exports.enum(["ai", "human"])
   }),
   counters: external_exports.strictObject({
     design: CounterSchema,
     plan_decision: CounterSchema,
-    plan_final: CounterSchema
+    plan_final: CounterSchema,
+    implement: CounterSchema
   }),
   cycle_counters: external_exports.strictObject({
     design: external_exports.number().int().min(0),
     plan_decision: external_exports.number().int().min(0),
-    plan_final: external_exports.number().int().min(0)
+    plan_final: external_exports.number().int().min(0),
+    implement: external_exports.number().int().min(0)
   }),
   active_review: ActiveReviewSchema.nullable(),
   active_invocation: InvocationSchema.nullable(),
@@ -28031,13 +27657,13 @@ var eventData = {
     status: text
   }),
   "review.mode_changed": external_exports.strictObject({
-    stage: external_exports.enum(["design", "plan_decision", "plan_final"]),
+    stage: external_exports.enum(["design", "plan_decision", "plan_final", "implement"]),
     from: external_exports.enum(["ai", "human"]),
     to: external_exports.enum(["ai", "human"]),
     reason: text
   }),
   "retry.scheduled": external_exports.strictObject({
-    stage: external_exports.enum(["design", "plan_decision", "plan_final"]),
+    stage: external_exports.enum(["design", "plan_decision", "plan_final", "implement"]),
     counter: external_exports.enum(["execution_retry", "human_retry", "automatic_revision"]),
     used: external_exports.literal(1),
     reason: text
@@ -28055,6 +27681,506 @@ var eventData = {
   })
 };
 
+// src/format.ts
+var import_node_crypto = require("node:crypto");
+var import_yaml = __toESM(require_dist(), 1);
+
+// src/errors.ts
+var FlowError = class extends Error {
+  constructor(message, code = "contract", exitCode = 3) {
+    super(message);
+    this.code = code;
+    this.exitCode = exitCode;
+  }
+  code;
+  exitCode;
+};
+function requireCondition(ok, message, condition = false) {
+  if (!ok)
+    throw new FlowError(
+      message,
+      condition ? "condition" : "contract",
+      condition ? 2 : 3
+    );
+}
+
+// src/format.ts
+function utf8(data) {
+  return new TextDecoder("utf-8", { fatal: true }).decode(data);
+}
+function load(text2) {
+  try {
+    const doc = (0, import_yaml.parseDocument)(text2, {
+      uniqueKeys: true,
+      stringKeys: false,
+      version: "1.1",
+      customTags: (tags) => tags.map((tag) => {
+        if (typeof tag === "string") return tag;
+        if (tag.tag === "tag:yaml.org,2002:timestamp")
+          return { ...tag, resolve: (value2) => value2 };
+        if (tag.format === "EXP" && tag.test)
+          return {
+            ...tag,
+            test: /^[-+]?(?:[0-9][0-9_]*(?:\.[0-9_]*)?|\.[0-9_]+)[eE][-+]?[0-9]+$/
+          };
+        return tag;
+      })
+    });
+    if (doc.errors.length)
+      throw new Error(doc.errors.map((e) => e.message).join("; "));
+    (0, import_yaml.visit)(doc, {
+      Map(_key, node2) {
+        for (const pair of node2.items)
+          requireCondition(
+            (0, import_yaml.isScalar)(pair.key) && typeof pair.key.value === "string",
+            "YAML mapping keys must be strings"
+          );
+      }
+    });
+    const value = doc.toJS({ maxAliasCount: 100 });
+    const visit2 = (v, seen = /* @__PURE__ */ new Set()) => {
+      if (v === null || typeof v === "string" || typeof v === "boolean") return;
+      if (typeof v === "number") {
+        requireCondition(Number.isFinite(v), "Non-finite YAML number");
+        return;
+      }
+      requireCondition(
+        typeof v === "object" && v !== void 0 && !(v instanceof Date),
+        "Non-JSON YAML value"
+      );
+      requireCondition(!seen.has(v), "Cyclic YAML value");
+      seen.add(v);
+      if (Array.isArray(v)) v.forEach((x) => visit2(x, seen));
+      else for (const x of Object.values(v)) visit2(x, seen);
+      seen.delete(v);
+    };
+    visit2(value);
+    return value;
+  } catch (e) {
+    throw new FlowError("Invalid YAML: " + e.message);
+  }
+}
+function dump(value) {
+  return (0, import_yaml.stringify)(value, {
+    lineWidth: 0,
+    version: "1.1",
+    aliasDuplicateObjects: false
+  });
+}
+function now() {
+  return (/* @__PURE__ */ new Date()).toISOString().replace(/\.\d{3}Z$/, "+00:00");
+}
+function digest(data) {
+  return (0, import_node_crypto.createHash)("sha256").update(data).digest("hex");
+}
+function canonical(value) {
+  if (Array.isArray(value)) return "[" + value.map(canonical).join(",") + "]";
+  if (value && typeof value === "object")
+    return "{" + Object.entries(value).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([k, v]) => JSON.stringify(k) + ":" + canonical(v)).join(",") + "}";
+  return JSON.stringify(value);
+}
+function equal(a, b) {
+  return canonical(a) === canonical(b);
+}
+function fingerprint(value) {
+  return digest(canonical(value));
+}
+function object2(value) {
+  requireCondition(
+    value && typeof value === "object" && !Array.isArray(value),
+    "Request must be a mapping"
+  );
+  return value;
+}
+function markdown(text2) {
+  requireCondition(text2.startsWith("---\n"), "Markdown requires YAML front matter");
+  const end = text2.indexOf("\n---\n", 4);
+  requireCondition(end !== -1, "Missing front matter terminator");
+  return [object2(load(text2.slice(4, end))), text2.slice(end + 5)];
+}
+function render(meta3, body) {
+  return "---\n" + dump(meta3) + "---\n" + body.replace(/^\n+/, "");
+}
+
+// src/code-review.ts
+function git(repository2, args) {
+  const result = (0, import_node_child_process.spawnSync)("git", ["-C", repository2, ...args], {
+    encoding: "utf8",
+    maxBuffer: 32 * 1024 * 1024
+  });
+  requireCondition(
+    result.status === 0,
+    "Code review Git operation failed: " + (result.stderr || result.error?.message)
+  );
+  return result.stdout;
+}
+function context(repository2, feature) {
+  requireCondition(import_node_path.default.isAbsolute(repository2), "Code repository must be absolute");
+  const root = import_node_fs.default.realpathSync(repository2);
+  requireCondition(
+    git(root, ["rev-parse", "--show-toplevel"]).trim() === root,
+    "Code repository must be Git root"
+  );
+  const relative = import_node_path.default.relative(root, import_node_fs.default.realpathSync(feature)).split(import_node_path.default.sep).join("/");
+  requireCondition(relative !== "", "Feature directory must not be repository root");
+  const excluded = !relative.startsWith("../") && !import_node_path.default.isAbsolute(relative) ? relative + "/" : null;
+  const included = (name) => !excluded || !name.startsWith(excluded);
+  return { root, included };
+}
+function tree(repository2, commit, included) {
+  const entries = git(repository2, ["ls-tree", "-rz", "--full-tree", commit]).split("\0").filter(Boolean);
+  return digest(
+    entries.filter((entry) => included(entry.slice(entry.indexOf("	") + 1))).join("\0")
+  );
+}
+function codeSnapshot(feature, request) {
+  requireCondition(
+    equal(
+      Object.keys(request).sort(),
+      ["repository", "base_commit", "head_commit"].sort()
+    ),
+    "Invalid code-snapshot request"
+  );
+  const parsed = CodeSnapshotSchema.omit({ tree_sha256: true }).safeParse(
+    request
+  );
+  requireCondition(
+    parsed.success,
+    "Code snapshot requires full commit IDs and repository"
+  );
+  const { root, included } = context(request.repository, feature);
+  for (const commit of [request.base_commit, request.head_commit])
+    requireCondition(
+      git(root, ["cat-file", "-t", commit]).trim() === "commit",
+      "Snapshot object must be commit"
+    );
+  git(root, [
+    "merge-base",
+    "--is-ancestor",
+    request.base_commit,
+    request.head_commit
+  ]);
+  git(root, ["merge-base", "--is-ancestor", request.head_commit, "HEAD"]);
+  const snapshot = {
+    ...request,
+    repository: root,
+    tree_sha256: tree(root, request.head_commit, included)
+  };
+  requireCondition(
+    tree(root, "HEAD", included) === snapshot.tree_sha256,
+    "Code changed after implementation commit"
+  );
+  for (const args of [
+    ["diff", "--no-ext-diff", "--no-textconv", "--name-only", "-z", "HEAD"],
+    ["diff", "--cached", "--no-ext-diff", "--no-textconv", "--name-only", "-z"],
+    ["ls-files", "--others", "--exclude-standard", "-z"]
+  ])
+    requireCondition(
+      !git(root, args).split("\0").filter(Boolean).some(included),
+      "Uncommitted code prevents Implement review"
+    );
+  return snapshot;
+}
+function checkCodeSnapshot(feature, snapshot, commit) {
+  requireCondition(
+    CodeSnapshotSchema.safeParse(snapshot).success,
+    "Invalid code snapshot"
+  );
+  if (commit !== void 0)
+    requireCondition(
+      commit === snapshot.head_commit,
+      "Implement commit/snapshot mismatch"
+    );
+  const actual = codeSnapshot(feature, {
+    repository: snapshot.repository,
+    base_commit: snapshot.base_commit,
+    head_commit: snapshot.head_commit
+  });
+  requireCondition(equal(actual, snapshot), "Stale code snapshot");
+}
+
+// src/cli.ts
+var import_node_fs6 = __toESM(require("node:fs"), 1);
+
+// src/persistence/audit.ts
+var JOURNAL = ".flow/journal.md";
+function auditView(meta3, events) {
+  const phases = /* @__PURE__ */ new Map();
+  const byId = new Map(events.map((event) => [event.event_id, event]));
+  const reviews = /* @__PURE__ */ new Set();
+  const entries = [];
+  const text2 = (value) => String(value).replace(/\s+/g, " ").trim();
+  const ref = (value) => value ? `${value.path} r${value.revision}` : "";
+  for (const event of events) {
+    const d = event.data;
+    let phase = phases.get(event.run_id) ?? "standalone";
+    let title = "", fact = "", reason = "", references = [];
+    switch (event.event_type) {
+      case "flow.started":
+        phase = d.state.phase;
+        title = "\u958B\u59CB";
+        fact = "\u8981\u6C42\u3092\u53D7\u9818\u3057\u3001Flow\u3092\u958B\u59CB\u3057\u305F\u3002";
+        references = [d.request_path];
+        break;
+      case "flow.transitioned": {
+        phase = d.to_phase;
+        const prepared = byId.get(d.prepared_event_id)?.data;
+        if (d.from_phase !== d.to_phase) {
+          title = "\u30D5\u30A7\u30FC\u30BA\u79FB\u884C";
+          fact = `${d.from_phase} \u2192 ${d.to_phase}`;
+        } else if (d.from_state !== d.to_state && [d.from_state, d.to_state].some(
+          (s) => ["blocked", "waiting"].includes(s)
+        )) {
+          title = d.to_state === "blocked" ? "\u505C\u6B62" : d.to_state === "waiting" ? "\u56DE\u7B54\u5F85\u3061" : "\u518D\u958B";
+          fact = `${d.from_state} \u2192 ${d.to_state}`;
+        }
+        reason = prepared?.arguments?.reason ?? "";
+        if (prepared?.arguments?.resume_condition)
+          fact += `\u3002\u518D\u958B\u6761\u4EF6\uFF1A${prepared.arguments.resume_condition}`;
+        references = d.evidence.map(ref);
+        break;
+      }
+      case "invocation.started":
+        if (phase === "standalone") {
+          const inferred = /flow-(design|plan|implement)(?:$|-)/.exec(
+            d.component
+          )?.[1];
+          if (inferred) phase = inferred;
+        }
+        break;
+      case "invocation.failed":
+        title = "\u5B9F\u884C\u969C\u5BB3";
+        fact = d.reason;
+        references = d.evidence;
+        break;
+      case "artifact.updated": {
+        const prepared = byId.get(d.prepared_event_id)?.data;
+        if (d.artifact.path.startsWith("reviews/") && d.artifact.path.endsWith("/review.md")) {
+          title = "\u30EC\u30D3\u30E5\u30FC\u7D50\u679C";
+          fact = prepared?.new_status ?? "\u4FDD\u5B58\u6E08\u307F";
+          references = [ref(d.artifact)];
+          reviews.add(ref(d.artifact));
+        }
+        break;
+      }
+      case "action.completed":
+        title = d.action;
+        fact = d.result;
+        references = d.evidence;
+        break;
+      case "decision.made":
+        title = "\u6C7A\u5B9A";
+        fact = d.decision;
+        reason = d.reason;
+        references = d.evidence;
+        if (d.assumptions.length)
+          reason += ` \u524D\u63D0\uFF1A${d.assumptions.join("\u3001")}`;
+        break;
+      case "interaction.presented":
+        title = "\u5224\u65AD\u4F9D\u983C";
+        fact = d.text;
+        references = [ref(d.target)];
+        break;
+      case "interaction.received":
+        title = "\u5229\u7528\u8005\u30D5\u30A3\u30FC\u30C9\u30D0\u30C3\u30AF";
+        fact = d.text;
+        break;
+      case "feedback.created":
+        title = "\u30D5\u30A3\u30FC\u30C9\u30D0\u30C3\u30AF\u767B\u9332";
+        fact = "\u5909\u66F4\u30FB\u56DE\u7B54\u3092\u6210\u679C\u7269\u3078\u6E21\u3059\u30D5\u30A3\u30FC\u30C9\u30D0\u30C3\u30AF\u3068\u3057\u3066\u4FDD\u5B58\u3057\u305F\u3002";
+        references = [ref(d.feedback), ...d.origin_event_ids];
+        break;
+      // Read-only legacy events: new reviews and block/resume use publish/transition.
+      case "review.completed":
+        if (!reviews.has(ref(d.review))) {
+          title = "\u30EC\u30D3\u30E5\u30FC\u7D50\u679C";
+          fact = d.status;
+          references = [ref(d.review)];
+        }
+        break;
+      case "review.mode_changed":
+        title = "\u30EC\u30D3\u30E5\u30FC\u65B9\u5F0F\u5909\u66F4";
+        fact = `${d.stage}: ${d.from} \u2192 ${d.to}`;
+        reason = d.reason;
+        break;
+      case "retry.scheduled":
+        title = "\u518D\u8A66\u884C";
+        fact = `${d.stage}: ${d.counter} ${d.used}\u56DE`;
+        reason = d.reason;
+        break;
+      case "flow.blocked":
+        title = "\u554F\u984C\u30FB\u8AB2\u984C";
+        fact = `${d.reason}\u3002\u518D\u958B\u6761\u4EF6\uFF1A${d.resume_condition}`;
+        break;
+      case "flow.resumed":
+        title = "\u518D\u958B";
+        fact = d.reason;
+        references = d.evidence;
+        break;
+      case "artifact.update_aborted":
+      case "flow.transition_aborted":
+        title = "\u4FDD\u5B58\u4E2D\u65AD";
+        fact = d.reason;
+        references = [d.prepared_event_id];
+        break;
+    }
+    phases.set(event.run_id, phase);
+    if (!title) continue;
+    entries.push(
+      `
+## ${text2(event.occurred_at)} \u2014 ${text2(phase)} \u2014 ${text2(title)} (${event.event_id})
+
+- \u4E8B\u5B9F\uFF1A${text2(fact)}
+` + (reason ? `- \u7406\u7531\uFF1A${text2(reason)}
+` : "") + (references.length ? `- \u53C2\u7167\uFF1A${references.map(text2).join("\u3001")}
+` : "")
+    );
+  }
+  return render(
+    { ...meta3, schema_version: "flow/audit-log-v2" },
+    "# \u76E3\u67FB\u30ED\u30B0\n" + entries.join("")
+  );
+}
+
+// src/persistence/store.ts
+var import_node_fs4 = __toESM(require("node:fs"), 1);
+var import_node_path3 = __toESM(require("node:path"), 1);
+
+// src/persistence/files.ts
+var import_node_fs2 = __toESM(require("node:fs"), 1);
+var import_node_path2 = __toESM(require("node:path"), 1);
+var import_node_crypto2 = require("node:crypto");
+var import_promises = require("node:timers/promises");
+var Files = class {
+  root;
+  constructor(root) {
+    this.root = this.resolveExisting(import_node_path2.default.resolve(root));
+  }
+  resolveExisting(p) {
+    if (import_node_fs2.default.existsSync(p)) return import_node_fs2.default.realpathSync(p);
+    const parent = import_node_path2.default.dirname(p);
+    return parent === p ? p : import_node_path2.default.join(this.resolveExisting(parent), import_node_path2.default.basename(p));
+  }
+  path(name) {
+    requireCondition(typeof name === "string" && name.length, "Missing relative path");
+    requireCondition(
+      !import_node_path2.default.isAbsolute(name) && !name.split(/[\\/]/).includes(".."),
+      "Paths must be feature-relative"
+    );
+    const resolved = this.resolveExisting(import_node_path2.default.join(this.root, name));
+    requireCondition(
+      resolved !== this.root && resolved.startsWith(this.root + import_node_path2.default.sep),
+      "Path escapes feature directory"
+    );
+    return resolved;
+  }
+  async locked(fn) {
+    import_node_fs2.default.mkdirSync(this.root, { recursive: true });
+    const lock = import_node_path2.default.join(this.root, ".flowctl.lock");
+    const gate = import_node_path2.default.join(this.root, ".flowctl.lock.recovery");
+    const token = `${process.pid}-${(0, import_node_crypto2.randomUUID)()}`;
+    const deadline = Date.now() + 3e4;
+    while (true) {
+      let gated = false, acquired = false;
+      try {
+        try {
+          import_node_fs2.default.mkdirSync(gate);
+          gated = true;
+        } catch (e) {
+          if (e.code !== "EEXIST") throw e;
+        }
+        if (gated) {
+          try {
+            const fd = import_node_fs2.default.openSync(lock, "wx", 384);
+            try {
+              import_node_fs2.default.writeFileSync(fd, token);
+              import_node_fs2.default.fsyncSync(fd);
+            } finally {
+              import_node_fs2.default.closeSync(fd);
+            }
+            acquired = true;
+          } catch (e) {
+            if (e.code !== "EEXIST") throw e;
+            requireCondition(
+              import_node_fs2.default.lstatSync(lock).isFile(),
+              "Legacy or invalid .flowctl.lock; inspect and remove it when no CLI is running",
+              true
+            );
+            const owner = import_node_fs2.default.readFileSync(lock, "utf8"), pid = Number(owner.split("-")[0]);
+            requireCondition(Number.isInteger(pid) && pid > 0, "Invalid lock owner", true);
+            let alive = true;
+            try {
+              process.kill(pid, 0);
+            } catch (err) {
+              if (err.code === "ESRCH")
+                alive = false;
+              else if (err.code !== "EPERM")
+                throw err;
+            }
+            if (!alive) {
+              import_node_fs2.default.unlinkSync(lock);
+              const fd = import_node_fs2.default.openSync(lock, "wx", 384);
+              try {
+                import_node_fs2.default.writeFileSync(fd, token);
+                import_node_fs2.default.fsyncSync(fd);
+              } finally {
+                import_node_fs2.default.closeSync(fd);
+              }
+              acquired = true;
+            }
+          }
+        }
+      } catch (e) {
+        if (e.code !== "ENOENT") throw e;
+      } finally {
+        if (gated) import_node_fs2.default.rmdirSync(gate);
+      }
+      if (acquired) break;
+      if (Date.now() >= deadline)
+        throw new FlowError(
+          "Feature lock is busy, or acquisition was interrupted; inspect .flowctl.lock.recovery before retrying",
+          "condition",
+          2
+        );
+      await (0, import_promises.setTimeout)(25);
+    }
+    try {
+      return await fn();
+    } finally {
+      requireCondition(
+        import_node_fs2.default.readFileSync(lock, "utf8") === token,
+        "Feature lock ownership changed"
+      );
+      import_node_fs2.default.unlinkSync(lock);
+    }
+  }
+  atomic(name, data) {
+    const target = this.path(name);
+    import_node_fs2.default.mkdirSync(import_node_path2.default.dirname(target), { recursive: true });
+    const tmp = import_node_path2.default.join(import_node_path2.default.dirname(target), ".flowctl-" + (0, import_node_crypto2.randomUUID)());
+    let fd;
+    try {
+      fd = import_node_fs2.default.openSync(tmp, "wx", 384);
+      import_node_fs2.default.writeFileSync(fd, data);
+      import_node_fs2.default.fsyncSync(fd);
+      import_node_fs2.default.closeSync(fd);
+      fd = void 0;
+      import_node_fs2.default.renameSync(tmp, target);
+      if (process.platform !== "win32") {
+        const directory = import_node_fs2.default.openSync(import_node_path2.default.dirname(target), "r");
+        try {
+          import_node_fs2.default.fsyncSync(directory);
+        } finally {
+          import_node_fs2.default.closeSync(directory);
+        }
+      }
+    } finally {
+      if (fd !== void 0) import_node_fs2.default.closeSync(fd);
+      if (import_node_fs2.default.existsSync(tmp)) import_node_fs2.default.unlinkSync(tmp);
+    }
+  }
+};
+
 // src/validation/guards.ts
 var KINDS = {
   "flow/phase-artifact-v2": "phase-artifact",
@@ -28069,12 +28195,14 @@ var KINDS = {
 var STAGES = {
   design: ["design_review", "design", "design"],
   plan_decision: ["plan_decision_review", "plan", "decision"],
-  plan_final: ["plan_review", "plan", "final"]
+  plan_final: ["plan_review", "plan", "final"],
+  implement: ["implement_review", "implement", "implement"]
 };
 var EXPECTED = {
   design: ["requirements", "quality-risk", "project-rules"],
   plan_decision: ["decision-quality", "project-rules"],
-  plan_final: ["task-readiness", "project-rules"]
+  plan_final: ["task-readiness", "project-rules"],
+  implement: ["correctness", "maintainability", "project-rules"]
 };
 var HEADINGS = {
   design: [
@@ -28320,6 +28448,17 @@ function validateMeta(meta3, body) {
   if (kind === "implement-artifact") {
     uniqueIds(meta3.tasks, "task");
     uniqueIds(meta3.verifications, "verification");
+    if (meta3.feedback) {
+      requireCondition(
+        meta3.feedback_results,
+        "Implement revision requires feedback results"
+      );
+      uniqueIds(meta3.feedback_results, "feedback");
+      requireCondition(
+        meta3.status !== "completed" || meta3.feedback_results.every((r) => r.result === "applied"),
+        "Completed Implement cannot contain unresolved feedback"
+      );
+    }
     requireCondition(
       meta3.status === "blocked" === Boolean(meta3.blocker),
       "Implement blocker/status mismatch"
@@ -28350,6 +28489,18 @@ function validateMeta(meta3, body) {
     requireCondition(
       meta3.phase === "plan" === (meta3.design !== null),
       "Plan review requires Design reference"
+    );
+    requireCondition(
+      meta3.phase === "implement" === (meta3.review_stage === "implement"),
+      "Implement review phase/stage mismatch"
+    );
+    requireCondition(
+      meta3.phase === "implement" || meta3.code === void 0,
+      "Code snapshot belongs to Implement review"
+    );
+    requireCondition(
+      meta3.phase !== "implement" || meta3.failure || meta3.code,
+      "Implement review requires code snapshot"
     );
     uniqueIds(meta3.findings, "finding");
     for (const f of meta3.findings)
@@ -28382,6 +28533,10 @@ function validateMeta(meta3, body) {
     }
   }
   if (kind === "phase-feedback") {
+    requireCondition(
+      meta3.phase !== "implement" || meta3.operation === "revise",
+      "Implement feedback only supports revise"
+    );
     uniqueIds(meta3.items, "feedback item");
     requireCondition(
       meta3.items.every(
@@ -28447,7 +28602,7 @@ function validateMeta(meta3, body) {
 }
 
 // src/transitions.ts
-var import_node_fs2 = __toESM(require("node:fs"), 1);
+var import_node_fs3 = __toESM(require("node:fs"), 1);
 
 // src/replanning.ts
 function replanTransition(store, state, action, args, evidence) {
@@ -28534,16 +28689,16 @@ function replanTransition(store, state, action, args, evidence) {
     evidence.push(target);
   } else if (action === "begin_replan") {
     fields("response_event_id", "approval");
-    const context = state.replan;
+    const context2 = state.replan;
     requireCondition(
-      context && !context.approved && state.state === "waiting_for_input",
+      context2 && !context2.approved && state.state === "waiting_for_input",
       "No pending replan approval",
       true
     );
     requireCondition(args.approval === "approve", "Replan requires explicit approval");
-    const response = events.find((e) => e.event_id === args.response_event_id), prompt = events.find((e) => e.event_id === context.prompt_event_id);
+    const response = events.find((e) => e.event_id === args.response_event_id), prompt = events.find((e) => e.event_id === context2.prompt_event_id);
     requireCondition(
-      response && response.event_type === "interaction.received" && response.actor === "human" && response.run_id === state.run_id && response.data.prompt_event_id === context.prompt_event_id && response.data.interaction_id === prompt?.data.interaction_id,
+      response && response.event_type === "interaction.received" && response.actor === "human" && response.run_id === state.run_id && response.data.prompt_event_id === context2.prompt_event_id && response.data.interaction_id === prompt?.data.interaction_id,
       "Missing human approval for this replan"
     );
     requireCondition(
@@ -28552,29 +28707,29 @@ function replanTransition(store, state, action, args, evidence) {
       ),
       "Approval already consumed"
     );
-    context.approved = true;
-    context.response_event_id = response.event_id;
+    context2.approved = true;
+    context2.response_event_id = response.event_id;
     state.state = "running";
     state.waiting = null;
   } else if (action === "cancel_replan") {
     fields("response_event_id");
-    const context = state.replan;
+    const context2 = state.replan;
     requireCondition(
-      context && !context.approved,
+      context2 && !context2.approved,
       "Only unapproved replans can be cancelled",
       true
     );
     const response = events.find((e) => e.event_id === args.response_event_id);
-    const prompt = events.find((e) => e.event_id === context.prompt_event_id);
+    const prompt = events.find((e) => e.event_id === context2.prompt_event_id);
     requireCondition(
-      response && response.event_type === "interaction.received" && response.actor === "human" && response.run_id === state.run_id && response.data.prompt_event_id === context.prompt_event_id && response.data.interaction_id === prompt?.data.interaction_id,
+      response && response.event_type === "interaction.received" && response.actor === "human" && response.run_id === state.run_id && response.data.prompt_event_id === context2.prompt_event_id && response.data.interaction_id === prompt?.data.interaction_id,
       "Missing human cancellation"
     );
     const prepared = events.find(
-      (e) => e.event_type === "flow.transition_prepared" && e.data.action === "request_replan" && e.data.after.replan.prompt_event_id === context.prompt_event_id
+      (e) => e.event_type === "flow.transition_prepared" && e.data.action === "request_replan" && e.data.after.replan.prompt_event_id === context2.prompt_event_id
     );
     requireCondition(prepared, "Missing original replan state");
-    for (const ref of Object.values(context.before))
+    for (const ref of Object.values(context2.before))
       if (ref) store.reference(ref);
     const revision = state.state_revision;
     Object.assign(state, prepared.data.before, {
@@ -28583,9 +28738,9 @@ function replanTransition(store, state, action, args, evidence) {
     });
   } else {
     fields("artifacts");
-    const context = state.replan;
+    const context2 = state.replan;
     requireCondition(
-      context?.approved && state.phase === "replanning" && state.state === "running",
+      context2?.approved && state.phase === "replanning" && state.state === "running",
       "No approved replan",
       true
     );
@@ -28601,7 +28756,7 @@ function replanTransition(store, state, action, args, evidence) {
       (e) => e.event_type === "flow.transitioned" && e.data.action === "begin_replan" && e.run_id === state.run_id && e.data.after_revision === state.state_revision
     );
     for (const artifact of ["design", "plan", "implement"]) {
-      const before = context.before[artifact], ref = args.artifacts[artifact];
+      const before = context2.before[artifact], ref = args.artifacts[artifact];
       requireCondition(!before || ref, "Cannot discard existing artifact");
       requireCondition(before || !ref, "Replan only synchronizes existing artifacts");
       if (!ref) continue;
@@ -28627,14 +28782,14 @@ function replanTransition(store, state, action, args, evidence) {
     }
     requireCondition(
       !equal(
-        args.artifacts[context.target_phase],
-        context.before[context.target_phase]
+        args.artifacts[context2.target_phase],
+        context2.before[context2.target_phase]
       ),
       "Approved target was not revised"
     );
-    if (context.target_phase === "plan")
+    if (context2.target_phase === "plan")
       requireCondition(
-        equal(args.artifacts.design, context.before.design),
+        equal(args.artifacts.design, context2.before.design),
         "Plan replan cannot change Design"
       );
     const design = args.artifacts.design, plan = args.artifacts.plan;
@@ -28654,8 +28809,9 @@ function replanTransition(store, state, action, args, evidence) {
     state.artifacts = args.artifacts;
     state.reviews.plan_decision = null;
     state.reviews.plan_final = null;
-    if (context.target_phase === "design") state.reviews.design = null;
-    state.phase = context.target_phase;
+    state.reviews.implement = null;
+    if (context2.target_phase === "design") state.reviews.design = null;
+    state.phase = context2.target_phase;
     state.replan = null;
     state.pending_operation = null;
     state.pending_feedback = null;
@@ -28715,7 +28871,10 @@ function transition(store, request) {
       "Wrong feedback operation"
     );
     requireCondition(
-      equal(fm.target, state.artifacts[fm.phase]),
+      equal(
+        fm.target,
+        state.artifacts[fm.phase]
+      ),
       "Feedback targets wrong active artifact"
     );
     const expected = state.active_review?.target ?? state.artifacts[state.phase];
@@ -28730,7 +28889,7 @@ function transition(store, request) {
     active_review: null,
     waiting: null,
     blocker: null,
-    pending_operation: operation,
+    pending_operation: phase === "implement" ? "execute" : operation,
     pending_feedback: ref
   });
   if ([
@@ -28750,6 +28909,7 @@ function transition(store, request) {
       design_review: "flow-design-review",
       plan_decision_review: "flow-plan-decision-review",
       plan_review: "flow-plan-review",
+      implement_review: "flow-implement-review",
       completed: null,
       replanning: null
     };
@@ -28761,9 +28921,12 @@ function transition(store, request) {
       args.operation === (["design", "plan", "implement"].includes(state.phase) ? state.pending_operation : "review"),
       "Wrong operation for phase"
     );
-    if (["design_review", "plan_decision_review", "plan_review"].includes(
-      state.phase
-    )) {
+    if ([
+      "design_review",
+      "plan_decision_review",
+      "plan_review",
+      "implement_review"
+    ].includes(state.phase)) {
       requireCondition(state.active_review, "Start review cycle first");
       evidence.push(state.active_review.target);
       if (state.active_review.mode === "human") {
@@ -28838,7 +29001,7 @@ function transition(store, request) {
       );
       if (state.pending_feedback)
         requireCondition(
-          meta3.inputs.some(
+          artifact === "implement" ? equal(meta3.feedback, state.pending_feedback) : meta3.inputs.some(
             (r) => equal(r, state.pending_feedback)
           ),
           "Output does not reference pending feedback"
@@ -28909,10 +29072,18 @@ function transition(store, request) {
     requireCondition(target, "Missing target artifact");
     const [tm] = store.reference(target);
     requireCondition(
-      tm.status === (stage === "plan_decision" ? "needs_input" : "ready"),
+      tm.status === (stage === "implement" ? "completed" : stage === "plan_decision" ? "needs_input" : "ready"),
       "Wrong target status",
       true
     );
+    if (stage === "implement") {
+      requireCondition(equal(tm.plan, state.artifacts.plan), "Implement Plan mismatch");
+      requireCondition(tm.code, "Implement review requires code snapshot");
+      checkCodeSnapshot(store.root, tm.code, tm.commit);
+      store.checkDocumentInputs(tm);
+      requireCondition(state.artifacts.plan, "Missing Plan");
+      store.checkDocumentInputs(store.reference(state.artifacts.plan)[0]);
+    }
     const design = artifact === "plan" ? state.artifacts.design : null;
     if (design) {
       const [dm] = store.reference(design);
@@ -28922,7 +29093,7 @@ function transition(store, request) {
       );
       evidence.push(design);
     }
-    const number4 = ++state.cycle_counters[stage], directory = stage.replace("_", "-"), mode = state.review_mode[stage === "design" ? "design" : "plan"];
+    const number4 = ++state.cycle_counters[stage], directory = stage.replace("_", "-"), mode = state.review_mode[stage === "implement" ? "implement" : stage === "design" ? "design" : "plan"];
     Object.assign(state, {
       phase,
       pending_operation: null,
@@ -28980,6 +29151,10 @@ function transition(store, request) {
         "Prompt target mismatch"
       );
       if (kind === "review_decision") {
+        requireCondition(
+          state.phase !== "implement_review",
+          "Implement human decisions require approved replanning"
+        );
         if (result.status === "blocked")
           requireCondition(
             ids.every(
@@ -29179,12 +29354,12 @@ function transition(store, request) {
         true
       );
     }
-    state.review_mode[stage === "design" ? "design" : "plan"] = mode;
+    state.review_mode[stage === "implement" ? "implement" : stage === "design" ? "design" : "plan"] = mode;
     state.active_review = null;
   } else if (action === "advance") {
     fields();
     running();
-    if (state.phase === "design_review" || state.phase === "plan_review") {
+    if (["design_review", "plan_review", "implement_review"].includes(state.phase)) {
       const result = store.reviewResult(state);
       requireCondition(result.status === "passed", "Review did not pass", true);
       const ar = state.active_review;
@@ -29198,30 +29373,37 @@ function transition(store, request) {
       );
       evidence.push(ar.target);
       if (ar.design) evidence.push(ar.design);
-      const phase = state.phase === "design_review" ? "plan" : "implement";
-      Object.assign(state, {
-        phase,
-        active_review: null,
-        pending_operation: phase === "plan" ? state.artifacts.plan ? null : "create" : "execute",
-        pending_feedback: null
-      });
+      if (state.phase === "implement_review") {
+        const ref = state.artifacts.implement;
+        requireCondition(ref && equal(ref, ar.target), "Implement review target mismatch");
+        const [im] = store.reference(ref);
+        requireCondition(
+          im.status === "completed" && equal(im.plan, state.artifacts.plan),
+          "Implement is not completed against active Plan"
+        );
+        store.checkDocumentInputs(im);
+        Object.assign(state, {
+          phase: "completed",
+          state: "completed",
+          active_review: null,
+          pending_operation: null,
+          pending_feedback: null
+        });
+      } else {
+        const phase = state.phase === "design_review" ? "plan" : "implement";
+        Object.assign(state, {
+          phase,
+          active_review: null,
+          pending_operation: phase === "plan" ? state.artifacts.plan ? null : "create" : "execute",
+          pending_feedback: null
+        });
+      }
     } else if (state.phase === "implement") {
-      const ref = state.artifacts.implement;
-      requireCondition(ref, "Missing Implement output");
-      const [im] = store.reference(ref);
-      requireCondition(
-        im.status === "completed" && equal(im.plan, state.artifacts.plan),
-        "Implement is not completed against active Plan",
-        true
+      throw new FlowError(
+        "Implement completion requires passed Implement review; start_review implement first",
+        "condition",
+        2
       );
-      store.reference(im.plan);
-      evidence.push(ref);
-      Object.assign(state, {
-        phase: "completed",
-        state: "completed",
-        pending_operation: null,
-        pending_feedback: null
-      });
     } else
       throw new FlowError(
         "No advance transition from this phase",
@@ -29250,7 +29432,7 @@ function transition(store, request) {
   state.updated_at = now();
   state.last_transition_event_id = eventId(store.events()[1].length + 2);
   validateMeta(state);
-  const before = digest(import_node_fs2.default.readFileSync(store.path("flow-state.yml"))), afterData = dump(state);
+  const before = digest(import_node_fs3.default.readFileSync(store.path("flow-state.yml"))), afterData = dump(state);
   const prepared = store.append(
     "flow.transition_prepared",
     {
@@ -29301,10 +29483,10 @@ var Store = class extends Files {
   document(name) {
     const p = this.path(name);
     requireCondition(
-      import_node_fs3.default.existsSync(p) && import_node_fs3.default.statSync(p).isFile(),
+      import_node_fs4.default.existsSync(p) && import_node_fs4.default.statSync(p).isFile(),
       "Missing artifact: " + name
     );
-    const raw = import_node_fs3.default.readFileSync(p);
+    const raw = import_node_fs4.default.readFileSync(p);
     const [meta3, body] = markdown(utf8(raw));
     validateMeta(meta3, body);
     return [
@@ -29320,8 +29502,8 @@ var Store = class extends Files {
     return [meta3, body];
   }
   state() {
-    const meta3 = object(
-      load(utf8(import_node_fs3.default.readFileSync(this.path("flow-state.yml"))))
+    const meta3 = object2(
+      load(utf8(import_node_fs4.default.readFileSync(this.path("flow-state.yml"))))
     );
     validateMeta(meta3);
     return meta3;
@@ -29329,10 +29511,10 @@ var Store = class extends Files {
   events() {
     const p = this.path(JOURNAL);
     requireCondition(
-      import_node_fs3.default.existsSync(p),
+      import_node_fs4.default.existsSync(p),
       "Missing .flow/journal.md; legacy audit.md requires audit-migrate"
     );
-    return this.parseEvents(utf8(import_node_fs3.default.readFileSync(p)));
+    return this.parseEvents(utf8(import_node_fs4.default.readFileSync(p)));
   }
   parseEvents(raw) {
     const [meta3, body] = markdown(raw);
@@ -29348,7 +29530,7 @@ var Store = class extends Files {
         m,
         "Truncated or malformed audit record; preserve and inspect .flow/journal.md"
       );
-      const e = object(load(m[3]));
+      const e = object2(load(m[3]));
       schemaCheck("audit-event", e);
       schemaCheck("event-data", e.data, e.event_type);
       requireCondition(
@@ -29414,12 +29596,12 @@ var Store = class extends Files {
 \`\`\`yaml
 ${dump(event)}\`\`\`
 `;
-    const fd = import_node_fs3.default.openSync(this.path(JOURNAL), "a");
+    const fd = import_node_fs4.default.openSync(this.path(JOURNAL), "a");
     try {
-      import_node_fs3.default.writeFileSync(fd, record2);
-      import_node_fs3.default.fsyncSync(fd);
+      import_node_fs4.default.writeFileSync(fd, record2);
+      import_node_fs4.default.fsyncSync(fd);
     } finally {
-      import_node_fs3.default.closeSync(fd);
+      import_node_fs4.default.closeSync(fd);
     }
     this.syncAudit();
     return event;
@@ -29561,9 +29743,20 @@ ${dump(event)}\`\`\`
     try {
       [tm] = this.reference(target);
       requireCondition(
-        tm.artifact === artifact && tm.status === (stage === "plan_decision" ? "needs_input" : "ready"),
+        tm.artifact === artifact && tm.status === (stage === "implement" ? "completed" : stage === "plan_decision" ? "needs_input" : "ready"),
         "Wrong review target/status"
       );
+      if (artifact === "implement") {
+        requireCondition(tm.code, "Implement review requires code snapshot");
+        checkCodeSnapshot(this.root, tm.code, tm.commit);
+        const [pm] = this.reference(tm.plan);
+        requireCondition(
+          pm.artifact === "plan" && pm.status === "ready",
+          "Implement review requires ready Plan"
+        );
+        this.checkDocumentInputs(pm);
+        base.code = tm.code;
+      }
       if (artifact === "plan") {
         requireCondition(design, "Missing Design input");
         const [dm] = this.reference(design);
@@ -29595,7 +29788,7 @@ ${dump(event)}\`\`\`
     let failure2 = null;
     let projectKnowledge;
     for (const sourcePath of paths) {
-      if (!import_node_fs3.default.existsSync(this.path(sourcePath))) {
+      if (!import_node_fs4.default.existsSync(this.path(sourcePath))) {
         if (!failure2 || failure2.kind !== "contract")
           failure2 = {
             kind: "execution",
@@ -29629,7 +29822,7 @@ ${dump(event)}\`\`\`
         for (const original of sm.findings) {
           requireCondition(
             original.decision_refs.every(
-              (id) => tm.questions.some((q) => q.id === id)
+              (id) => (tm.questions ?? []).some((q) => q.id === id)
             ),
             "Unknown decision reference"
           );
@@ -29653,6 +29846,8 @@ ${dump(event)}\`\`\`
     if (!equal([...seen].sort(), [...expected].sort()) && !failure2)
       failure2 = { kind: "execution", reason: "Required sources are missing" };
     this.reference(target);
+    if (artifact === "implement")
+      checkCodeSnapshot(this.root, tm.code, tm.commit);
     if (design) this.reference(design);
     return {
       ...base,
@@ -29667,14 +29862,14 @@ ${dump(event)}\`\`\`
   }
   checkKnowledgeDocuments(meta3) {
     for (const d of meta3.project_knowledge?.documents ?? []) {
-      if (d.status !== "available" || !import_node_path2.default.isAbsolute(d.location)) continue;
+      if (d.status !== "available" || !import_node_path3.default.isAbsolute(d.location)) continue;
       requireCondition(
-        import_node_fs3.default.existsSync(d.location) && import_node_fs3.default.statSync(d.location).isFile(),
+        import_node_fs4.default.existsSync(d.location) && import_node_fs4.default.statSync(d.location).isFile(),
         "Missing knowledge document: " + d.location,
         true
       );
       requireCondition(
-        digest(import_node_fs3.default.readFileSync(d.location)) === d.sha256,
+        digest(import_node_fs4.default.readFileSync(d.location)) === d.sha256,
         "Stale knowledge document: " + d.location,
         true
       );
@@ -29716,6 +29911,26 @@ ${dump(event)}\`\`\`
           "Multiple Design inputs"
         );
     } else if (kind === "implement-artifact") {
+      if (meta3.feedback) {
+        const [fm] = this.reference(meta3.feedback);
+        requireCondition(
+          fm.schema_version === "flow/phase-feedback-v2" && fm.phase === "implement" && fm.operation === "revise",
+          "Invalid Implement feedback"
+        );
+        requireCondition(
+          equal(
+            fm.items.map((i) => i.id).sort(),
+            (meta3.feedback_results ?? []).map((i) => i.id).sort()
+          ),
+          "Missing Implement feedback results"
+        );
+        requireCondition(
+          fm.target.path === "artifacts/implement.md" && fm.target.revision < meta3.revision,
+          "Wrong Implement feedback target"
+        );
+      }
+      if (meta3.code && meta3.status === "completed")
+        checkCodeSnapshot(this.root, meta3.code, meta3.commit);
       if (meta3.status === "blocked" && meta3.producer !== "flow-artifact-sync")
         return;
       const [plan] = this.reference(meta3.plan);
@@ -29758,9 +29973,19 @@ ${dump(event)}\`\`\`
       this.checkKnowledgeDocuments(meta3);
       const [target] = this.reference(meta3.target);
       requireCondition(
-        target.status === (meta3.review_stage === "decision" ? "needs_input" : "ready") && target.artifact === meta3.phase,
+        target.status === (meta3.review_stage === "implement" ? "completed" : meta3.review_stage === "decision" ? "needs_input" : "ready") && target.artifact === meta3.phase,
         "Wrong review target/status"
       );
+      if (meta3.phase === "implement") {
+        requireCondition(equal(meta3.code, target.code), "Source code snapshot mismatch");
+        checkCodeSnapshot(this.root, meta3.code, target.commit);
+        const [pm] = this.reference(target.plan);
+        requireCondition(
+          pm.artifact === "plan" && pm.status === "ready",
+          "Implement review requires ready Plan"
+        );
+        this.checkDocumentInputs(pm);
+      }
       if (meta3.design) {
         const [dm] = this.reference(meta3.design);
         requireCondition(
@@ -29772,7 +29997,8 @@ ${dump(event)}\`\`\`
       const stage = {
         design: "design",
         decision: "plan_decision",
-        final: "plan_final"
+        final: "plan_final",
+        implement: "implement"
       }[meta3.review_stage];
       const result = this.reviewCheck(
         stage,
@@ -29788,7 +30014,8 @@ ${dump(event)}\`\`\`
         "findings",
         "failure",
         "judgments",
-        "project_knowledge"
+        "project_knowledge",
+        "code"
       ])
         requireCondition(
           equal(meta3[key], result[key]),
@@ -29799,22 +30026,22 @@ ${dump(event)}\`\`\`
   syncAudit() {
     const [meta3, events] = this.events();
     const expected = Buffer.from(auditView(meta3, events));
-    if (!import_node_fs3.default.existsSync(this.path("audit.md")) || !import_node_fs3.default.readFileSync(this.path("audit.md")).equals(expected))
+    if (!import_node_fs4.default.existsSync(this.path("audit.md")) || !import_node_fs4.default.readFileSync(this.path("audit.md")).equals(expected))
       this.atomic("audit.md", expected);
     return events.length;
   }
   migrateAudit() {
-    if (!import_node_fs3.default.existsSync(this.path(JOURNAL))) {
-      const original = import_node_fs3.default.readFileSync(this.path("audit.md"));
+    if (!import_node_fs4.default.existsSync(this.path(JOURNAL))) {
+      const original = import_node_fs4.default.readFileSync(this.path("audit.md"));
       this.parseEvents(utf8(original));
       this.atomic(JOURNAL, original);
     }
     return { events: this.syncAudit(), journal: JOURNAL };
   }
   ensureAudit() {
-    if (import_node_fs3.default.existsSync(this.path(JOURNAL))) return;
+    if (import_node_fs4.default.existsSync(this.path(JOURNAL))) return;
     requireCondition(
-      !import_node_fs3.default.existsSync(this.path("audit.md")),
+      !import_node_fs4.default.existsSync(this.path("audit.md")),
       "Legacy audit.md requires explicit audit-migrate",
       true
     );
@@ -29823,7 +30050,7 @@ ${dump(event)}\`\`\`
       render(
         {
           schema_version: "flow/audit-log-v1",
-          feature_id: import_node_path2.default.basename(this.root),
+          feature_id: import_node_path3.default.basename(this.root),
           created_at: now()
         },
         "# \u76E3\u67FB\u30ED\u30B0\n"
@@ -29879,12 +30106,12 @@ ${dump(event)}\`\`\`
     const [meta3, draftBody] = markdown(request.document);
     let body = draftBody;
     if (meta3.schema_version === "flow/phase-feedback-v2" && name === "feedback/" + meta3.phase + "/next") {
-      const directory = this.path("feedback/" + meta3.phase), numbers = import_node_fs3.default.existsSync(directory) ? import_node_fs3.default.readdirSync(directory).filter((p2) => /^feedback-[0-9]{4,}\.md$/.test(p2)).map((p2) => Number(p2.slice(9, -3))) : [];
+      const directory = this.path("feedback/" + meta3.phase), numbers = import_node_fs4.default.existsSync(directory) ? import_node_fs4.default.readdirSync(directory).filter((p2) => /^feedback-[0-9]{4,}\.md$/.test(p2)).map((p2) => Number(p2.slice(9, -3))) : [];
       name = `feedback/${meta3.phase}/feedback-${String(Math.max(0, ...numbers) + 1).padStart(4, "0")}.md`;
     }
     const p = this.path(name), kind = KINDS[meta3.schema_version];
     const syncing = meta3.producer === "flow-artifact-sync";
-    if (syncing && import_node_fs3.default.existsSync(this.path("flow-state.yml"))) {
+    if (syncing && import_node_fs4.default.existsSync(this.path("flow-state.yml"))) {
       requireCondition(
         !this.state().replan || this.state().replan?.approved,
         "Replan is awaiting human approval",
@@ -29901,12 +30128,12 @@ ${dump(event)}\`\`\`
       "publish only accepts phase documents"
     );
     let old = null, oldBody = "", before = null;
-    if (import_node_fs3.default.existsSync(p)) [old, oldBody, before] = this.document(name);
+    if (import_node_fs4.default.existsSync(p)) [old, oldBody, before] = this.document(name);
     if (syncing) {
       requireCondition(old !== null, "Sync only updates existing artifacts", true);
       if (kind === "implement-artifact")
         requireCondition(
-          meta3.status === "blocked" && meta3.commit === null && meta3.tasks.every((t) => t.status === "pending") && meta3.verifications.every((v) => v.status === "not_run"),
+          meta3.status === "blocked" && meta3.commit === null && meta3.code === void 0 && meta3.feedback === void 0 && meta3.feedback_results === void 0 && meta3.tasks.every((t) => t.status === "pending") && meta3.verifications.every((v) => v.status === "not_run"),
           "Sync must invalidate implementation completion and verification evidence"
         );
     }
@@ -29931,11 +30158,30 @@ ${dump(event)}\`\`\`
         !old || old.artifact === meta3.artifact,
         "Cannot change artifact identity"
       );
+      let reviewRevision = false;
+      if (kind === "implement-artifact" && meta3.feedback && before && !syncing) {
+        const [fm] = this.reference(meta3.feedback);
+        const continuing = old?.feedback && equal(old.feedback, meta3.feedback);
+        reviewRevision = fm.schema_version === "flow/phase-feedback-v2" && fm.phase === "implement" && fm.operation === "revise" && (continuing || equal(fm.target, before));
+        requireCondition(
+          reviewRevision && equal(meta3.plan, old.plan),
+          "Invalid Implement revision feedback/Plan"
+        );
+        requireCondition(
+          meta3.invocation_id !== old.invocation_id || continuing,
+          "Implement revision requires new invocation"
+        );
+      }
       requireCondition(
-        !old || old.status !== "completed" || syncing,
-        "Completed implementation is terminal",
+        !old || old.status !== "completed" || syncing || reviewRevision && !equal(old.feedback, meta3.feedback),
+        "Completed implementation is terminal without new review feedback",
         true
       );
+      if (kind === "implement-artifact" && old?.code && !syncing)
+        requireCondition(
+          meta3.code && meta3.code.repository === old.code.repository && meta3.code.base_commit === old.code.base_commit,
+          "Implement baseline cannot change during correction"
+        );
       if (kind === "phase-artifact") {
         requireCondition(
           meta3.operation === "create" === (old === null),
@@ -29992,7 +30238,8 @@ ${dump(event)}\`\`\`
       const directory = {
         design: "design",
         decision: "plan-decision",
-        final: "plan-final"
+        final: "plan-final",
+        implement: "implement"
       }[meta3.review_stage];
       requireCondition(
         meta3.review_cycle_id.startsWith(directory + "-cycle-"),
@@ -30002,7 +30249,7 @@ ${dump(event)}\`\`\`
       if (kind === "phase-review")
         requireCondition(name === base + "review.md", "Invalid aggregate path");
       else {
-        const allowed = meta3.review_stage === "design" ? EXPECTED.design : meta3.review_stage === "decision" ? EXPECTED.plan_decision : EXPECTED.plan_final;
+        const allowed = meta3.review_stage === "design" ? EXPECTED.design : meta3.review_stage === "decision" ? EXPECTED.plan_decision : meta3.review_stage === "implement" ? EXPECTED.implement : EXPECTED.plan_final;
         requireCondition(
           (meta3.source_kind === "ai" ? allowed : ["human"]).includes(
             meta3.source_id
@@ -30058,7 +30305,7 @@ ${dump(event)}\`\`\`
       "Invalid init request"
     );
     requireCondition(
-      !import_node_fs3.default.existsSync(this.path("flow-state.yml")) && !import_node_fs3.default.existsSync(this.path("audit.md")) && !import_node_fs3.default.existsSync(this.path(JOURNAL)),
+      !import_node_fs4.default.existsSync(this.path("flow-state.yml")) && !import_node_fs4.default.existsSync(this.path("audit.md")) && !import_node_fs4.default.existsSync(this.path(JOURNAL)),
       "Feature already initialized",
       true
     );
@@ -30070,11 +30317,21 @@ ${dump(event)}\`\`\`
       phase: "design",
       state: "running",
       artifacts: { design: null, plan: null, implement: null },
-      reviews: { design: null, plan_decision: null, plan_final: null },
-      review_mode: { design: "ai", plan: "ai" },
+      reviews: {
+        design: null,
+        plan_decision: null,
+        plan_final: null,
+        implement: null
+      },
+      review_mode: { design: "ai", plan: "ai", implement: "ai" },
       counters: {
         design: { automatic_revision: 0, execution_retry: 0, human_retry: 0 },
         plan_decision: {
+          automatic_revision: 0,
+          execution_retry: 0,
+          human_retry: 0
+        },
+        implement: {
           automatic_revision: 0,
           execution_retry: 0,
           human_retry: 0
@@ -30085,7 +30342,12 @@ ${dump(event)}\`\`\`
           human_retry: 0
         }
       },
-      cycle_counters: { design: 0, plan_decision: 0, plan_final: 0 },
+      cycle_counters: {
+        design: 0,
+        plan_decision: 0,
+        plan_final: 0,
+        implement: 0
+      },
       active_review: null,
       active_invocation: null,
       waiting: null,
@@ -30217,6 +30479,11 @@ ${dump(event)}\`\`\`
       equal(result.target, active.target) && equal(result.design, active.design),
       "Review target mismatch"
     );
+    if (active.stage === "implement") {
+      const [im] = this.reference(active.target);
+      requireCondition(equal(result.code, im.code), "Review code snapshot mismatch");
+      checkCodeSnapshot(this.root, im.code, im.commit);
+    }
     if (result.status === "passed") this.checkDocumentInputs(result);
     this.reference(active.target);
     if (active.design) this.reference(active.design);
@@ -30229,7 +30496,7 @@ ${dump(event)}\`\`\`
     let [, events] = this.events();
     this.syncAudit();
     const standalone = !events.some((e) => e.event_type === "flow.started");
-    if (!import_node_fs3.default.existsSync(this.path("flow-state.yml")) && !standalone) {
+    if (!import_node_fs4.default.existsSync(this.path("flow-state.yml")) && !standalone) {
       const started = events.filter((e) => e.event_type === "flow.started");
       requireCondition(
         started.length === 1,
@@ -30244,7 +30511,7 @@ ${dump(event)}\`\`\`
     for (const event of pending) {
       requireCondition(recover, "Unfinished persistence operation; use --recover", true);
       const data = event.data, p = data.target_path && event.event_type === "artifact.update_prepared" ? data.target_path : "flow-state.yml";
-      const current = import_node_fs3.default.existsSync(this.path(p)) ? digest(import_node_fs3.default.readFileSync(this.path(p))) : null, after = event.event_type === "artifact.update_prepared" ? data.after.sha256 : data.after_sha256, key = event.event_key.replace(/:prepared$/, "");
+      const current = import_node_fs4.default.existsSync(this.path(p)) ? digest(import_node_fs4.default.readFileSync(this.path(p))) : null, after = event.event_type === "artifact.update_prepared" ? data.after.sha256 : data.after_sha256, key = event.event_key.replace(/:prepared$/, "");
       if (current === after) {
         let type, payload;
         if (event.event_type === "artifact.update_prepared") {
@@ -30350,7 +30617,9 @@ ${dump(event)}\`\`\`
         }
       }
     if (state.active_review) {
-      this.reference(state.active_review.target);
+      const [target] = this.reference(state.active_review.target);
+      if (state.active_review.stage === "implement")
+        checkCodeSnapshot(this.root, target.code, target.commit);
       if (state.active_review.design)
         this.reference(state.active_review.design);
     }
@@ -30365,13 +30634,13 @@ ${dump(event)}\`\`\`
 };
 
 // src/checkpoints.ts
-var import_node_fs4 = __toESM(require("node:fs"), 1);
+var import_node_fs5 = __toESM(require("node:fs"), 1);
 var import_node_os = __toESM(require("node:os"), 1);
-var import_node_path3 = __toESM(require("node:path"), 1);
-var import_node_child_process = require("node:child_process");
+var import_node_path4 = __toESM(require("node:path"), 1);
+var import_node_child_process2 = require("node:child_process");
 var import_node_crypto3 = require("node:crypto");
-function git(cwd, args, input2, env = {}) {
-  const result = (0, import_node_child_process.spawnSync)("git", args, {
+function git2(cwd, args, input2, env = {}) {
+  const result = (0, import_node_child_process2.spawnSync)("git", args, {
     cwd,
     input: input2,
     encoding: "utf8",
@@ -30386,17 +30655,17 @@ function git(cwd, args, input2, env = {}) {
   return result.stdout.trim();
 }
 function repository(store) {
-  return import_node_fs4.default.realpathSync(git(store.root, ["rev-parse", "--show-toplevel"]));
+  return import_node_fs5.default.realpathSync(git2(store.root, ["rev-parse", "--show-toplevel"]));
 }
 function verify(store, repo, checkpoint) {
   requireCondition(
-    git(repo, ["rev-parse", "refs/tags/" + checkpoint.tag]) === checkpoint.commit,
+    git2(repo, ["rev-parse", "refs/tags/" + checkpoint.tag]) === checkpoint.commit,
     "Checkpoint tag differs from recorded commit",
     true
   );
-  const relative = import_node_path3.default.relative(repo, store.root).split(import_node_path3.default.sep).join("/");
+  const relative = import_node_path4.default.relative(repo, store.root).split(import_node_path4.default.sep).join("/");
   for (const ref of checkpoint.artifacts) {
-    const result = (0, import_node_child_process.spawnSync)(
+    const result = (0, import_node_child_process2.spawnSync)(
       "git",
       [
         "show",
@@ -30434,7 +30703,7 @@ function createCheckpoint(store, request) {
     verify(store, repo, done.data.checkpoint);
     return done.data.checkpoint;
   }
-  const feature = import_node_path3.default.relative(repo, store.root).split(import_node_path3.default.sep).join("/");
+  const feature = import_node_path4.default.relative(repo, store.root).split(import_node_path4.default.sep).join("/");
   requireCondition(
     feature !== "" && !feature.startsWith("../"),
     "Feature must be inside a Git repository subdirectory"
@@ -30442,13 +30711,13 @@ function createCheckpoint(store, request) {
   const selected = [.../* @__PURE__ */ new Set([feature, ...request.paths])];
   for (const name of selected) {
     requireCondition(
-      typeof name === "string" && name.length && !import_node_path3.default.isAbsolute(name) && !name.split(/[\\/]/).some((p) => p === ".." || p === ".git") && !name.startsWith(":"),
+      typeof name === "string" && name.length && !import_node_path4.default.isAbsolute(name) && !name.split(/[\\/]/).some((p) => p === ".." || p === ".git") && !name.startsWith(":"),
       "Invalid checkpoint path"
     );
-    const candidate = import_node_path3.default.resolve(repo, name);
-    if (import_node_fs4.default.existsSync(candidate))
+    const candidate = import_node_path4.default.resolve(repo, name);
+    if (import_node_fs5.default.existsSync(candidate))
       requireCondition(
-        import_node_fs4.default.realpathSync(candidate).startsWith(repo + import_node_path3.default.sep),
+        import_node_fs5.default.realpathSync(candidate).startsWith(repo + import_node_path4.default.sep),
         "Checkpoint path escapes repository"
       );
   }
@@ -30467,14 +30736,14 @@ function createCheckpoint(store, request) {
       "Unknown checkpoint decision event"
     );
   const tag = `flow/${state.feature_id}/${state.run_id}/${request.checkpoint_id}`;
-  const existing = (0, import_node_child_process.spawnSync)(
+  const existing = (0, import_node_child_process2.spawnSync)(
     "git",
     ["show-ref", "--verify", "--quiet", "refs/tags/" + tag],
     { cwd: repo }
   );
   requireCondition(existing.status === 1, "Checkpoint tag already exists", true);
-  git(repo, ["check-ref-format", "refs/tags/" + tag]);
-  const parent = git(repo, ["rev-parse", "HEAD"]);
+  git2(repo, ["check-ref-format", "refs/tags/" + tag]);
+  const parent = git2(repo, ["rev-parse", "HEAD"]);
   const start = store.append(
     "action.started",
     {
@@ -30488,15 +30757,15 @@ function createCheckpoint(store, request) {
     "flow",
     state.run_id
   );
-  const temporary = import_node_fs4.default.mkdtempSync(
-    import_node_path3.default.join(import_node_os.default.tmpdir(), "flow-checkpoint-index-")
+  const temporary = import_node_fs5.default.mkdtempSync(
+    import_node_path4.default.join(import_node_os.default.tmpdir(), "flow-checkpoint-index-")
   );
   let commit;
   try {
-    const env = { GIT_INDEX_FILE: import_node_path3.default.join(temporary, "index") };
-    git(repo, ["read-tree", parent], void 0, env);
-    git(repo, ["add", "-f", "--", ...selected], void 0, env);
-    git(
+    const env = { GIT_INDEX_FILE: import_node_path4.default.join(temporary, "index") };
+    git2(repo, ["read-tree", parent], void 0, env);
+    git2(repo, ["add", "-f", "--", ...selected], void 0, env);
+    git2(
       repo,
       [
         "rm",
@@ -30510,17 +30779,17 @@ function createCheckpoint(store, request) {
       void 0,
       env
     );
-    const tree = git(repo, ["write-tree"], void 0, env);
-    commit = git(
+    const tree2 = git2(repo, ["write-tree"], void 0, env);
+    commit = git2(
       repo,
-      ["commit-tree", tree, "-p", parent],
+      ["commit-tree", tree2, "-p", parent],
       `Flow checkpoint ${request.checkpoint_id}
 
 ${request.reason}
 `
     );
   } finally {
-    import_node_fs4.default.rmSync(temporary, { recursive: true, force: true });
+    import_node_fs5.default.rmSync(temporary, { recursive: true, force: true });
   }
   const checkpoint = {
     checkpoint_id: request.checkpoint_id,
@@ -30541,7 +30810,7 @@ ${request.reason}
     null,
     [start.event_id]
   );
-  git(repo, [
+  git2(repo, [
     "update-ref",
     "refs/tags/" + tag,
     commit,
@@ -30570,7 +30839,7 @@ function recoverCheckpoint(store, request) {
   );
   requireCondition(prepared, "Missing prepared checkpoint");
   const checkpoint = prepared.data.checkpoint, repo = repository(store);
-  const exists = (0, import_node_child_process.spawnSync)(
+  const exists = (0, import_node_child_process2.spawnSync)(
     "git",
     ["show-ref", "--verify", "--quiet", "refs/tags/" + checkpoint.tag],
     { cwd: repo }
@@ -30582,10 +30851,10 @@ function recoverCheckpoint(store, request) {
       true
     );
     requireCondition(
-      git(repo, ["cat-file", "-t", checkpoint.commit]) === "commit",
+      git2(repo, ["cat-file", "-t", checkpoint.commit]) === "commit",
       "Checkpoint commit is missing"
     );
-    git(repo, [
+    git2(repo, [
       "update-ref",
       "refs/tags/" + checkpoint.tag,
       checkpoint.commit,
@@ -30617,7 +30886,7 @@ function restoreCheckpoint(store, request) {
   requireCondition(event, "Unknown completed checkpoint");
   const checkpoint = event.data.checkpoint;
   verify(store, repo, checkpoint);
-  git(repo, ["check-ref-format", "refs/heads/" + request.branch]);
+  git2(repo, ["check-ref-format", "refs/heads/" + request.branch]);
   const key = "checkpoint-restore:" + request.request_id;
   const previous = events.find((e) => e.event_key === key);
   if (previous)
@@ -30625,7 +30894,7 @@ function restoreCheckpoint(store, request) {
       equal(previous.data.evidence, [checkpoint.commit, request.branch]),
       "Restore request ID reused"
     );
-  const branch = (0, import_node_child_process.spawnSync)(
+  const branch = (0, import_node_child_process2.spawnSync)(
     "git",
     ["rev-parse", "--verify", "refs/heads/" + request.branch],
     { cwd: repo, encoding: "utf8" }
@@ -30654,7 +30923,7 @@ function restoreCheckpoint(store, request) {
       "flow",
       event.run_id
     );
-    git(repo, [
+    git2(repo, [
       "update-ref",
       "refs/heads/" + request.branch,
       checkpoint.commit,
@@ -30676,9 +30945,9 @@ function restoreCheckpoint(store, request) {
 }
 
 // src/cli.ts
-var help = `flowctl 4.5.0 \u2014 Flow persistence and contract guards
+var help = `flowctl 4.6.0 \u2014 Flow persistence and contract guards
 Usage: node flowctl.js --root FEATURE COMMAND [OPTIONS]
-Commands: init, publish, transition, audit-append, review-check --request FILE|-
+Commands: init, publish, transition, audit-append, code-snapshot, review-check --request FILE|-
           validate PATH [--references]
           resume-check [--recover], audit-migrate
           checkpoint-create, checkpoint-recover, checkpoint-restore --request FILE|-
@@ -30687,7 +30956,7 @@ Options: --version, --help
 async function main(argv = process.argv.slice(2)) {
   try {
     if (argv.includes("--version")) {
-      console.log("flowctl 4.5.0");
+      console.log("flowctl 4.6.0");
       return 0;
     }
     if (argv.includes("--help") || argv.includes("-h")) {
@@ -30738,6 +31007,7 @@ async function main(argv = process.argv.slice(2)) {
           "transition",
           "audit-append",
           "review-check",
+          "code-snapshot",
           "checkpoint-create",
           "checkpoint-recover",
           "checkpoint-restore"
@@ -30748,8 +31018,8 @@ async function main(argv = process.argv.slice(2)) {
         argv.length === 2 && argv[0] === "--request",
         "--request FILE|- is required"
       );
-      const request = object(
-        load(utf8(import_node_fs5.default.readFileSync(argv[1] === "-" ? 0 : argv[1])))
+      const request = object2(
+        load(utf8(import_node_fs6.default.readFileSync(argv[1] === "-" ? 0 : argv[1])))
       );
       if (command === "checkpoint-create")
         return createCheckpoint(store, request);
@@ -30757,6 +31027,7 @@ async function main(argv = process.argv.slice(2)) {
         return recoverCheckpoint(store, request);
       if (command === "checkpoint-restore")
         return restoreCheckpoint(store, request);
+      if (command === "code-snapshot") return codeSnapshot(store.root, request);
       if (command === "init") return store.initialize(request);
       if (command === "publish") return store.publish(request);
       if (command === "transition") return store.transition(request);

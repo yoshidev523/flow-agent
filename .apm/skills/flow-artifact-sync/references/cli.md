@@ -78,7 +78,7 @@ feedbackはtarget_pathを`feedback/{phase}/next`にするとlock内で次番号�
 
 ## review-check
 
-request: stage design|plan_decision|plan_final、target参照、design参照またはnull、
+request: stage design|plan_decision|plan_final|implement、target参照、design参照またはnull、
 review_cycle_id、mode ai|human、source_paths。
 必要source全部のpathを指定し、欠落pathも含める。
 返却値へschema_version flow/phase-review-v2、revision 1、mode、created_atを加え、
@@ -195,3 +195,17 @@ aggregateへそのまま保存する。findingsだけでなく確認済み項目
 ローカル文書の欠落・digest不一致は契約不一致として旧reviewの利用を拒否する。
 外部URIの再取得は行わないため、呼出側が集約・phase移行前にconnectorで鮮度を確認する。
 詳細は[project-knowledge.md](project-knowledge.md)を参照する。
+
+## code-snapshot
+
+Implement review用の読取専用command。requestはrepository（Git rootの絶対path）、base_commit、head_commit。
+commitは小文字16進の完全IDを指定し、HEAD等の別名を渡さない。対象feature directoryは--rootで指定する。
+
+```sh
+node {flowctl} --root {feature_dir} code-snapshot --request /tmp/code-snapshot.yml
+```
+
+返却されたrepository/base_commit/head_commit/tree_sha256をImplementのcodeへ保持する。
+初回変更前はbase/headとも現在HEADで取得し、完了時はbaseを維持しheadを実装commitへ更新する。
+未commitコード、古いhead、祖先でないbaseは拒否する。Gitや作業treeを書き換えず、監査も追加しない。
+Implementのcompletedは作業完了であり、Flow完了にはstart_review implementとpassed後のadvanceが必要。

@@ -1,3 +1,4 @@
+import { checkCodeSnapshot } from "../code-review.js";
 import fs from "node:fs";
 import path from "node:path";
 import { Files } from "./files.js";
@@ -333,15 +334,31 @@ export class Store extends Files {
         review_cycle_id: cycle,
         target,
         design,
-      };
+      } as Fields;
     let tm: Fields;
     try {
       [tm] = this.reference(target);
       check(
         tm.artifact === artifact &&
-          tm.status === (stage === "plan_decision" ? "needs_input" : "ready"),
+          tm.status ===
+            (stage === "implement"
+              ? "completed"
+              : stage === "plan_decision"
+                ? "needs_input"
+                : "ready"),
         "Wrong review target/status",
       );
+      if (artifact === "implement") {
+        check(tm.code, "Implement review requires code snapshot");
+        checkCodeSnapshot(this.root, tm.code, tm.commit);
+        const [pm] = this.reference(tm.plan);
+        check(
+          pm.artifact === "plan" && pm.status === "ready",
+          "Implement review requires ready Plan",
+        );
+        this.checkDocumentInputs(pm);
+        base.code = tm.code;
+      }
       if (artifact === "plan") {
         check(design, "Missing Design input");
         const [dm] = this.reference(design);
@@ -412,7 +429,7 @@ export class Store extends Files {
         for (const original of sm.findings) {
           check(
             original.decision_refs.every((id: string) =>
-              tm.questions.some((q: Fields) => q.id === id),
+              (tm.questions ?? []).some((q: Fields) => q.id === id),
             ),
             "Unknown decision reference",
           );
@@ -436,6 +453,8 @@ export class Store extends Files {
     if (!equal([...seen].sort(), [...expected].sort()) && !failure)
       failure = { kind: "execution", reason: "Required sources are missing" };
     this.reference(target);
+    if (artifact === "implement")
+      checkCodeSnapshot(this.root, tm.code, tm.commit);
     if (design) this.reference(design);
     return {
       ...base,
@@ -504,6 +523,30 @@ export class Store extends Files {
           "Multiple Design inputs",
         );
     } else if (kind === "implement-artifact") {
+      if (meta.feedback) {
+        const [fm] = this.reference(meta.feedback);
+        check(
+          fm.schema_version === "flow/phase-feedback-v2" &&
+            fm.phase === "implement" &&
+            fm.operation === "revise",
+          "Invalid Implement feedback",
+        );
+        check(
+          equal(
+            fm.items.map((i: Fields) => i.id).sort(),
+            (meta.feedback_results ?? []).map((i: Fields) => i.id).sort(),
+          ),
+          "Missing Implement feedback results",
+        );
+        // The feedback targets an earlier revision of this mutable artifact.
+        check(
+          fm.target.path === "artifacts/implement.md" &&
+            fm.target.revision < meta.revision,
+          "Wrong Implement feedback target",
+        );
+      }
+      if (meta.code && meta.status === "completed")
+        checkCodeSnapshot(this.root, meta.code, meta.commit);
       if (meta.status === "blocked" && meta.producer !== "flow-artifact-sync")
         return;
       const [plan] = this.reference(meta.plan);
@@ -548,10 +591,23 @@ export class Store extends Files {
       const [target] = this.reference(meta.target);
       check(
         target.status ===
-          (meta.review_stage === "decision" ? "needs_input" : "ready") &&
-          target.artifact === meta.phase,
+          (meta.review_stage === "implement"
+            ? "completed"
+            : meta.review_stage === "decision"
+              ? "needs_input"
+              : "ready") && target.artifact === meta.phase,
         "Wrong review target/status",
       );
+      if (meta.phase === "implement") {
+        check(equal(meta.code, target.code), "Source code snapshot mismatch");
+        checkCodeSnapshot(this.root, meta.code, target.commit);
+        const [pm] = this.reference(target.plan);
+        check(
+          pm.artifact === "plan" && pm.status === "ready",
+          "Implement review requires ready Plan",
+        );
+        this.checkDocumentInputs(pm);
+      }
       if (meta.design) {
         const [dm] = this.reference(meta.design);
         check(
@@ -567,8 +623,9 @@ export class Store extends Files {
           design: "design",
           decision: "plan_decision",
           final: "plan_final",
+          implement: "implement",
         } as const
-      )[meta.review_stage as "design" | "decision" | "final"];
+      )[meta.review_stage as "design" | "decision" | "final" | "implement"];
       const result = this.reviewCheck(
         stage,
         meta.target,
@@ -584,6 +641,7 @@ export class Store extends Files {
         "failure",
         "judgments",
         "project_knowledge",
+        "code",
       ])
         check(
           equal(meta[key], result[key]),
@@ -725,6 +783,9 @@ export class Store extends Files {
         check(
           meta.status === "blocked" &&
             meta.commit === null &&
+            meta.code === undefined &&
+            meta.feedback === undefined &&
+            meta.feedback_results === undefined &&
             meta.tasks.every((t: Fields) => t.status === "pending") &&
             meta.verifications.every((v: Fields) => v.status === "not_run"),
           "Sync must invalidate implementation completion and verification evidence",
@@ -752,11 +813,44 @@ export class Store extends Files {
         !old || old.artifact === meta.artifact,
         "Cannot change artifact identity",
       );
+      let reviewRevision = false;
+      if (
+        kind === "implement-artifact" &&
+        meta.feedback &&
+        before &&
+        !syncing
+      ) {
+        const [fm] = this.reference(meta.feedback);
+        const continuing = old?.feedback && equal(old.feedback, meta.feedback);
+        reviewRevision =
+          fm.schema_version === "flow/phase-feedback-v2" &&
+          fm.phase === "implement" &&
+          fm.operation === "revise" &&
+          (continuing || equal(fm.target, before));
+        check(
+          reviewRevision && equal(meta.plan, old!.plan),
+          "Invalid Implement revision feedback/Plan",
+        );
+        check(
+          meta.invocation_id !== old!.invocation_id || continuing,
+          "Implement revision requires new invocation",
+        );
+      }
       check(
-        !old || old.status !== "completed" || syncing,
-        "Completed implementation is terminal",
+        !old ||
+          old.status !== "completed" ||
+          syncing ||
+          (reviewRevision && !equal(old.feedback, meta.feedback)),
+        "Completed implementation is terminal without new review feedback",
         true,
       );
+      if (kind === "implement-artifact" && old?.code && !syncing)
+        check(
+          meta.code &&
+            meta.code.repository === old.code.repository &&
+            meta.code.base_commit === old.code.base_commit,
+          "Implement baseline cannot change during correction",
+        );
       if (kind === "phase-artifact") {
         check(
           (meta.operation === "create") === (old === null),
@@ -817,8 +911,9 @@ export class Store extends Files {
           design: "design",
           decision: "plan-decision",
           final: "plan-final",
+          implement: "implement",
         } as const
-      )[meta.review_stage as "design" | "decision" | "final"];
+      )[meta.review_stage as "design" | "decision" | "final" | "implement"];
       check(
         meta.review_cycle_id.startsWith(directory + "-cycle-"),
         "Cycle stage prefix mismatch",
@@ -832,7 +927,9 @@ export class Store extends Files {
             ? EXPECTED.design
             : meta.review_stage === "decision"
               ? EXPECTED.plan_decision
-              : EXPECTED.plan_final;
+              : meta.review_stage === "implement"
+                ? EXPECTED.implement
+                : EXPECTED.plan_final;
         check(
           (meta.source_kind === "ai" ? allowed : ["human"]).includes(
             meta.source_id,
@@ -904,11 +1001,21 @@ export class Store extends Files {
       phase: "design",
       state: "running",
       artifacts: { design: null, plan: null, implement: null },
-      reviews: { design: null, plan_decision: null, plan_final: null },
-      review_mode: { design: "ai", plan: "ai" },
+      reviews: {
+        design: null,
+        plan_decision: null,
+        plan_final: null,
+        implement: null,
+      },
+      review_mode: { design: "ai", plan: "ai", implement: "ai" },
       counters: {
         design: { automatic_revision: 0, execution_retry: 0, human_retry: 0 },
         plan_decision: {
+          automatic_revision: 0,
+          execution_retry: 0,
+          human_retry: 0,
+        },
+        implement: {
           automatic_revision: 0,
           execution_retry: 0,
           human_retry: 0,
@@ -919,7 +1026,12 @@ export class Store extends Files {
           human_retry: 0,
         },
       },
-      cycle_counters: { design: 0, plan_decision: 0, plan_final: 0 },
+      cycle_counters: {
+        design: 0,
+        plan_decision: 0,
+        plan_final: 0,
+        implement: 0,
+      },
       active_review: null,
       active_invocation: null,
       waiting: null,
@@ -1056,6 +1168,11 @@ export class Store extends Files {
         equal(result.design, active.design),
       "Review target mismatch",
     );
+    if (active.stage === "implement") {
+      const [im] = this.reference(active.target);
+      check(equal(result.code, im.code), "Review code snapshot mismatch");
+      checkCodeSnapshot(this.root, im.code, im.commit);
+    }
     if (result.status === "passed") this.checkDocumentInputs(result);
     this.reference(active.target);
     if (active.design) this.reference(active.design);
@@ -1212,7 +1329,9 @@ export class Store extends Files {
         }
       }
     if (state.active_review) {
-      this.reference(state.active_review.target);
+      const [target] = this.reference(state.active_review.target);
+      if (state.active_review.stage === "implement")
+        checkCodeSnapshot(this.root, target.code, target.commit);
       if (state.active_review.design)
         this.reference(state.active_review.design);
     }
