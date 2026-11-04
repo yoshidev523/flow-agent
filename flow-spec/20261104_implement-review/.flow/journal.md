@@ -353,3 +353,56 @@ data:
     revision: 5
     sha256: f49e7a882f03ab8e086fd0997b8ec27bb3fab856f1b94026e4f08cfa6e601817
 ```
+
+## E-000014 — artifact.update_prepared
+
+```yaml
+event_id: "E-000014"
+event_key: implement-review-implementation-commit-record:prepared
+event_type: artifact.update_prepared
+run_id: implement-review-authoring
+invocation_id: implement-review-authoring
+occurred_at: "2026-11-04T14:28:54+00:00"
+recorded_at: "2026-11-04T14:28:54+00:00"
+actor: flow-implement
+caused_by: []
+data:
+  target_path: artifacts/implement.md
+  before_sha256: f49e7a882f03ab8e086fd0997b8ec27bb3fab856f1b94026e4f08cfa6e601817
+  request_sha256: 53d57d7983c3a5523c6d393d979c02fa3a3bbf0ac0642a600267584c6afe56c7
+  after:
+    path: artifacts/implement.md
+    revision: 6
+    sha256: 7d896f996ee11c85275d338179435deb4730eeef967a616cdc74c84489e1a54b
+  operation: execute
+  change: 利用者依頼の実装commitとコードsnapshotを記録し作業完了へ更新
+  reason: 実装変更のcommit成功を確認したため
+  sections:
+    - タスク進捗
+    - 未完了事項
+  references:
+    - fed2ccabc0af6b12bda39f01fe8936a38242c986
+  old_status: in_progress
+  new_status: completed
+```
+
+## E-000015 — artifact.updated
+
+```yaml
+event_id: "E-000015"
+event_key: implement-review-implementation-commit-record:completed
+event_type: artifact.updated
+run_id: implement-review-authoring
+invocation_id: implement-review-authoring
+occurred_at: "2026-11-04T14:28:54+00:00"
+recorded_at: "2026-11-04T14:28:54+00:00"
+actor: flow-implement
+caused_by:
+  - "E-000014"
+data:
+  prepared_event_id: "E-000014"
+  artifact:
+    path: artifacts/implement.md
+    revision: 6
+    sha256: 7d896f996ee11c85275d338179435deb4730eeef967a616cdc74c84489e1a54b
+```

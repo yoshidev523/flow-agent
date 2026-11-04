@@ -1,12 +1,12 @@
 ---
 schema_version: flow/implement-artifact-v2
 artifact: implement
-revision: 5
-status: in_progress
+revision: 6
+status: completed
 producer: flow-implement
 invocation_id: implement-review-authoring
 operation: execute
-updated_at: "2026-11-04T14:26:45+00:00"
+updated_at: "2026-11-04T14:28:54+00:00"
 plan:
   path: artifacts/plan.md
   revision: 1
@@ -46,7 +46,7 @@ verifications:
     status: passed
     reason: 最終版を一時consumerでCodex/Claudeへ配置成功。tmp.b4GgGrhrLZを保持。
 blocker: null
-commit: null
+commit: fed2ccabc0af6b12bda39f01fe8936a38242c986
 project_knowledge:
   discovery: 適用範囲のAGENTS.md、既存review hub/観点skill、Zod契約・遷移・CLIと配布検証を確認した。外部projectへの変更なし。
   completeness: complete
@@ -68,11 +68,16 @@ project_knowledge:
       status: compliant
       evidence: .apmのhub/2観点agent・skill、共通project-rules拡張、src契約/guard/transitionと対応文書・template・配置検証を更新
       finding_ids: []
+code:
+  repository: /Users/yoshikihonda/.codex/worktrees/e9a0/flow-agent
+  base_commit: 91c9fb8fcf31b050d2807ce3a49d3e39a68ae5dc
+  head_commit: fed2ccabc0af6b12bda39f01fe8936a38242c986
+  tree_sha256: 0bfb74e286ca3687eb9ef1022cc4916723d4d497c8d136a804c7373b6bd77cf7
 ---
 # Implementレビュー追加
 
 ## タスク進捗
-今回の変更範囲に従う。
+T-001〜004の変更と必須検証、利用者が依頼した実装commitを完了した。Flow本体によるreview通過を表すものではない。
 
 ## 変更サマリ
 利用者指定で4.6.0へ更新。apm/package/lock/CLI/現行文書の表記を揃え、両配布CLIと同期資源を再生成した。
@@ -95,7 +100,7 @@ APM verify/build/check-dist/deploymentと3skillのquick_validate.pyは成功。g
 新規review契約を作らず既存v2を拡張。新stage/keyが必要なため旧Flow stateは暗黙移行しない。TDDを共通必須とせずproject-rulesが適用規約と実施証拠を確認する。
 
 ## 未完了事項
-変更は未commit。Flow本体や新reviewerを実際のagent環境で起動した実地評価は未実施。機械テスト・配置検証と区別する。
+実装commit fed2ccabc0af6b12bda39f01fe8936a38242c986を確認済み。Flow本体や新reviewerを実際のagent環境で起動した実地評価は未実施。機械テスト・配置検証と区別する。
 
 ## 変更履歴
 
@@ -148,3 +153,13 @@ APM verify/build/check-dist/deploymentと3skillのquick_validate.pyは成功。g
 - 変更箇所: 変更サマリ、検証ログ、プロジェクト知識
 - 参照: apm.yml、package.json、package-lock.json、src/cli.ts
 - 状態変更: in_progress → in_progress
+
+### revision 6
+
+- 日時: 2026-11-04T14:28:54+00:00
+- 操作: execute
+- 変更内容: 利用者依頼の実装commitとコードsnapshotを記録し作業完了へ更新
+- 背景・理由: 実装変更のcommit成功を確認したため
+- 変更箇所: タスク進捗、未完了事項
+- 参照: fed2ccabc0af6b12bda39f01fe8936a38242c986
+- 状態変更: in_progress → completed
