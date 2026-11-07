@@ -17,6 +17,7 @@ printf 'Deployment verification directory: %s\n' "$flow_verify_root"
   apm compile --validate --target claude,codex
 )
 for skill_name in flow flow-artifact-sync flow-design flow-plan flow-implement \
+  flow-session-report flow-pr-annotations \
   flow-implement-review flow-implement-review-correctness flow-implement-review-maintainability \
   flow-project-knowledge flow-project-rules-review \
   flow-design-review flow-design-review-requirements flow-design-review-quality-risk \
@@ -28,6 +29,7 @@ do
   test -f "$flow_consumer_dir/.claude/skills/$skill_name/SKILL.md"
 done
 for agent_name in flow-designer flow-planner flow-implementer flow-design-reviewer \
+  flow-session-reporter \
   flow-implement-reviewer flow-implement-correctness-reviewer flow-implement-maintainability-reviewer \
   flow-project-knowledge-agent flow-project-rules-reviewer \
   flow-design-requirements-reviewer flow-design-quality-risk-reviewer \
@@ -60,6 +62,7 @@ do
   node "$flow_sync_only_dir/flow-artifact-sync/scripts/flowctl.js" --help >/dev/null
   cmp "$flow_source_dir/.apm/skills/flow/scripts/flowctl.js" "$flow_consumer_dir/$skill_root/skills/flow/scripts/flowctl.js"
   test -f "$flow_consumer_dir/$skill_root/skills/flow/references/project-knowledge.md"
+  cmp "$flow_source_dir/.apm/skills/flow-session-report/assets/session-report.html" "$flow_consumer_dir/$skill_root/skills/flow-session-report/assets/session-report.html"
   test -f "$flow_consumer_dir/$skill_root/skills/flow-artifact-sync/references/project-knowledge.md"
   cmp "$flow_source_dir/.apm/skills/flow/references/contracts.md" "$flow_consumer_dir/$skill_root/skills/flow/references/contracts.md"
   test ! -e "$flow_consumer_dir/$skill_root/skills/flow/references/contracts.schema.json"
