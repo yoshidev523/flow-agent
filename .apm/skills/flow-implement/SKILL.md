@@ -34,6 +34,8 @@ Planのpath・revision・digest、任意の実装修正feedback参照、target p
    code-snapshotはcommit済みかつコードtreeが一致する時だけ採取できるため、初回は開始時HEAD同士で取得して
    in_progressのcodeへ保存し、完了時にhead_commitだけを実装commitへ更新する。
 4. タスクの依存順に実装する。監査はタスク単位の検証結果、問題・課題と重要な決定へ絞る。
+   変更箇所を読むだけでは分からない重要な前提や制約は、該当コードの近くに理由を記す。
+   主要な採用理由と、削除・置換による振る舞いや責務への影響はImplement本文にも残す。
 5. checkpointsでtasks、verifications、blockerを更新し、publishする。
 6. Plan外の公開API、責務、入出力、error、範囲、検証条件の変更が必要ならblockedで停止する。
    矛盾・崩れた前提の証拠、影響、通常修正で解決できない理由、必要な変更をblockerと本文へ記録し、

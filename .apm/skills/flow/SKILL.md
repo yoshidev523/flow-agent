@@ -85,6 +85,8 @@ phase移行後は検証済みstateから次の操作を取り出し、同じタ�
    AIはcorrectness/maintainability/project-rulesの3観点、humanはsources/human.mdだけを使う。
    対象Implement・Planとcode snapshotを集約時・完了直前に照合する。
    passedをcheckpointへ保存してからadvanceで全体完了とし、完了stateもcheckpointへ保存する。
+8. 完了チェックポイントの保存後、応答終了前に[セッションレポート](#完了時のセッションレポート)の手順で
+   `flow-session-reporter` へHTML生成を委譲する。
 
 ## Review結果への対応
 
@@ -202,7 +204,7 @@ checkpoint-createの専用commit / local tagとは別に実行する。
 1. その応答で生じた問題・重要な判断・フィードバック・検証結果の要点を共通CLIで保存し、必要なstate・成果物の保存を終える。
    writerなどが更新中なら完了を待ち、保存commitと同時に対象fileを更新させない。
 2. git statusと差分を確認し、対象feature directoryの`audit.md`、`.flow/journal.md`、`flow-state.yml`、
-   artifacts、inputs、reviews、feedbackの未保存差分をまとめる。
+   artifacts（現行のセッションレポートを含む）、inputs、reviews、feedbackの未保存差分をまとめる。
    Flowが起動時に作成・補完した`.gitattributes`も対象に含める。
    lockなどの一時file、機密、別タスク・利用者の無関係な変更、実装途中のcodeは含めない。
 3. 対象pathを明示してstageし、今回の保存対象だけをcommitする。
@@ -218,11 +220,38 @@ Git履歴を証跡とする。成功・失敗を記録するためにaudit.mdや
 重要な実装結果やpush・PR作成の結果は記録する。checkpoint内部処理はjournalだけへ残す。
 pushやtagの作成はこの手順に含めず、pushは利用者の明示依頼がある場合だけ行う。
 
+## 完了時のセッションレポート
+
+Flowは完了チェックポイント保存後、`flow-session-reporter` に対象repository、feature directory、
+完了チェックポイントのcommit SHA、現行のImplement review cycleとコードsnapshotを渡す。
+サブエージェントは[flow-session-report](../flow-session-report/SKILL.md)で
+`artifacts/session-report.html` を生成する。
+FlowはHTMLの実装commit・review cycle・完了チェックポイントと現在のstate・現行参照を照合し、
+応答終了前の保存commitに含めてpathを返す。
+
+委譲や生成に失敗した場合は、完了状態を保持し、HTMLが未生成または未更新であることと理由を返す。
+完了後の生成中断や再生成依頼は、`resume-check` と完了チェックポイントを照合して生成だけを委譲する。
+同じ対象の完全なHTMLは再利用できる。再計画中やレビュー対象が変わった後は旧HTMLを現行結果として案内せず、
+新しい完了チェックポイントから固定pathのHTMLを更新する。
+
+## PR作成後の行コメント
+
+完了済みFlowのPR作成依頼はメインエージェントが扱う。PR本文に変更で可能になったことと主な変更を要約する。
+現行HTMLがPRのhead commitに含まれる場合は、そのcommit上のファイルへのリンクを載せ、
+取得してブラウザで開く形式と伝える。
+PR URLが確定したら、メインエージェントが[flow-pr-annotations](../flow-pr-annotations/SKILL.md)を直接実行する。
+PR差分と今回のfeatureの変更が重なる箇所を対象にする。コードはレビュー済み差分と照合し、
+設計・計画などは完了証拠と照合する。対応を確認できた箇所だけを説明する。
+注釈の投稿も依頼されていれば投稿モード、PR作成のみなら下書きモードを使う。
+投稿の結果はPR作成の結果とともに既存の `action.completed` へ記録する。
+中断時はGitHub上の結果を確認してから再開する。
+
 ## 監査と所有
 
 監査の対象・形式・記録経路は[共通の記録方針](references/contracts.md#監査の記録方針)に従う。
 Flowは利用者の判断依頼と回答、feedbackとの対応を記録する。
-completed後に成果物変更が必要なら人間承認付き再計画へ進む。
+completed後に設計・計画・実装の成果物変更が必要なら人間承認付き再計画へ進む。
+同じ完了証拠から派生するセッションレポートの生成・復旧は[完了時のセッションレポート](#完了時のセッションレポート)に従う。
 補記は根拠と補記であることを明示し、元日時を推測せず、occurred_atには実測日時を使う。
 state更新、成果物保存、監査への追記は共通CLIだけを使う。監査保存障害では次操作へ進まない。
 新しい中継request/result成果物を設けず、既存artifactの参照で接続する。
@@ -231,6 +260,7 @@ state更新、成果物保存、監査への追記は共通CLIだけを使う。
 Flow
 ├── phase writer
 ├── flow-project-knowledge-agent -> flow-project-knowledge
+├── flow-session-reporter -> flow-session-report
 ├── decision review hub -> decision-quality / project-rules reviewers
 └── final review hub -> perspective reviewers
 ```

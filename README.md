@@ -35,6 +35,12 @@ Flow起動時に対象projectの`.gitattributes`を確認し、なければ作�
 既存の内容を保持し、`flow-spec/** linguist-generated=true`が未設定なら追記します。
 成果物はGit管理しながら、GitHubのPRでは差分を既定で折りたたみます。
 
+実装レビューを通過してFlowが完了すると、`artifacts/session-report.html` に
+変更前後、主な判断と理由、検証結果を保存します。取得したHTMLはブラウザで開けます。
+FlowのPRを作るときはメインエージェントが
+[flow-pr-annotations](.apm/skills/flow-pr-annotations/SKILL.md)で差分上の説明を用意します。
+投稿を依頼した場合はPRに行コメントとして追加します。このスキルはPR URLを指定して単独でも使えます。
+
 再計画の変更を既存成果物へ反映するときは
 [flow-artifact-sync](.apm/skills/flow-artifact-sync/SKILL.md)が既存成果物の本文・入力参照を更新し、
 同期の開始は内部journalへ、結果の要点は監査履歴へ残します。他スキルやFlow stateなしで、どのフェーズからでも使えます。

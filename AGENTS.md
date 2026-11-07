@@ -11,7 +11,8 @@
 機能ごとの実行成果物は`flow-spec/YYYYMMDD_feature/`へ保存します。
 Flow 4.7.0では`flow-state.yml`、事実履歴の`audit.md`、復旧用の`.flow/journal.md`、固定pathの
 `artifacts/design.md`、`artifacts/plan.md`、`artifacts/implement.md`を使います。
-固定成果物はrevisionと変更履歴を更新し、revision別fileは作りません。
+固定Markdown成果物はrevisionと変更履歴を更新し、revision別fileは作りません。
+完了後の説明は派生成果物として固定pathの`artifacts/session-report.html`に保存します。
 レビューは`reviews/{design,plan-decision,plan-final,implement}/cycle-0001/`へsourceとreview.md、
 feedbackは`feedback/{design,plan,implement}/feedback-0001.md`へ保存します。
 配布用CLI、Markdown契約、テンプレートは`.apm/skills/flow/`に同梱します。
@@ -68,6 +69,7 @@ flow_consumer_dir="$flow_verify_root/consumer"
 
 for skill_name in \
   flow flow-artifact-sync flow-design flow-plan flow-implement \
+  flow-session-report flow-pr-annotations \
   flow-implement-review flow-implement-review-correctness flow-implement-review-maintainability \
   flow-project-knowledge flow-project-rules-review \
   flow-design-review flow-design-review-requirements \
@@ -83,6 +85,7 @@ do
 done
 for agent_name in \
   flow-designer flow-planner flow-implementer \
+  flow-session-reporter \
   flow-implement-reviewer flow-implement-correctness-reviewer flow-implement-maintainability-reviewer \
   flow-project-knowledge-agent flow-project-rules-reviewer \
   flow-design-reviewer flow-design-requirements-reviewer \
@@ -151,6 +154,7 @@ APMは自己package installを循環依存として扱うため、独立consumer
 Flow
 ├── phase writer
 ├── flow-project-knowledge-agent
+├── flow-session-reporter (完了後のHTML)
 ├── decision review hub (Plan needs_input only)
 │   ├── decision-quality reviewer
 │   └── project-rules reviewer
@@ -205,6 +209,7 @@ Flow内部状態は`flow-state-v2`として`flow-state.yml`へ保存します。
 - perspective reviewer: 自分のsource
 - review hub: 自分のaggregate artifact
 - executor: `implement.md`
+- セッションレポート担当: `session-report.html`。完了証拠を読み、FlowがGitへ保存する。
 - Implement review hub: 実装review aggregate。correctness・maintainability・project-rules reviewerは各sourceだけを所有する。
 
 Flowはreview開始ごとに一意な`review_cycle_id`を発行し、state、全source、aggregateで
@@ -227,6 +232,8 @@ checkpointで変更前を保存し、同期後の旧承認を無効化します�
 decision reviewの`passed`は質問提示の根拠、最終reviewの`passed`はImplement開始の根拠と
 します。
 Implementのcompletedは作業完了を示し、Flow完了にはコードsnapshotを固定したImplement reviewのpassedを必須とします。
+完了チェックポイントの後にHTMLを生成し、通常の保存commitへ含めます。
+PR作成時の行コメントはFlow自身が独立した`flow-pr-annotations`を使って準備します。
 新しい正規化feedbackがある場合だけcompleted Implementを修正し、必須検証・commit・新cycle reviewを行います。
 保守性reviewは責務・可読性・重複/過剰抽象化・状態・変更波及・テストを評価し、任意改善をgateにしません。
 
