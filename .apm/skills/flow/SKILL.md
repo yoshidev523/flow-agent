@@ -5,7 +5,7 @@ disable-model-invocation: true
 user-invocable: true
 ---
 
-# Flow 4.6.0
+# Flow 4.7.0
 
 ## 起動と責務
 
@@ -61,6 +61,9 @@ review_mode.planはdecision/finalへ共通適用し、review_mode.implementは�
 
 ## 実行
 
+phase移行後は検証済みstateから次の操作を取り出し、同じターンで担当を起動して結果を処理する。
+利用者の回答・承認待ち、規定手順での停止、または依頼範囲の完了で応答を終える。
+
 1. 新規はinit、再開はresume-check。未完了invocationは実態確認前に再実行しない。
 2. pending_operationがnullで現在成果物がある場合はwriterを再起動せず、statusに応じた質問・reviewへ進む。
    作成・修正が必要な場合だけstart_invocationでwriterを予約し、指定操作、自分の入出力、対象project・対象範囲だけを渡して起動する。
@@ -70,11 +73,14 @@ review_mode.planはdecision/finalへ共通適用し、review_mode.implementは�
    正規化feedbackをpublishのfeedback/{phase}/nextで保存し、answer後にrespondを起動する。
 4. Design readyはstart_review design。AI hubはproject-rulesを含む3観点を直接起動し、human modeはFlowがsourceを作る。
    hubのpublish結果を登録し、passedならcheckpoint-create後にadvanceでPlanへ進む。
+   同じターンで手順2に従ってflow-plannerを起動し、結果を登録して手順5へ進む。
 5. PlanはDesign参照を保持する。needs_inputはstart_review plan_decision、readyはplan_final。
    decision passedをcheckpointへ保存してから未回答質問を提示し、回答採用時もcheckpointへ保存する。
    回答後はrespondでPlanへ戻る。
-6. final passedをcheckpointへ保存してからadvanceしexecutorへPlanと対象project・対象範囲を渡す。
+6. final passedをcheckpointへ保存してからadvanceし、同じターンでstart_invocationにより
+   flow-implementのexecuteを予約してflow-implementerを起動する。Planと対象project・対象範囲を渡す。
    executorは開始前のGit baselineを固定し、completedに実装commitとcode-snapshotを保持する。
+   publish結果をfinish_invocationで登録し、completedなら手順7へ、blockedなら停止手順へ進む。
 7. Implement completedを登録後、start_review implementでflow-implement-reviewerへ委譲する。
    AIはcorrectness/maintainability/project-rulesの3観点、humanはsources/human.mdだけを使う。
    対象Implement・Planとcode snapshotを集約時・完了直前に照合する。
@@ -105,7 +111,8 @@ AI reviewでは全stageのhubがproject-rules reviewerも起動する。Human mo
 人間に同じルール確認を依頼してhuman sourceへ正規化する。
 
 review登録後・phase移行前に、主要ルールの確認結果、例外、未確認事項、Markdownへのlinkを
-チャットへ表示する。passedの通知だけでは回答待ちにしない。Implement結果も同じ形式で知らせる。
+チャットへ表示する。passedは途中経過として通知し、同じターンで次の操作へ進む。
+Implement結果も同じ形式で知らせる。
 phase移行前はローカル文書のCLI検証に加え、外部正本の現在版を対応connectorで照合する。
 変更や必須資料の確認不能があれば旧reviewを使わず、共通手順の再評価・停止・再計画を使う。
 
