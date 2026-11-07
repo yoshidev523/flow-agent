@@ -1,4 +1,4 @@
-# Flow 4.8.0 契約
+# Flow 4.9.0 契約
 
 ## 正本
 
@@ -157,6 +157,10 @@ findingはgate/scope_candidate。
 gateはid/classification/resolution revise|human_decision/decision_refs/target/problem/evidence/instruction/completion/judgment。
 human_decisionにはjudgment必須、それ以外はnull。
 scope_candidateはid/classification/decision_refs/proposal/evidence/impact/recommendation。
+gateとscope_candidateのdecision_refsには、レビュー対象成果物のfront matterにあるquestions[].idだけを指定する。
+該当する質問がなければ `[]` とする。Implementは質問を持たないため常に `[]` とする。
+本文の判断IDを指摘で参照するときは根拠欄（evidence）に記載する。
+この規則はAIと人間の両方のsourceに適用する。
 judgmentはid/question/background/options/recommendation/reason/answer_format。
 現在scopeの成立に必須な問題だけをgateとし、追加scopeはstatusから除外する。
 decision reviewではscope_candidateを生成しない。
@@ -375,7 +379,7 @@ resume-check --recoverまたは元のtransition requestの再送で、保存済�
 外部操作の完了は推測しない。active invocationは実態と証拠を確認して登録または停止する。
 履歴は訂正イベントで補正する。暗号学的な改ざん防止や複数fileの完全transactionを保証しない。
 
-## 再計画とチェックポイント（4.8.0）
+## 再計画とチェックポイント（4.9.0）
 
 request_replanは進行中invocationがないこと、現在参照とcheckpointの一致、現在stateより後の
 checkpoint監査地点、kind replanの提示eventを検証し、phase replanningへ移す。
