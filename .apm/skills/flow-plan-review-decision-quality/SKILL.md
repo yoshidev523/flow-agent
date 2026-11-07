@@ -20,6 +20,8 @@ review cycle ID、対象path・revision・digest、出力path、feature director
 findingは質問・選択肢・影響・推奨・前提の成立に必須なgateだけとする。
 gateは現在scopeの成立に必須の問題だけで、resolutionはreviseまたはhuman_decision。
 対象、問題、根拠、要求変更、完了条件、decision_refsを持つ。
+decision_refsには対象Planのquestions[].idだけを指定し、該当がなければ `[]` とする。
+本文の判断IDを参照するときは根拠欄（evidence）に記載する。
 人間の判断が必要ならhuman_decisionとjudgmentを記録する。質問への回答を代行しない。
 既存選択肢を推奨できるが、回答を確定しない。選択肢自体が成立しない場合は
 満たすべき条件をrevise gateとしてwriterへ返す。

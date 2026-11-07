@@ -40,6 +40,8 @@ writerと同じ正本を使うが、適合判定は独立して行う。対象�
 ## 出力と保存
 
 review-source-v2、source_kind ai、project_knowledgeを必ず記録する。
+decision_refsには対象成果物のquestions[].idだけを指定し、該当がなければ `[]` とする。
+Implementでは常に `[]` とする。本文の判断IDを参照するときは根拠欄（evidence）に記載する。
 評価不能の場合も確認済み範囲・未確認箇所を可能な限り記録し、completenessはpartialとする。
 独自ルールがない場合は探索根拠をdiscoveryに記録し、documents/checksを空にできる。
 statusはfailureがあればunable、human_decision gateがあればblocked、revise gateがあれば

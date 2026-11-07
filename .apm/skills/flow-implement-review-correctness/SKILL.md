@@ -31,7 +31,9 @@ Plan内で修正できる場合はrevise、上流判断変更が必要ならhuma
 ## 出力
 
 review-source-v2、phase/review_stageはimplement、designはnull、source_kindはai。
-decision_refsは空（Implementは質問を所有しない）。failureがあればunable、
+Implementは質問を持たないためdecision_refsは常に `[]` とする。
+本文の判断IDを参照するときは根拠欄（evidence）に記載する。
+failureがあればunable、
 human_decision gateがあればblocked、revise gateがあればchanges_required、gateなしはpassed。
 契約不一致はunable/contract。評価開始時と保存直前のsnapshot・対象参照が一致することを確認する。
 他source・aggregate・実コード・Plan・Flow stateを編集しない。修正・利用者対話は呼出側へ返す。

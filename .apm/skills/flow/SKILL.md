@@ -5,7 +5,7 @@ disable-model-invocation: true
 user-invocable: true
 ---
 
-# Flow 4.8.0
+# Flow 4.9.0
 
 ## 起動と責務
 
@@ -143,7 +143,7 @@ Flowは返却されたルール・ナレッジへの反映要否と理由、実�
 
 ## Human modeと追加scope
 
-Human modeへ切り替える場合は[human-review.md](references/human-review.md)を読む。
+Human modeでレビューを行う場合は[human-review.md](references/human-review.md)を読む。
 直前の評価、切替理由、修正内容、未解決なのか修正後未評価なのかを提示する。
 Plan decisionのhuman reviewは質問への回答を求めず、質問が提示可能かだけを評価する。
 
