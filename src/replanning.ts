@@ -261,6 +261,7 @@ export function replanTransition(
     state.artifacts = args.artifacts;
     state.reviews.plan_decision = null;
     state.reviews.plan_final = null;
+    state.reviews.implement = null;
     if (context.target_phase === "design") state.reviews.design = null;
     state.phase = context.target_phase;
     state.replan = null;

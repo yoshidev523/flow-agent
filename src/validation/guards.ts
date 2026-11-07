@@ -21,12 +21,14 @@ export const STAGES = {
   design: ["design_review", "design", "design"],
   plan_decision: ["plan_decision_review", "plan", "decision"],
   plan_final: ["plan_review", "plan", "final"],
+  implement: ["implement_review", "implement", "implement"],
 } as const;
 export type Stage = keyof typeof STAGES;
 export const EXPECTED: Record<Stage, string[]> = {
   design: ["requirements", "quality-risk", "project-rules"],
   plan_decision: ["decision-quality", "project-rules"],
   plan_final: ["task-readiness", "project-rules"],
+  implement: ["correctness", "maintainability", "project-rules"],
 };
 export const HEADINGS: Record<string, string[]> = {
   design: [
@@ -306,6 +308,18 @@ export function validateMeta(meta: Fields, body?: string): ContractName {
   if (kind === "implement-artifact") {
     uniqueIds(meta.tasks, "task");
     uniqueIds(meta.verifications, "verification");
+    if (meta.feedback) {
+      check(
+        meta.feedback_results,
+        "Implement revision requires feedback results",
+      );
+      uniqueIds(meta.feedback_results, "feedback");
+      check(
+        meta.status !== "completed" ||
+          meta.feedback_results.every((r: Fields) => r.result === "applied"),
+        "Completed Implement cannot contain unresolved feedback",
+      );
+    }
     check(
       (meta.status === "blocked") === Boolean(meta.blocker),
       "Implement blocker/status mismatch",
@@ -337,6 +351,18 @@ export function validateMeta(meta: Fields, body?: string): ContractName {
     check(
       (meta.phase === "plan") === (meta.design !== null),
       "Plan review requires Design reference",
+    );
+    check(
+      (meta.phase === "implement") === (meta.review_stage === "implement"),
+      "Implement review phase/stage mismatch",
+    );
+    check(
+      meta.phase === "implement" || meta.code === undefined,
+      "Code snapshot belongs to Implement review",
+    );
+    check(
+      meta.phase !== "implement" || meta.failure || meta.code,
+      "Implement review requires code snapshot",
     );
     uniqueIds(meta.findings, "finding");
     for (const f of meta.findings)
@@ -377,6 +403,10 @@ export function validateMeta(meta: Fields, body?: string): ContractName {
     }
   }
   if (kind === "phase-feedback") {
+    check(
+      meta.phase !== "implement" || meta.operation === "revise",
+      "Implement feedback only supports revise",
+    );
     uniqueIds(meta.items, "feedback item");
     check(
       meta.items.every(

@@ -5,7 +5,7 @@ disable-model-invocation: true
 user-invocable: true
 ---
 
-# Flow 4.5.0
+# Flow 4.6.0
 
 ## 起動と責務
 
@@ -52,12 +52,12 @@ flow-spec/** linguist-generated=true
 ```text
 design -> design_review -> plan
 plan(needs_input) -> plan_decision_review -> 回答 -> plan
-plan(ready) -> plan_review -> implement -> completed
+plan(ready) -> plan_review -> implement -> implement_review -> completed
 ```
 
 Flowのみがtransitionでflow-state.ymlを更新する。next_actionは保存せず、検証済み状態から導く。
-各stageの自動修正とAI実行retryは1回、human source再取得も1回。cycleやrevision更新でリセットしない。
-review_mode.planはdecision/finalへ共通適用する。1 cycleでAIとhumanを混在させない。
+Implement reviewも含む各stageの自動修正とAI実行retryは1回、human source再取得も1回。cycleやrevision更新でリセットしない。
+review_mode.planはdecision/finalへ共通適用し、review_mode.implementは実装レビュー専用とする。1 cycleでAIとhumanを混在させない。
 
 ## 実行
 
@@ -74,15 +74,21 @@ review_mode.planはdecision/finalへ共通適用する。1 cycleでAIとhumanを
    decision passedをcheckpointへ保存してから未回答質問を提示し、回答採用時もcheckpointへ保存する。
    回答後はrespondでPlanへ戻る。
 6. final passedをcheckpointへ保存してからadvanceしexecutorへPlanと対象project・対象範囲を渡す。
-   completedを検証してadvanceで全体完了とし、完了stateをcheckpointへ保存する。
+   executorは開始前のGit baselineを固定し、completedに実装commitとcode-snapshotを保持する。
+7. Implement completedを登録後、start_review implementでflow-implement-reviewerへ委譲する。
+   AIはcorrectness/maintainability/project-rulesの3観点、humanはsources/human.mdだけを使う。
+   対象Implement・Planとcode snapshotを集約時・完了直前に照合する。
+   passedをcheckpointへ保存してからadvanceで全体完了とし、完了stateもcheckpointへ保存する。
 
 ## Review結果への対応
 
 - passed: 同一cycle・revision・digestを検証して進む。decisionは質問提示だけを許可する。
 - changes_required: findingsを意味を変えずfeedbackへ正規化する。AIの自動修正が未使用なら
-  reviseでcounterを消費してwriterを起動する。使用済みならset_modeでhumanへ切り替える。
+  reviseでcounterを消費してwriterまたはexecutorを起動する。Implementのoperationはexecuteとし、
+  Planと正規化feedbackを渡し、feedback_resultsで全itemを追跡させる。修正後は必須検証・commit・新cycle reviewを行う。使用済みならset_modeでhumanへ切り替える。
   humanの変更要求は同じ正規化を行い修正後を再評価する。
-- blocked: hubが作った判断文を変更せず提示する。回答をanswer feedbackへ正規化してwriterへ渡す。
+- blocked: hubが作った判断文を変更せず提示する。Design/Planは回答をanswer feedbackへ正規化する。
+  Implementの上流判断変更はanswerで直接継続せず、人間承認付き再計画へ接続する。
 - incomplete/execution: retryを1回使い、新cycleで再評価する。AIの再失敗はhumanへ切替、
   humanの再失敗はblockで停止する。
 - incomplete/contract、旧schema、参照不一致: blockで停止し、読み替え・自動修復しない。
@@ -135,6 +141,8 @@ Plan decisionのhuman reviewは質問への回答を求めず、質問が提示�
 scope_candidateはreview status・counter・human切替へ影響しない。
 passedに候補があればまとめて提示し、除外を推奨する。excludeで現在のpassedを維持し、
 adoptした項目だけをfeedbackへ正規化して改訂・再reviewする。
+Implementの候補は現在Plan内の整理だけをreviseへ渡す。Plan外の範囲・責務・契約変更は採用意思だけで実装せず、
+戻り先と修正範囲を明示した人間承認付き再計画へ接続する。
 Plan/Implementで上流の変更が必要なら作業を停止し、下記の人間承認付き再計画を使う。
 
 ## 再計画と成果物同期

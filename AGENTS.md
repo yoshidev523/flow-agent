@@ -9,11 +9,11 @@
 `apm.lock.yaml`で管理します。
 
 機能ごとの実行成果物は`flow-spec/YYYYMMDD_feature/`へ保存します。
-Flow 4.5.0では`flow-state.yml`、事実履歴の`audit.md`、復旧用の`.flow/journal.md`、固定pathの
+Flow 4.6.0では`flow-state.yml`、事実履歴の`audit.md`、復旧用の`.flow/journal.md`、固定pathの
 `artifacts/design.md`、`artifacts/plan.md`、`artifacts/implement.md`を使います。
 固定成果物はrevisionと変更履歴を更新し、revision別fileは作りません。
-レビューは`reviews/{design,plan-decision,plan-final}/cycle-0001/`へsourceとreview.md、
-feedbackは`feedback/{design,plan}/feedback-0001.md`へ保存します。
+レビューは`reviews/{design,plan-decision,plan-final,implement}/cycle-0001/`へsourceとreview.md、
+feedbackは`feedback/{design,plan,implement}/feedback-0001.md`へ保存します。
 配布用CLI、Markdown契約、テンプレートは`.apm/skills/flow/`に同梱します。
 TypeScriptとZod定義の正本はrepositoryの`src/`に置きます。
 独立同期skillには同じCLI・契約・templateを同梱し、build/check-flow-distで正本との一致を確認します。
@@ -31,7 +31,8 @@ apm run test-flow
 apm run verify-flow-deployment
 ```
 
-通常の実行にはNode.js 22以上だけを必要とします。チェックポイント操作にはGitも必要です。利用側のnpm install・ビルドは不要です。
+通常の実行にはNode.js 22以上だけを必要とします。チェックポイントとImplement reviewのコード固定にはGitも必要です。
+`code-snapshot --request`でrepository・base/head commit・コードtree digestを取得します。利用側のnpm install・ビルドは不要です。
 `verify-flow-deployment`は下記の配置検証を自動化し、CLI・Markdown契約・templateの同梱も確認します。
 
 ```sh
@@ -67,6 +68,7 @@ flow_consumer_dir="$flow_verify_root/consumer"
 
 for skill_name in \
   flow flow-artifact-sync flow-design flow-plan flow-implement \
+  flow-implement-review flow-implement-review-correctness flow-implement-review-maintainability \
   flow-project-knowledge flow-project-rules-review \
   flow-design-review flow-design-review-requirements \
   flow-design-review-quality-risk \
@@ -81,6 +83,7 @@ do
 done
 for agent_name in \
   flow-designer flow-planner flow-implementer \
+  flow-implement-reviewer flow-implement-correctness-reviewer flow-implement-maintainability-reviewer \
   flow-project-knowledge-agent flow-project-rules-reviewer \
   flow-design-reviewer flow-design-requirements-reviewer \
   flow-design-quality-risk-reviewer \
@@ -139,7 +142,7 @@ APMは自己package installを循環依存として扱うため、独立consumer
 - 追加scope候補はreview status、自動修正、human review切替へ影響させません。
 - reviewerは既存の別選択肢を推奨できますが、利用者の回答変更や選択肢外の回答確定は
   行いません。
-- Implement executorは渡されたPlanの内容と完全性だけを扱い、上流状態を認識しません。
+- Implement executorは渡されたPlanと正規化済み修正feedbackの内容だけを扱い、上流状態・review判定を認識しません。
 - leafの単独利用はFlow内部状態に依存せず、自身の入出力契約だけで完結させます。
 
 物理階層は次とします。
@@ -153,7 +156,7 @@ Flow
 │   └── project-rules reviewer
 └── final review hub
     ├── perspective reviewer 1
-    ├── perspective reviewer 2 (Design only)
+    ├── perspective reviewer 2 (Design / Implement)
     └── project-rules reviewer
 ```
 
@@ -202,6 +205,7 @@ Flow内部状態は`flow-state-v2`として`flow-state.yml`へ保存します。
 - perspective reviewer: 自分のsource
 - review hub: 自分のaggregate artifact
 - executor: `implement.md`
+- Implement review hub: 実装review aggregate。correctness・maintainability・project-rules reviewerは各sourceだけを所有する。
 
 Flowはreview開始ごとに一意な`review_cycle_id`を発行し、state、全source、aggregateで
 一致を必須にします。review対象のSHA-256はaggregate作成時とphase移行時に
@@ -219,11 +223,14 @@ Planは入力Designのpath、revision、SHA-256を保持し、Plan decision revi
 checkpointで変更前を保存し、同期後の旧承認を無効化します。cycleとretry上限は保持します。
 
 `design -> design_review -> plan`の後、未回答質問があれば
-`plan_decision_review -> plan`を経て、`plan_review -> implement -> completed`へ進みます。
+`plan_decision_review -> plan`を経て、`plan_review -> implement -> implement_review -> completed`へ進みます。
 decision reviewの`passed`は質問提示の根拠、最終reviewの`passed`はImplement開始の根拠と
 します。
+Implementのcompletedは作業完了を示し、Flow完了にはコードsnapshotを固定したImplement reviewのpassedを必須とします。
+新しい正規化feedbackがある場合だけcompleted Implementを修正し、必須検証・commit・新cycle reviewを行います。
+保守性reviewは責務・可読性・重複/過剰抽象化・状態・変更波及・テストを評価し、任意改善をgateにしません。
 
-AI reviewの変更要求に対する自動修正はDesign、Plan decision、Plan finalの各stageで
+AI reviewの変更要求に対する自動修正はDesign、Plan decision、Plan final、Implementの各stageで
 1回まで、実行障害の再試行も各stageで1回までです。使い切った場合はhuman modeへ
 切り替えます。利用者判断が必要な`blocked`はFlowが質問し、回答をfeedbackへ正規化します。
 
@@ -246,7 +253,7 @@ agent定義はfront matter後を「あなたは〜です。」で始め、「主
 履歴には確立済みのcommit規約がないため、命令形で対象を明確にした短い件名を使います。
 PRには目的、変更file、検証結果または未実施理由を記載し、関連Issueがあればlinkします。
 
-## Flow 4.5.0 の機械処理
+## Flow 4.6.0 の機械処理
 
 HOWは`.apm/skills/flow/references/`、schemaの正本は`src/contracts/`のZod定義です。
 実行処理はTypeScriptで実装し、依存を含む`scripts/flowctl.js`をFlow skillへ同梱します。

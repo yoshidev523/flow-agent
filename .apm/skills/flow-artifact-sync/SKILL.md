@@ -57,7 +57,8 @@ expected_revision・expected_sha256で他の変更を検出し、revisionと変�
   inputsへ最新Design参照と今回feedbackを記録する。未回答の重要判断はneeds_inputとする。
 - Implementの更新が必要な場合は、最新Plan参照と影響・再検証事項を記録する。
   statusはblocked、blockerは再実装・再検証の必要事項、commitはnullとする。
-  tasksはpending、verificationsはnot_runへ戻し、旧完了・passedは履歴として保持する。
+  tasksはpending、verificationsはnot_runへ戻し、code/feedback/feedback_resultsは削除する。
+  旧コードsnapshotとfeedback反映結果を新Planの証拠にせず、旧完了・passedは履歴として保持する。
   同期はコードの実装やtestを実行せず、新しい完了証拠を作らない。
 
 影響のない成果物は更新せずrevisionも増やさない。

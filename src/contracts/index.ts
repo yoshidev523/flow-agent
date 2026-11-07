@@ -184,6 +184,13 @@ export const PhaseArtifactSchema = z.strictObject({
   project_knowledge: ProjectKnowledgeSchema.optional(),
 });
 
+export const CodeSnapshotSchema = z.strictObject({
+  repository: text,
+  base_commit: z.string().regex(/^[0-9a-f]{40,64}$/),
+  head_commit: z.string().regex(/^[0-9a-f]{40,64}$/),
+  tree_sha256: z.string().regex(/^[0-9a-f]{64}$/),
+});
+
 export const ImplementArtifactSchema = z.strictObject({
   schema_version: z.literal("flow/implement-artifact-v2"),
   artifact: z.literal("implement"),
@@ -194,6 +201,9 @@ export const ImplementArtifactSchema = z.strictObject({
   operation: z.literal("execute"),
   updated_at: timestamp,
   plan: ReferenceSchema,
+  code: CodeSnapshotSchema.optional(),
+  feedback: ReferenceSchema.optional(),
+  feedback_results: z.array(FeedbackResultSchema).optional(),
   tasks: z.array(TaskProgressSchema),
   verifications: z.array(VerificationSchema),
   blocker: text.nullable(),
@@ -202,13 +212,18 @@ export const ImplementArtifactSchema = z.strictObject({
 });
 
 export const ReviewSourceSchema = z.strictObject({
-  phase: z.enum(["design", "plan"]),
-  review_stage: z.enum(["design", "decision", "final"]),
+  phase: z.enum(["design", "plan", "implement"]),
+  review_stage: z.enum(["design", "decision", "final", "implement"]),
   review_cycle_id: z
     .string()
-    .regex(new RegExp("^(design|plan-decision|plan-final)-cycle-[0-9]{4,}$")),
+    .regex(
+      new RegExp(
+        "^(design|plan-decision|plan-final|implement)-cycle-[0-9]{4,}$",
+      ),
+    ),
   target: ReferenceSchema,
   design: ReferenceSchema.nullable(),
+  code: CodeSnapshotSchema.optional(),
   findings: z.array(FindingSchema),
   failure: FailureSchema.nullable(),
   schema_version: z.literal("flow/review-source-v2"),
@@ -221,13 +236,18 @@ export const ReviewSourceSchema = z.strictObject({
 });
 
 export const PhaseReviewSchema = z.strictObject({
-  phase: z.enum(["design", "plan"]),
-  review_stage: z.enum(["design", "decision", "final"]),
+  phase: z.enum(["design", "plan", "implement"]),
+  review_stage: z.enum(["design", "decision", "final", "implement"]),
   review_cycle_id: z
     .string()
-    .regex(new RegExp("^(design|plan-decision|plan-final)-cycle-[0-9]{4,}$")),
+    .regex(
+      new RegExp(
+        "^(design|plan-decision|plan-final|implement)-cycle-[0-9]{4,}$",
+      ),
+    ),
   target: ReferenceSchema,
   design: ReferenceSchema.nullable(),
+  code: CodeSnapshotSchema.optional(),
   findings: z.array(FindingSchema),
   failure: FailureSchema.nullable(),
   schema_version: z.literal("flow/phase-review-v2"),
@@ -260,7 +280,7 @@ export const FeedbackItemSchema = z.strictObject({
 export const PhaseFeedbackSchema = z.strictObject({
   schema_version: z.literal("flow/phase-feedback-v2"),
   revision: z.literal(1),
-  phase: z.enum(["design", "plan"]),
+  phase: z.enum(["design", "plan", "implement"]),
   target: ReferenceSchema,
   operation: z.enum(["revise", "respond"]),
   created_at: timestamp,
@@ -274,7 +294,7 @@ export const CounterSchema = z.strictObject({
 });
 
 export const ActiveReviewSchema = z.strictObject({
-  stage: z.enum(["design", "plan_decision", "plan_final"]),
+  stage: z.enum(["design", "plan_decision", "plan_final", "implement"]),
   review_cycle_id: text,
   mode: z.enum(["ai", "human"]),
   target: ReferenceSchema,
@@ -359,6 +379,7 @@ export const FlowStateSchema = z.strictObject({
     "plan_decision_review",
     "plan_review",
     "implement",
+    "implement_review",
     "completed",
     "replanning",
   ]),
@@ -372,20 +393,24 @@ export const FlowStateSchema = z.strictObject({
     design: ReferenceSchema.nullable(),
     plan_decision: ReferenceSchema.nullable(),
     plan_final: ReferenceSchema.nullable(),
+    implement: ReferenceSchema.nullable(),
   }),
   review_mode: z.strictObject({
     design: z.enum(["ai", "human"]),
     plan: z.enum(["ai", "human"]),
+    implement: z.enum(["ai", "human"]),
   }),
   counters: z.strictObject({
     design: CounterSchema,
     plan_decision: CounterSchema,
     plan_final: CounterSchema,
+    implement: CounterSchema,
   }),
   cycle_counters: z.strictObject({
     design: z.number().int().min(0),
     plan_decision: z.number().int().min(0),
     plan_final: z.number().int().min(0),
+    implement: z.number().int().min(0),
   }),
   active_review: ActiveReviewSchema.nullable(),
   active_invocation: InvocationSchema.nullable(),
@@ -600,13 +625,13 @@ export const eventData = {
     status: text,
   }),
   "review.mode_changed": z.strictObject({
-    stage: z.enum(["design", "plan_decision", "plan_final"]),
+    stage: z.enum(["design", "plan_decision", "plan_final", "implement"]),
     from: z.enum(["ai", "human"]),
     to: z.enum(["ai", "human"]),
     reason: text,
   }),
   "retry.scheduled": z.strictObject({
-    stage: z.enum(["design", "plan_decision", "plan_final"]),
+    stage: z.enum(["design", "plan_decision", "plan_final", "implement"]),
     counter: z.enum(["execution_retry", "human_retry", "automatic_revision"]),
     used: z.literal(1),
     reason: text,

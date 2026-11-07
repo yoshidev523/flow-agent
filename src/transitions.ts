@@ -1,3 +1,4 @@
+import { checkCodeSnapshot } from "./code-review.js";
 import fs from "node:fs";
 import type { Store } from "./persistence/store.js";
 import { eventId } from "./persistence/store.js";
@@ -74,7 +75,10 @@ export function transition(store: Store, request: Fields): FlowState {
       "Wrong feedback operation",
     );
     check(
-      equal(fm.target, state.artifacts[fm.phase as "design" | "plan"]),
+      equal(
+        fm.target,
+        state.artifacts[fm.phase as "design" | "plan" | "implement"],
+      ),
       "Feedback targets wrong active artifact",
     );
     const expected =
@@ -86,7 +90,7 @@ export function transition(store: Store, request: Fields): FlowState {
     return [fm, fr];
   };
   const writer = (
-    phase: "design" | "plan",
+    phase: "design" | "plan" | "implement",
     operation: "revise" | "respond",
     ref: ArtifactRef,
   ) =>
@@ -96,7 +100,7 @@ export function transition(store: Store, request: Fields): FlowState {
       active_review: null,
       waiting: null,
       blocker: null,
-      pending_operation: operation,
+      pending_operation: phase === "implement" ? "execute" : operation,
       pending_feedback: ref,
     });
   if (
@@ -118,6 +122,7 @@ export function transition(store: Store, request: Fields): FlowState {
       design_review: "flow-design-review",
       plan_decision_review: "flow-plan-decision-review",
       plan_review: "flow-plan-review",
+      implement_review: "flow-implement-review",
       completed: null,
       replanning: null,
     };
@@ -133,9 +138,12 @@ export function transition(store: Store, request: Fields): FlowState {
       "Wrong operation for phase",
     );
     if (
-      ["design_review", "plan_decision_review", "plan_review"].includes(
-        state.phase,
-      )
+      [
+        "design_review",
+        "plan_decision_review",
+        "plan_review",
+        "implement_review",
+      ].includes(state.phase)
     ) {
       check(state.active_review, "Start review cycle first");
       evidence.push(state.active_review.target);
@@ -225,9 +233,11 @@ export function transition(store: Store, request: Fields): FlowState {
       );
       if (state.pending_feedback)
         check(
-          meta.inputs.some((r: ArtifactRef) =>
-            equal(r, state.pending_feedback),
-          ),
+          artifact === "implement"
+            ? equal(meta.feedback, state.pending_feedback)
+            : meta.inputs.some((r: ArtifactRef) =>
+                equal(r, state.pending_feedback),
+              ),
           "Output does not reference pending feedback",
         );
       if (artifact === "plan") {
@@ -298,10 +308,23 @@ export function transition(store: Store, request: Fields): FlowState {
     check(target, "Missing target artifact");
     const [tm] = store.reference(target);
     check(
-      tm.status === (stage === "plan_decision" ? "needs_input" : "ready"),
+      tm.status ===
+        (stage === "implement"
+          ? "completed"
+          : stage === "plan_decision"
+            ? "needs_input"
+            : "ready"),
       "Wrong target status",
       true,
     );
+    if (stage === "implement") {
+      check(equal(tm.plan, state.artifacts.plan), "Implement Plan mismatch");
+      check(tm.code, "Implement review requires code snapshot");
+      checkCodeSnapshot(store.root, tm.code, tm.commit);
+      store.checkDocumentInputs(tm);
+      check(state.artifacts.plan, "Missing Plan");
+      store.checkDocumentInputs(store.reference(state.artifacts.plan)[0]);
+    }
     const design = artifact === "plan" ? state.artifacts.design : null;
     if (design) {
       const [dm] = store.reference(design);
@@ -314,7 +337,14 @@ export function transition(store: Store, request: Fields): FlowState {
     }
     const number = ++state.cycle_counters[stage],
       directory = stage.replace("_", "-"),
-      mode = state.review_mode[stage === "design" ? "design" : "plan"];
+      mode =
+        state.review_mode[
+          stage === "implement"
+            ? "implement"
+            : stage === "design"
+              ? "design"
+              : "plan"
+        ];
     Object.assign(state, {
       phase,
       pending_operation: null,
@@ -382,6 +412,10 @@ export function transition(store: Store, request: Fields): FlowState {
         "Prompt target mismatch",
       );
       if (kind === "review_decision") {
+        check(
+          state.phase !== "implement_review",
+          "Implement human decisions require approved replanning",
+        );
         if (result.status === "blocked")
           check(
             ids.every((id) =>
@@ -615,12 +649,20 @@ export function transition(store: Store, request: Fields): FlowState {
         true,
       );
     }
-    state.review_mode[stage === "design" ? "design" : "plan"] = mode;
+    state.review_mode[
+      stage === "implement"
+        ? "implement"
+        : stage === "design"
+          ? "design"
+          : "plan"
+    ] = mode;
     state.active_review = null;
   } else if (action === "advance") {
     fields();
     running();
-    if (state.phase === "design_review" || state.phase === "plan_review") {
+    if (
+      ["design_review", "plan_review", "implement_review"].includes(state.phase)
+    ) {
       const result = store.reviewResult(state);
       check(result.status === "passed", "Review did not pass", true);
       const ar = state.active_review;
@@ -634,35 +676,42 @@ export function transition(store: Store, request: Fields): FlowState {
       );
       evidence.push(ar.target);
       if (ar.design) evidence.push(ar.design);
-      const phase = state.phase === "design_review" ? "plan" : "implement";
-      Object.assign(state, {
-        phase,
-        active_review: null,
-        pending_operation:
-          phase === "plan"
-            ? state.artifacts.plan
-              ? null
-              : "create"
-            : "execute",
-        pending_feedback: null,
-      });
+      if (state.phase === "implement_review") {
+        const ref = state.artifacts.implement;
+        check(ref && equal(ref, ar.target), "Implement review target mismatch");
+        const [im] = store.reference(ref);
+        check(
+          im.status === "completed" && equal(im.plan, state.artifacts.plan),
+          "Implement is not completed against active Plan",
+        );
+        store.checkDocumentInputs(im);
+        Object.assign(state, {
+          phase: "completed",
+          state: "completed",
+          active_review: null,
+          pending_operation: null,
+          pending_feedback: null,
+        });
+      } else {
+        const phase = state.phase === "design_review" ? "plan" : "implement";
+        Object.assign(state, {
+          phase,
+          active_review: null,
+          pending_operation:
+            phase === "plan"
+              ? state.artifacts.plan
+                ? null
+                : "create"
+              : "execute",
+          pending_feedback: null,
+        });
+      }
     } else if (state.phase === "implement") {
-      const ref = state.artifacts.implement;
-      check(ref, "Missing Implement output");
-      const [im] = store.reference(ref);
-      check(
-        im.status === "completed" && equal(im.plan, state.artifacts.plan),
-        "Implement is not completed against active Plan",
-        true,
+      throw new FlowError(
+        "Implement completion requires passed Implement review; start_review implement first",
+        "condition",
+        2,
       );
-      store.reference(im.plan);
-      evidence.push(ref);
-      Object.assign(state, {
-        phase: "completed",
-        state: "completed",
-        pending_operation: null,
-        pending_feedback: null,
-      });
     } else
       throw new FlowError(
         "No advance transition from this phase",

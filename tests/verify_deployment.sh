@@ -17,6 +17,7 @@ printf 'Deployment verification directory: %s\n' "$flow_verify_root"
   apm compile --validate --target claude,codex
 )
 for skill_name in flow flow-artifact-sync flow-design flow-plan flow-implement \
+  flow-implement-review flow-implement-review-correctness flow-implement-review-maintainability \
   flow-project-knowledge flow-project-rules-review \
   flow-design-review flow-design-review-requirements flow-design-review-quality-risk \
   flow-plan-decision-review flow-plan-review-decision-quality flow-plan-review flow-plan-review-task-readiness
@@ -27,6 +28,7 @@ do
   test -f "$flow_consumer_dir/.claude/skills/$skill_name/SKILL.md"
 done
 for agent_name in flow-designer flow-planner flow-implementer flow-design-reviewer \
+  flow-implement-reviewer flow-implement-correctness-reviewer flow-implement-maintainability-reviewer \
   flow-project-knowledge-agent flow-project-rules-reviewer \
   flow-design-requirements-reviewer flow-design-quality-risk-reviewer \
   flow-plan-decision-reviewer flow-plan-decision-quality-reviewer flow-plan-reviewer flow-plan-task-readiness-reviewer

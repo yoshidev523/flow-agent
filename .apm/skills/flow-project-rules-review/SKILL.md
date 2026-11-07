@@ -1,6 +1,6 @@
 ---
 name: flow-project-rules-review
-description: Flowのreview hubからの委譲、または利用者の明示呼び出しで、DesignまたはPlanのproject固有ルールへの適合を独立評価し、確認済み項目も含む固有sourceを保存する。通常のレビュー依頼から暗黙に起動しない。
+description: Flowのreview hubからの委譲、または利用者の明示呼び出しで、Design・Plan・Implementのproject固有ルールへの適合を独立評価し、確認済み項目も含む固有sourceを保存する。通常のレビュー依頼から暗黙に起動しない。
 ---
 
 # Flow Project Rules Review
@@ -8,7 +8,7 @@ description: Flowのreview hubからの委譲、または利用者の明示呼�
 ## 責務と入力
 
 source IDはproject-rules。入力はfeature directory、projectと対象範囲、review cycle ID、
-対象path・revision・digest、Planの場合はDesign参照、指定source出力path。
+対象path・revision・digest、Planの場合はDesign参照、Implementの場合はPlan参照とcode snapshot、指定source出力path。
 自分のsourceだけを保存し、対象・ルール文書・他source・aggregate・Flow stateを編集しない。
 利用者対話やphase移行、知識更新の採否を扱わない。
 
@@ -22,6 +22,11 @@ writerと同じ正本を使うが、適合判定は独立して行う。対象�
 - Design: 要件・制約・受け入れ条件への反映を確認する。
 - Plan decision: 未回答質問・選択肢・影響・推奨・前提だけを確認する。詳細タスクの不足を指摘しない。
 - Plan final: 採用判断・HOW・タスク・検証への反映を確認する。採用回答を勝手に変更しない。
+- Implement: code-snapshotを開始時・保存前に照合し、差分と関連実コード・検証記録を規約と独立照合する。
+  確認項目・必要な証拠・例外の扱いは、対象範囲に適用されるプロジェクト規約に従う。
+  自己申告と確認できる証拠を区別し、証拠不足を適合へ読み替えない。
+  規約にない開発手法や手順を追加の必須条件にしない。例外は適用範囲と根拠を記録する。
+  phase/review_stageはimplement、designはnull、codeは対象Implementと一致させる。
 
 今回適用する基準ごとに、適合／不適合／対象外／確認不能と、その根拠・該当箇所を記録する。
 明示された必須ルールの違反が現在scopeの成立を妨げる場合はgateとし、修正ならrevise、
@@ -44,6 +49,6 @@ changes_required、gateがなければpassed。推奨・知識更新候補をsta
 
 最初に[契約](../flow/references/contracts.md)と[CLI](../flow/references/cli.md)を読む。
 [template](../flow/assets/templates/project-rules-source.md)をdraftへ複製し、指定cycleの
-reviews/{design,plan-decision,plan-final}/cycle-{number}/sources/project-rules.mdへ一度publishする。
+reviews/{design,plan-decision,plan-final,implement}/cycle-{number}/sources/project-rules.mdへ一度publishする。
 CLIはnode ../flow/scripts/flowctl.js --root {feature_dir}。validate後にpath・status・確認概要を返す。
 監査は共通CLIを使い、自動保存イベントと通常読取を重複記録しない。

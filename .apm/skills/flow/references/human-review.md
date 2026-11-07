@@ -46,3 +46,12 @@ Human reviewが必要です。
 人間に適合／不適合／対象外／確認不能と理由を確認してもらい、human sourceの
 project_knowledgeへ正規化する。確認していない項目を適合として補完しない。
 AI reviewerは起動しない。文書の鮮度とアクセス不能はproject-knowledge.mdに従う。
+
+## Implementの人間レビュー
+
+completed Implement、ready Planとcode snapshotを渡し、base..head差分と必要な接続先を確認してもらう。
+correctness・maintainability・project規約を同じsourceで評価し、未確認事項を成功へ読み替えない。
+Flowは回答をreviews/implement/cycle-{number}/sources/human.mdへ正規化する。
+phase/review_stageはimplement、designはnull、codeは対象Implementと一致させる。
+AI reviewerを併用せず、hubはこの1sourceだけを集約する。コードの変更は新cycleで再評価する。
+Plan内の修正はrevise feedback、上流判断変更は人間承認付き再計画を使う。

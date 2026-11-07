@@ -28,7 +28,8 @@ commit: null
 実施内容。
 
 ## 検証ログ
-実施内容。
+実施内容。初回変更前にcode-snapshotでbaseを固定しfront matterのcodeへ保持する。
+完了時は実装commitをheadとするsnapshotへ更新する。実装修正時はfeedbackとfeedback_resultsも保持する。
 
 ## 補足・計画との差分
 実施内容。

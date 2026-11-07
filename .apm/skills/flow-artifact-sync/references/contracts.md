@@ -1,4 +1,4 @@
-# Flow 4.5.0 契約
+# Flow 4.6.0 契約
 
 ## 正本
 
@@ -6,7 +6,7 @@ repositoryの`src/contracts/`に置くZod定義が機械契約の正本。
 成果物と監査の入出力形式はこの文書とtemplateで参照する。CLIはZodを内蔵する。
 契約の変更時はZod定義・この文書・templateを同時に更新する。
 field間の整合性・状態遷移・file参照の検査は別のguardで実施する。
-project_knowledge以外のfieldを必須とし、nullable fieldはnullを明記する。未知field、重複YAML key、旧schema、
+project_knowledgeと明示された追加field以外を必須とし、nullable fieldはnullを明記する。未知field、重複YAML key、旧schema、
 別名status、並行する承認状態を拒否する。日時はtimezone付きISO 8601。
 pathはfeature directoryからの相対pathで、絶対path、親directory参照、外へのsymlinkを拒否する。
 project_knowledgeのlocationは正本文書の絶対pathまたはURIとし、成果物参照のpathとは区別する。
@@ -14,7 +14,7 @@ SHA-256は保存完了後の全バイトから計算する。成果物自身のd
 
 ## 型と必須フィールド
 
-次の表はfront matterとFlow stateの入力項目を列挙する。project_knowledge以外は必須で、省略や暗黙の補完はしない。
+次の表はfront matterとFlow stateの入力項目を列挙する。省略可と明記したfield以外は必須で、省略や暗黙の補完はしない。
 `text`は空でない文字列、`boolean`はtrue/false、`integer`は安全に表現できる整数、
 `timestamp`はtimezone付きISO 8601文字列、`sha256`は小文字16進64桁。
 `T[]`は型Tの配列で、空配列は明記する。`T|null`は値がない場合にnullを明記する。
@@ -37,16 +37,16 @@ SHA-256は保存完了後の全バイトから計算する。成果物自身のd
 | finding/gate | id:text; classification:gate; resolution:revise/human_decision; decision_refs:text[]; target:text; problem:text; evidence:text; instruction:text; completion:text; judgment:judgment\|null |
 | finding/scope_candidate | id:text; classification:scope_candidate; decision_refs:text[]; proposal:text; evidence:text; impact:text; recommendation:text |
 | phase-artifact | schema_version:flow/phase-artifact-v2; artifact:design/plan; revision:integer>=1; status:needs_input/ready; producer:text; invocation_id:text; operation:create/revise/respond; updated_at:timestamp; inputs:reference[]; questions:question[]; feedback_results:feedback-result[]; tasks:task[]; verification_plan:verification-plan[]; handoff_checks:handoff-check[]; project_knowledge:project-knowledge（省略可） |
-| implement-artifact | schema_version:flow/implement-artifact-v2; artifact:implement; revision:integer>=1; status:in_progress/blocked/completed; producer:flow-implement/flow-artifact-sync; invocation_id:text; operation:execute; updated_at:timestamp; plan:reference; tasks:task-progress[]; verifications:verification[]; blocker:text\|null; commit:小文字16進40〜64桁\|null; project_knowledge:project-knowledge（省略可） |
-| review-source | phase:design/plan; review_stage:design/decision/final; review_cycle_id:cycle ID; target:reference; design:reference\|null; findings:finding[]; failure:failure\|null; schema_version:flow/review-source-v2; revision:1; source_id:text; source_kind:ai/human; status:passed/changes_required/blocked/unable; created_at:timestamp; project_knowledge:project-knowledge（省略可） |
-| phase-review | phase:design/plan; review_stage:design/decision/final; review_cycle_id:cycle ID; target:reference; design:reference\|null; findings:finding[]; failure:failure\|null; schema_version:flow/phase-review-v2; revision:1; mode:ai/human; status:passed/changes_required/blocked/incomplete; sources:reference[]; judgments:judgment[]; created_at:timestamp; source_paths:text[]（重複不可）; project_knowledge:project-knowledge（省略可） |
+| implement-artifact | schema_version:flow/implement-artifact-v2; artifact:implement; revision:integer>=1; status:in_progress/blocked/completed; producer:flow-implement/flow-artifact-sync; invocation_id:text; operation:execute; updated_at:timestamp; plan:reference; code:code-snapshot（省略可）; feedback:reference（省略可）; feedback_results:feedback-result[]（省略可）; tasks:task-progress[]; verifications:verification[]; blocker:text\|null; commit:小文字16進40〜64桁\|null; project_knowledge:project-knowledge（省略可） |
+| review-source | phase:design/plan/implement; review_stage:design/decision/final/implement; review_cycle_id:cycle ID; target:reference; design:reference\|null; code:code-snapshot（Implement以外は省略、Implementは正常評価時必須）; findings:finding[]; failure:failure\|null; schema_version:flow/review-source-v2; revision:1; source_id:text; source_kind:ai/human; status:passed/changes_required/blocked/unable; created_at:timestamp; project_knowledge:project-knowledge（省略可） |
+| phase-review | phase:design/plan/implement; review_stage:design/decision/final/implement; review_cycle_id:cycle ID; target:reference; design:reference\|null; code:code-snapshot（Implement以外は省略、Implementは正常評価時必須）; findings:finding[]; failure:failure\|null; schema_version:flow/phase-review-v2; revision:1; mode:ai/human; status:passed/changes_required/blocked/incomplete; sources:reference[]; judgments:judgment[]; created_at:timestamp; source_paths:text[]（重複不可）; project_knowledge:project-knowledge（省略可） |
 | feedback-item | id:text; kind:change/answer; target:text; instruction:text; evidence:text; completion:text |
-| phase-feedback | schema_version:flow/phase-feedback-v2; revision:1; phase:design/plan; target:reference; operation:revise/respond; created_at:timestamp; items:feedback-item[1..] |
+| phase-feedback | schema_version:flow/phase-feedback-v2; revision:1; phase:design/plan/implement; target:reference; operation:revise/respond; created_at:timestamp; items:feedback-item[1..] |
 | counter | automatic_revision:0/1; execution_retry:0/1; human_retry:0/1 |
-| active-review | stage:design/plan_decision/plan_final; review_cycle_id:text; mode:ai/human; target:reference; design:reference\|null; path:text; scope_acknowledged:boolean; human_source:reference\|null |
+| active-review | stage:design/plan_decision/plan_final/implement; review_cycle_id:text; mode:ai/human; target:reference; design:reference\|null; path:text; scope_acknowledged:boolean; human_source:reference\|null |
 | invocation | invocation_id:text; component:text; operation:text; inputs:reference[] |
 | waiting | kind:writer_question/human_review/review_decision/scope_candidate/implement_blocker/replan; target:reference; question_ids:text[1..]; prompt_event_id:text |
-| flow-state | schema_version:flow/flow-state-v2; feature_id:text; run_id:text; state_revision:integer>=1; phase:design/design_review/plan/plan_decision_review/plan_review/implement/completed/replanning; state:running/waiting_for_input/blocked/completed; artifacts:artifact参照map; reviews:review参照map; review_mode:mode map; counters:counter map; cycle_counters:cycle map; active_review:active-review\|null; active_invocation:invocation\|null; waiting:waiting\|null; blocker:text\|null; last_transition_event_id:text; updated_at:timestamp; pending_operation:create/revise/respond/execute/null; pending_feedback:reference\|null; replan:replan\|null（省略可） |
+| flow-state | schema_version:flow/flow-state-v2; feature_id:text; run_id:text; state_revision:integer>=1; phase:design/design_review/plan/plan_decision_review/plan_review/implement/implement_review/completed/replanning; state:running/waiting_for_input/blocked/completed; artifacts:artifact参照map; reviews:review参照map; review_mode:mode map; counters:counter map; cycle_counters:cycle map; active_review:active-review\|null; active_invocation:invocation\|null; waiting:waiting\|null; blocker:text\|null; last_transition_event_id:text; updated_at:timestamp; pending_operation:create/revise/respond/execute/null; pending_feedback:reference\|null; replan:replan\|null（省略可） |
 | audit-event | event_id:E-に続く6桁以上の数字; event_key:text; event_type:イベント一覧の名前; run_id:text; invocation_id:text\|null; occurred_at:timestamp; recorded_at:timestamp; actor:text; caused_by:text[]; data:イベント別object |
 | audit-log | schema_version:flow/audit-log-v1; feature_id:text; created_at:timestamp |
 | audit-view | schema_version:flow/audit-log-v2; feature_id:text; created_at:timestamp |
@@ -59,13 +59,13 @@ SHA-256は保存完了後の全バイトから計算する。成果物自身のd
 flow-stateのmapは次の固定keyをすべて持ち、未知keyを拒否する。
 
 - artifacts: design、plan、implement。それぞれreferenceまたはnull。
-- reviews: design、plan_decision、plan_final。それぞれreferenceまたはnull。
-- review_mode: design、plan。それぞれaiまたはhuman。
-- counters: design、plan_decision、plan_final。それぞれcounter。
-- cycle_counters: design、plan_decision、plan_final。それぞれ0以上のinteger。
+- reviews: design、plan_decision、plan_final、implement。それぞれreferenceまたはnull。
+- review_mode: design、plan、implement。それぞれaiまたはhuman。
+- counters: design、plan_decision、plan_final、implement。それぞれcounter。
+- cycle_counters: design、plan_decision、plan_final、implement。それぞれ0以上のinteger。
 
 finding[]はgateとscope_candidateを混在できるが、decision reviewはgateだけ。
-cycle IDの形式は`{design|plan-decision|plan-final}-cycle-{4桁以上の数字}`。
+cycle IDの形式は`{design|plan-decision|plan-final|implement}-cycle-{4桁以上の数字}`。
 質問・選択肢・task・verification・handoff・feedback・finding・judgmentのIDの一意性、
 statusと内容の整合性、参照の鮮度、保存pathは各契約の説明とCLIのguardで検証する。
 本文の必須見出しは対応templateに従う。固定artifactの変更履歴sectionはdraft時に空にする。
@@ -79,8 +79,8 @@ flow-spec/YYYYMMDD_feature-name/
 ├── .flow/journal.md
 ├── inputs/request.md
 ├── artifacts/{design,plan,implement}.md
-├── feedback/{design,plan}/feedback-0001.md
-└── reviews/{design,plan-decision,plan-final}/cycle-0001/
+├── feedback/{design,plan,implement}/feedback-0001.md
+└── reviews/{design,plan-decision,plan-final,implement}/cycle-0001/
     ├── review.md
     └── sources/{source-id}.md
 ```
@@ -132,22 +132,25 @@ blocked記録は不正なPlanを修復せず、呼出側が指定した参照と
 completedは全Plan taskがcompleted、Planに指定した検証結果がすべてあり、必須検証がpassed、commit SHAが記録済み。
 検証commandとrequiredはPlanの値から変更できない。
 commitが実際に対象変更を含むことと検証結果の真実性はexecutorが確認し、証拠を監査へ記録する。
-通常executorにとってcompleted成果物は終端。同期ownerだけは既存のcompletedも更新できる。
+通常executorは新しいphase implement/operation reviseのfeedbackが現在のcompletedを参照する時だけ再開できる。
+同じfeedbackの再送でcompletedを再開できない。Plan参照とcode baselineを維持し、feedback_resultsで全itemを追跡する。
+completedでは全item appliedが必須。上流変更はblockedで呼出側へ返す。
+同期ownerは既存completedも更新できる。
 同期のpublishではstatus blocked、commit null、全tasks pending、全verifications not_runを必須とし、
-旧完了証拠を新Planへ流用しない。変更前の証拠は変更履歴・監査へ残す。
+code/feedback/feedback_resultsも削除し、旧完了証拠を新Planへ流用しない。変更前の証拠は変更履歴・監査へ残す。
 in_progress/blockedの進捗変更もrevisionと変更履歴を更新する。
 同期はFlow stateを変更しない。旧revisionを参照するstate・reviewはstaleとして再利用しない。
 
 ## review-source-v2 / phase-review-v2
 
-sourceはrevision 1、phase、review_stage design|decision|final、review_cycle_id、target、design、
+sourceはrevision 1、phase、review_stage design|decision|final|implement、review_cycle_id、target、design、
 source_id、source_kind ai|human、status、findings、failure、created_atを保持する。
-Designはdesign:null。Planは入力Design参照が必須。
-cycle IDはdesign-cycle-0001、plan-decision-cycle-0001、plan-final-cycle-0001。
+Design/Implementはdesign:null。Planは入力Design参照が必須。
+cycle IDはdesign-cycle-0001、plan-decision-cycle-0001、plan-final-cycle-0001、implement-cycle-0001。
 cycle番号はstageごとに増やし、再試行・mode変更でも再利用しない。
 
 AIの必要sourceはDesignがrequirements・quality-risk・project-rules、decisionがdecision-quality・project-rules、
-finalがtask-readiness・project-rules。
+finalがtask-readiness・project-rules、Implementがcorrectness・maintainability・project-rules。
 Humanはhuman 1件だけ。同cycleで混在させない。
 
 findingはgate/scope_candidate。
@@ -204,14 +207,14 @@ feedbackにはstatusを設けず、監査の状態欄もnullにする。
 
 ## flow-state-v2
 
-phaseはdesign/design_review/plan/plan_decision_review/plan_review/implement/completed/replanning。
+phaseはdesign/design_review/plan/plan_decision_review/plan_review/implement/implement_review/completed/replanning。
 stateはrunning/waiting_for_input/blocked/completed。
 completed phase/stateは同時に成立し、実行・review・回答待ちがない。
 Planの質問はdecision review通過後に提示するためplanにwaiting_for_inputを置かない。
 waiting_for_inputはwaiting必須、blockedはblocker必須。
 
 artifactsとreviewsは現在の参照を持つ。review_modeはdesign/planでai|human。
-countersはdesign/plan_decision/plan_finalごとのautomatic_revision/execution_retry/human_retryを0/1で持つ。
+countersはdesign/plan_decision/plan_final/implementごとのautomatic_revision/execution_retry/human_retryを0/1で持つ。
 cycle_countersはstageごとの発行数。counterをcycle/revision更新でリセットしない。
 active_reviewはstage/review_cycle_id/mode/target/design/path/scope_acknowledged/human_source。
 Flow内のhuman hubは、人間回答を記録してhuman sourceを登録した後だけ起動する。
@@ -231,7 +234,8 @@ next_actionは保存せず、検証済みphase/stateから導く。
 | answer | 対応する人間回答、正規化feedback | writer/respond |
 | start_review plan_final | Plan ready、Design参照一致 | plan_review |
 | advance plan_review | 同一Plan/Designのpassed、追加scope処理済み | implement/execute |
-| advance implement | Plan一致、Implement completed | completed |
+| start_review implement | Plan一致、Implement completed、code snapshot一致 | implement_review |
+| advance implement_review | 同一Implement/コードのpassed、追加scope処理済み | completed |
 | revise | changes_required、AIなら自動修正未使用 | writer/revise、事前にcounter消費 |
 | retry | incomplete/execution、当該modeのretry未使用 | 新cycleの開始を許可 |
 | set_mode自動 | AI自動修正後もchanges_required、またはretry後も実行障害 | humanへ切替 |
@@ -314,8 +318,8 @@ dataは次の表のfieldをすべて持ち、未知fieldを拒否する。型は
 | interaction.received | interaction_id:text; prompt_event_id:text\|null; text:text |
 | feedback.created | feedback:reference; origin_event_ids:text[]; mappings:feedback-mapping[] |
 | review.completed | review:reference; status:text |
-| review.mode_changed | stage:design/plan_decision/plan_final; from:ai/human; to:ai/human; reason:text |
-| retry.scheduled | stage:design/plan_decision/plan_final; counter:execution_retry/human_retry/automatic_revision; used:1; reason:text |
+| review.mode_changed | stage:design/plan_decision/plan_final/implement; from:ai/human; to:ai/human; reason:text |
+| retry.scheduled | stage:design/plan_decision/plan_final/implement; counter:execution_retry/human_retry/automatic_revision; used:1; reason:text |
 | flow.blocked | reason:text; resume_condition:text |
 | flow.resumed | reason:text; evidence:text[] |
 | flow.completed | implement:reference |
@@ -371,7 +375,7 @@ resume-check --recoverまたは元のtransition requestの再送で、保存済�
 外部操作の完了は推測しない。active invocationは実態と証拠を確認して登録または停止する。
 履歴は訂正イベントで補正する。暗号学的な改ざん防止や複数fileの完全transactionを保証しない。
 
-## 再計画とチェックポイント（4.5.0）
+## 再計画とチェックポイント（4.6.0）
 
 request_replanは進行中invocationがないこと、現在参照とcheckpointの一致、現在stateより後の
 checkpoint監査地点、kind replanの提示eventを検証し、phase replanningへ移す。
@@ -394,3 +398,28 @@ checkpoint.prepared/completedはCLI専用。直接audit-appendせずcheckpoint c
 未作成tagの作成はcreate_missing_tag:trueで明示した場合だけ行う。
 checkpoint-restoreは新しいbranchだけを作り、checkout・reset・push・Flow再開はしない。
 過去snapshotの参照はGit commit内のbytesと照合し、現在成果物のrevision変更で無効扱いにしない。
+
+## Implement reviewのコード固定と完了
+
+code-snapshotは新しいphase境界契約ではなく、Implementとreviewへ埋め込む補助型。
+fieldはrepository（Git rootの絶対path）、base_commit/head_commit（完全commit ID）、tree_sha256（SHA-256）。
+開始時HEADをbase_commitとして固定し、初期in_progressで保存する。修正時にbaselineやrepositoryを変更しない。
+head_commitはImplement.commitと一致させ、code-snapshot commandの返却をそのまま使う。
+baseはheadの祖先、headは現在HEADの祖先であることが必要。
+code treeはheadの全追跡fileのmode/object ID/pathから算出し、feature directory自身だけを除外する。
+レビューはbase..headの差分と関連コードを読み、feature metadataだけの後続commitは許容する。
+未commit変更（indexを含む）・非ignore未追跡file・head後のコード変更は拒否する。
+feature directoryがrepository rootなら除外範囲が全体となるため拒否する。
+別repositoryにも対応する。関係ない未commitコードがある場合も自動でstash/commitせず分離を求める。
+snapshotはレビュー開始、source保存、集約、phase移行で再照合する。コード変更後の旧passedを再利用しない。
+
+Implement reviewの対象statusはcompleted、review_stageとphaseはimplement、designはnull。
+sourceとaggregateのcodeは対象Implementと一致する。Plan参照と現在のDesign入力も再検証する。
+reviews/counters/cycle_countersへimplement key、review_modeへimplement modeを持つ。
+状態はimplementからstart_review(stage implement)でimplement_reviewへ進み、passed後のadvanceだけでcompletedとなる。
+Implementから直接advanceは拒否する。自動修正・実行retry・human retryの各上限は他stageと同じ1回。
+changes_requiredはphase implement/revise feedbackをFlowが保存し、reviseでexecuteへ戻す。
+executorはPlanとfeedbackだけを受け取り、修正・必須検証・新commit後に新cycleで再評価する。
+human_decisionは通常answerでは処理せず、人間承認付きDesign/Plan再計画へ接続する。
+追加scopeはstatusへ影響せず、採用済みでもPlan外なら再計画する。
+旧Flow stateに追加keyを暗黙補完しない。旧成果物・旧stateの一括移行はこの変更に含めない。
