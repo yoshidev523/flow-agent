@@ -34,6 +34,7 @@ node {flowctl} --root {feature_dir} validate audit.md
 ```
 
 既定は構造検証。--referencesは現在の入力参照も検証する。
+成果物の返却値は `artifact`（path・revision・sha256）と `status`。呼出側から受領した参照との照合に使う。
 消費済みfeedbackは保存時の変更前digestを監査へ照合する。
 過去cycleのreviewやfeedbackは現在参照と一致しないことがあるため、歴史資料として構造検証する。
 flow-state.ymlの--referencesはresume-check相当。
@@ -206,6 +207,7 @@ node {flowctl} --root {feature_dir} code-snapshot --request /tmp/code-snapshot.y
 ```
 
 返却されたrepository/base_commit/head_commit/tree_sha256をImplementのcodeへ保持する。
-初回変更前はbase/headとも現在HEADで取得し、完了時はbaseを維持しheadを実装commitへ更新する。
+初回変更前はbase/headとも開始時HEADで取得する。実装commit後はrepositoryとbaseを維持し、
+headに実装commitを指定して再実行する。tree_sha256を含め、返却されたsnapshot全体を保存する。
 未commitコード、古いhead、祖先でないbaseは拒否する。Gitや作業treeを書き換えず、監査も追加しない。
 Implementのcompletedは作業完了であり、Flow完了にはstart_review implementとpassed後のadvanceが必要。

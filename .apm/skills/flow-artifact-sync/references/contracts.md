@@ -1,4 +1,4 @@
-# Flow 4.9.0 契約
+# Flow 4.9.1 契約
 
 ## 正本
 
@@ -99,6 +99,9 @@ Design/Planは固定path、status needs_input/ready、正のrevision、producer�
 updated_at、inputs、questions、feedback_results、tasks、verification_plan、handoff_checksを保持する。
 Designのproducerはflow-design、Planはflow-plan。明示的な同期ではどちらもflow-artifact-syncを使える。
 同期ownerは既存成果物だけを更新し、他ownerのactive invocation中にはpublishしない。Designのtasksは空。
+`needs_input` と `ready` はwriterの成果物の状態。状態はfront matterの `status` にだけ記録し、
+本文やfront matterに独立した承認欄（Pending、Approvedなど）を設けない。
+Flowが利用者対話、reviewとphase移行を管理する。
 
 questionsはid、question、required、status open/resolved、2〜3 options、recommendation、reason、
 assumptions、answerを持つ。optionはid/text/impact。openのanswerはnull、resolvedは空でない文字列。
@@ -128,7 +131,9 @@ task進捗はid/status pending|in_progress|blocked|completed/evidence。
 verificationはid/command/status passed|failed|not_run/required/reason。
 blockedはblocker必須。他statusのblockerはnull。
 blocked記録は不正なPlanを修復せず、呼出側が指定した参照と停止理由を保存できる。
-開始・再開・完了には有効なready Planとの一致が必要。
+開始・再開・完了には、指定されたpath・revision・SHA-256に一致する `flow/phase-artifact-v2` の
+`artifact: plan`、`status: ready` が必要。Flow内では、現行Planの最終reviewがpassedとなり、
+Flowがimplementへの移行と起動を行う。
 completedは全Plan taskがcompleted、Planに指定した検証結果がすべてあり、必須検証がpassed、commit SHAが記録済み。
 検証commandとrequiredはPlanの値から変更できない。
 commitが実際に対象変更を含むことと検証結果の真実性はexecutorが確認し、証拠を監査へ記録する。
@@ -379,7 +384,7 @@ resume-check --recoverまたは元のtransition requestの再送で、保存済�
 外部操作の完了は推測しない。active invocationは実態と証拠を確認して登録または停止する。
 履歴は訂正イベントで補正する。暗号学的な改ざん防止や複数fileの完全transactionを保証しない。
 
-## 再計画とチェックポイント（4.9.0）
+## 再計画とチェックポイント（4.9.1）
 
 request_replanは進行中invocationがないこと、現在参照とcheckpointの一致、現在stateより後の
 checkpoint監査地点、kind replanの提示eventを検証し、phase replanningへ移す。

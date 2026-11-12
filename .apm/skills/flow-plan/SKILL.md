@@ -22,6 +22,8 @@ feedbackはphase planで現在のPlanを参照し、revise/change、respond/answ
 
 ## 出力と状態
 
+成果物の状態はfront matterの `status` だけに記録する。独立した承認欄を本文やfront matterに追加しない。
+
 `phase-artifact-v2`、artifactはplan、statusは`needs_input | ready`。
 needs_inputは利用者が決める必要のあるHOWが未解決、readyは追加の重要判断なしで
 実装に着手できることを表す。readyはreview通過を意味しない。
@@ -31,14 +33,14 @@ needs_inputは利用者が決める必要のあるHOWが未解決、readyは追�
 1. AGENTS.md、入力Designまたは要求、既存コード・テスト・設定を読む。
 2. 根拠をConfirmed / Docs-derived / Assumption / Openに区別する。
 3. 公開契約、責務、互換性、外部依存・権限・継続cost、不可逆な挙動、受容trade-offのうち
-   利用者判断が必要なHOWだけを質問する。
+   利用者判断が必要なHOWだけを確認事項として成果物に記録する。
 4. 各質問へ現在のscopeで成立する2〜3個の選択肢、影響、推奨、理由、前提を記録する。
 5. 未回答判断に依存する詳細タスクを確定せずneeds_inputにする。
 6. respondで採用回答を反映し、対象file、責務、入出力、error、接続点、順序、
    完了条件、検証方法を詳細化する。回答後も質問と選択肢を残す。
 7. revise/respondは全feedbackをapplied/unresolvedで追跡する。
 8. 未回答の必須質問がなく、実装引き継ぎチェックがOKまたは理由付き該当なしならready。
-9. publishでrevisionと変更履歴を更新する。
+9. publishでrevisionと変更履歴を更新し、`validate --references` で保存結果と入力参照を確認する。
 
 内部変数名、import順、軽微な構造、個別test caseなど既存規約で決められる事項は質問しない。
 選択肢外の回答を勝手に写像しない。Designやscopeの変更が必要ならneeds_inputで理由を示す。

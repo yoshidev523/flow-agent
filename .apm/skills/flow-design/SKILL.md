@@ -22,6 +22,8 @@ feedbackの出所やreview主体を評価しない。
 
 ## 出力と状態
 
+成果物の状態はfront matterの `status` だけに記録する。独立した承認欄を本文やfront matterに追加しない。
+
 `phase-artifact-v2`、artifactはdesign、statusは`needs_input | ready`。
 needs_inputはWHATの確定に必要な回答が残ること、readyは目的・範囲・要件・制約・
 受け入れ条件が揃うことを表す。readyは外部評価の通過を意味しない。
