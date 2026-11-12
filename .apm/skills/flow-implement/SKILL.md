@@ -25,14 +25,16 @@ Planのpath・revision・digest、任意の実装修正feedback参照、target p
 ## 手順
 
 1. git status、AGENTS.md、Plan、関連fileを確認する。
-2. Planのschema、ready、対象file、責務、手順、完了条件、検証方法を確認する。
+2. 指定されたPlanを `validate <Planのpath> --references` で検証する。
+   front matterが `schema_version: flow/phase-artifact-v2`、`artifact: plan` であることを確認する。
+   返却された参照のpath・revision・sha256を受領した参照と照合し、statusが `ready` であることを確認する。
+   対象file、責務、手順、完了条件、検証方法も確認する。
    内容不足や契約不一致なら実装せず、渡されたPlan参照と停止理由をblocked成果物へ残す。
    参照自体が欠落・不正で契約を作れない場合は推測せず、監査と最終報告へ停止理由を残す。
 3. 再開時はimplementのPlan参照と現在のPlanが一致することを確認する。
    実装修正feedbackはphase implement/operation revise、現在のImplementをtargetとし、Planを変更しない。
-   初回変更前のrepositoryとGit HEADをbaselineとして記録する。既存codeのbaselineは修正時も保持する。
-   code-snapshotはcommit済みかつコードtreeが一致する時だけ採取できるため、初回は開始時HEAD同士で取得して
-   in_progressのcodeへ保存し、完了時にhead_commitだけを実装commitへ更新する。
+   初回変更前に `code-snapshot --request` でbase/headとも開始時HEADを指定し、返却値全体を
+   初期in_progressのcodeへ保存する。再開・修正時もrepositoryとbase_commitを保持する。
 4. タスクの依存順に実装する。監査はタスク単位の検証結果、問題・課題と重要な決定へ絞る。
    変更箇所を読むだけでは分からない重要な前提や制約は、該当コードの近くに理由を記す。
    主要な採用理由と、削除・置換による振る舞いや責務への影響はImplement本文にも残す。
@@ -48,15 +50,16 @@ Planのpath・revision・digest、任意の実装修正feedback参照、target p
 8. 全タスクと必須検証の完了後、Plan対象fileとimplementにgit check-ignore --no-indexを実行する。
    ignore対象を強制追加しない。既存変更・Plan外変更を含めず、今回の実装変更だけをcommitする。
    件名は`[flow-implement] {短い命令形}`。
-9. commit成功後にcommit SHAとcode-snapshot（repository/base_commit/head_commit/tree_sha256）を記録する。
-   snapshotは`code-snapshot --request`で採取する。未commitのコードがあれば完了扱いにせず分離・保存を確認する。
-   feedbackの全itemがappliedで必須検証も成功してからcompletedをpublishする。分離・commitに失敗したらblocked。
+9. 実装commitの完全なSHAを `commit` に記録する。保存済みのrepositoryとbase_commitを使い、
+   head_commitに実装commitを指定して `code-snapshot --request` を実行する。返却値全体を `code` に記録する。
+   feedbackの全itemがappliedで必須検証も成功してからcompletedをpublishする。
+   変更の分離、commit、snapshot取得に失敗したら理由をblockedへ記録する。
    commit済み内容が確定後のimplement.md自身のdigestを含む必要はない。
-10. 保存したfront matterとgit statusを確認して報告する。
+10. 保存したImplementを `validate --references` で検証し、git statusとともに報告する。
 
 既存規約への軽微な調整はPlanの意味を変えない範囲で判断でき、その理由を監査へ残す。
 新しい正規化feedbackなしにcompletedを再開しない。レビューsourceやFlow stateを直接読んで修正しない。
-push・PR作成は明示依頼時だけ。
+push・PR作成は利用者が各操作を明示依頼した場合だけ行う。
 
 ## プロジェクト知識の適用
 

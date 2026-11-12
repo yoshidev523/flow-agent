@@ -9,7 +9,7 @@
 `apm.lock.yaml`で管理します。
 
 機能ごとの実行成果物は`flow-spec/YYYYMMDD_feature/`へ保存します。
-Flow 4.9.0では`flow-state.yml`、事実履歴の`audit.md`、復旧用の`.flow/journal.md`、固定pathの
+Flow 4.9.1では`flow-state.yml`、事実履歴の`audit.md`、復旧用の`.flow/journal.md`、固定pathの
 `artifacts/design.md`、`artifacts/plan.md`、`artifacts/implement.md`を使います。
 固定Markdown成果物はrevisionと変更履歴を更新し、revision別fileは作りません。
 完了後の説明は派生成果物として固定pathの`artifacts/session-report.html`に保存します。
@@ -260,7 +260,7 @@ agent定義はfront matter後を「あなたは〜です。」で始め、「主
 履歴には確立済みのcommit規約がないため、命令形で対象を明確にした短い件名を使います。
 PRには目的、変更file、検証結果または未実施理由を記載し、関連Issueがあればlinkします。
 
-## Flow 4.9.0 の機械処理
+## Flow 4.9.1 の機械処理
 
 HOWは`.apm/skills/flow/references/`、schemaの正本は`src/contracts/`のZod定義です。
 実行処理はTypeScriptで実装し、依存を含む`scripts/flowctl.js`をFlow skillへ同梱します。
