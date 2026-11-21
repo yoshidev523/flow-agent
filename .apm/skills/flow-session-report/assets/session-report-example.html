@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>サンプル｜文章と図で伝えるFlowレポート</title><style>
+    body { margin: 0; background: #f5f7fa; color: #182230; font: 1rem/1.65 system-ui, sans-serif; }
+    main { max-width: 68rem; margin: auto; padding: clamp(1rem, 4vw, 3rem); }
+    h1, h2, h3 { line-height: 1.3; }
+    section { margin-block: 2rem; }
+    a { color: #17458a; }
+    code { overflow-wrap: anywhere; }
+    .comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin: 0; }
+    .comparison > div, details { background: #fff; border: 1px solid #ccd5e0; border-radius: .5rem; padding: 1rem; }
+    .comparison h3 { margin-top: 0; }
+    .comparison > div { min-width: 0; }
+    .comparison figcaption { grid-column: 1 / -1; }
+    .diagram { overflow-x: auto; padding: .5rem; }
+    .diagram-flow { display: flex; flex-direction: column; align-items: center; gap: .5rem; }
+    .diagram-node { box-sizing: border-box; max-width: 100%; border: 2px solid #526477; border-radius: .5rem; padding: .75rem 1rem; background: #fff; overflow-wrap: anywhere; }
+    .diagram-edge { text-align: center; color: #35495e; }
+    .diagram-node.added { border: 3px solid #176342; background: #edf8f1; }
+    .diagram-node.removed { border: 2px dashed #8a3434; background: #fff2f2; }
+    .diagram-node.moved { border: 3px double #17458a; background: #eff4ff; }
+    .legend { font-size: .9rem; }
+    details + details { margin-top: .75rem; }
+    summary { cursor: pointer; font-weight: 650; }
+    @media (max-width: 42rem) { .comparison { grid-template-columns: 1fr; } }
+
+:root { color-scheme: light; }
+body { background: #f3f5f8; }
+main { max-width: 72rem; }
+header { padding: 2rem 0 1rem; border-bottom: 1px solid #ccd5e0; }
+h1 { font-size: clamp(1.8rem, 4vw, 2.7rem); margin: .6rem 0 1rem; }
+h2 { font-size: 1.5rem; }
+h3 { font-size: 1.12rem; }
+p { max-width: 68ch; }
+.kicker { color: #17458a; font-weight: 700; font-size: .85rem; letter-spacing: .08em; }
+.meta, figcaption { color: #43536a; font-size: .92rem; }
+.notice { background: #fff7e8; border-left: 4px solid #a16614; padding: .8rem 1rem; }
+.lead { font-size: 1.12rem; }
+.topic { border-top: 1px solid #ccd5e0; margin-top: 2rem; padding-top: 1rem; }
+.diagram-node { width: 100%; text-align: center; }
+.diagram-node small { display: block; color: #43536a; margin-top: .25rem; }
+.pill { font-size: .75rem; font-weight: 700; display: inline-block; margin-right: .5rem; }
+.tree { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .75rem; }
+.tree .root { grid-column: 1 / -1; }
+.tree .branch { text-align: center; color: #43536a; }
+.tree .wide { grid-column: 1 / -1; }
+.tree .diagram-node { height: 100%; }
+.map { background: #fff; border: 1px solid #ccd5e0; border-radius: .5rem; padding: 1rem; margin: 0; }
+.route { display: flex; align-items: center; gap: .7rem; margin: .65rem 0; }
+.route .diagram-node { flex: 1; }
+.route .arrow { flex: 0 0 auto; }
+table { width: 100%; border-collapse: collapse; background: #fff; }
+th, td { text-align: left; vertical-align: top; border-bottom: 1px solid #ccd5e0; padding: .85rem; }
+th { background: #e9eef5; }
+footer { border-top: 1px solid #ccd5e0; margin-top: 2rem; padding-top: 1rem; font-size: .9rem; color: #43536a; }
+@media (max-width: 42rem) { header { padding-top: 0; } .tree { grid-template-columns: 1fr; } .route { flex-direction: column; } .route .arrow { transform: rotate(90deg); } .route .diagram-node { flex: auto; } th,td { padding: .5rem; } }
+.gallery-nav { display:flex; flex-wrap:wrap; gap:.6rem 1.2rem; margin:1rem 0; }
+#diagram-gallery .map { margin:1rem 0 2rem; }
+#diagram-gallery h4 { margin:0 0 .8rem; }
+#diagram-gallery .node { border:2px solid #526477; border-radius:.4rem; padding:.8rem 1rem; background:#fff; text-align:center; overflow-wrap:anywhere; }
+#diagram-gallery .node small { display:block; color:#43536a; margin-top:.3rem; }
+#diagram-gallery .connector, #diagram-gallery .branch-label { text-align:center; padding:.4rem; color:#35495e; }
+#diagram-gallery .terminal { border-radius:2rem; }
+#diagram-gallery .flow-example { max-width:36rem; margin:auto; display:grid; grid-template-columns:1fr 1fr; gap:.4rem 1.4rem; align-items:center; }
+#diagram-gallery .flow-span { grid-column:1/-1; justify-self:center; min-width:10rem; }
+#diagram-gallery .decision { clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%); padding:2rem 2.7rem; background:#e2eaf5; text-align:center; }
+#diagram-gallery .diagram-scroll { overflow-x:auto; padding:.3rem; }
+#diagram-gallery .sequence-example { min-width:660px; }
+#diagram-gallery .participants { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; }
+#diagram-gallery .sequence-body { position:relative; display:grid; grid-template-columns:repeat(4,1fr); grid-template-rows:repeat(6,4.3rem); padding-bottom:1rem; }
+#diagram-gallery .lifelines { position:absolute; inset:0; display:grid; grid-template-columns:repeat(4,1fr); pointer-events:none; }
+#diagram-gallery .lifelines i { justify-self:center; border-left:1px dashed #8998aa; }
+#diagram-gallery .message { position:relative; margin-left:calc(100% / 4); margin-right:calc(100% / 4); align-self:center; border-bottom:2px solid #17458a; padding-bottom:.4rem; text-align:center; }
+#diagram-gallery .message[style*="2 / 5"] { margin-left:calc(100% / 6); margin-right:calc(100% / 6); }
+#diagram-gallery .message span { position:relative; background:#fff; padding:.1rem .35rem; }
+#diagram-gallery .message::after { content:''; position:absolute; bottom:-6px; width:9px; height:9px; border-top:2px solid #17458a; border-right:2px solid #17458a; }
+#diagram-gallery .message.right::after { right:0; transform:rotate(45deg); }
+#diagram-gallery .message.left::after { left:0; transform:rotate(-135deg); }
+#diagram-gallery .message.response { border-bottom-style:dashed; }
+#diagram-gallery .er-example { min-width:730px; display:grid; grid-template-columns:1fr 110px 1fr 110px 1fr; align-items:center; gap:.3rem; }
+#diagram-gallery .entity { align-self:start; border:2px solid #526477; border-radius:.4rem; overflow:hidden; }
+#diagram-gallery .entity h4 { padding:.7rem; margin:0; background:#e9eef5; border-bottom:1px solid #526477; text-align:center; }
+#diagram-gallery .entity > div { padding:.4rem .7rem; border-bottom:1px solid #e1e6ed; }
+#diagram-gallery .relation { text-align:center; white-space:nowrap; }
+#diagram-gallery .relation small { display:block; color:#43536a; }
+#diagram-gallery .component-example { max-width:42rem; margin:auto; }
+#diagram-gallery .system-boundary { border:1px solid #8998aa; padding:1.2rem; border-radius:.5rem; }
+#diagram-gallery .component-path { max-width:22rem; margin:auto; }
+#diagram-gallery .component-branches { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+#diagram-gallery .external { border-style:dashed; }
+#diagram-gallery .external-note { color:#43536a; margin-top:.6rem; }
+#diagram-gallery .dependency-example { max-width:25rem; margin:auto; }
+#diagram-gallery .dep-implements { border-left:2px dashed #8998aa; width:fit-content; margin:auto; padding-left:1rem; }
+@media(max-width:42rem) { #diagram-gallery .component-branches { grid-template-columns:1fr; } #diagram-gallery .flow-example { gap:.3rem .7rem; } #diagram-gallery .node { padding:.6rem; } }
+</style></head><body><main>
+<header>
+<div class="kicker">FLOW / SESSION REPORT SAMPLE</div>
+<h1>変更の説明を、文章と図で伝える</h1>
+<p class="lead">完了レポートに図の選択基準を追加しました。各変更を短い文章で説明し、必要に応じて複数の図で構造や流れを補います。</p>
+<p class="meta">対象：flow-session-report の指示・HTMLテンプレート ｜ 2026年11月21日</p>
+<p class="notice">構成・表現を参照するための保存済みサンプルです。レポート生成ルールを変更した時点の差分を題材にしています。実装commit・Implement review cycle・完了チェックポイントは未作成です。</p>
+</header>
+<section>
+<h2>できるようになったこと</h2>
+<p>レポートを読む人が、変更の要点を文章でつかみ、図で関係や前後の違いを確認できるように、生成ルールを整えました。図の種類や枚数は、変更の内容に合わせて選びます。</p>
+</section>
+<section>
+<h2>変更前と変更後</h2>
+<div class="topic">
+<h3>01　変更内容に合わせて図を選ぶ</h3>
+<p>従来は図の種類を選ぶ基準がなく、テンプレートも箇条書きの前後比較が中心でした。今回は、処理・状態・責務など、説明したい関係に合う図を選ぶ指示を追加しました。</p>
+<figure class="comparison" aria-label="図の選択と生成手順の前後比較">
+<div><h3>変更前</h3><div class="diagram diagram-flow">
+<div class="diagram-node">成果物・監査・Git差分を読む</div>
+<div class="diagram-edge">↓ 変更を整理</div>
+<div class="diagram-node">前後比較と判断理由をまとめる<small>図の種類の選択基準は未指定</small></div>
+<div class="diagram-edge">↓ テンプレートへ反映</div>
+<div class="diagram-node">箇条書き中心の比較欄<small>図を描く場合はHTML/CSS</small></div>
+</div></div>
+<div><h3>変更後</h3><div class="diagram diagram-flow">
+<div class="diagram-node">成果物・監査・Git差分を読む</div>
+<div class="diagram-edge">↓ 変更を整理</div>
+<div class="diagram-node added"><span class="pill">追加</span>各変更を簡潔な文章で説明<small>変更内容と効果・影響を伝える</small></div>
+<div class="diagram-edge">↓ 理解に役立つ場合</div>
+<div class="diagram-node added"><span class="pill">追加</span>関係に合う図を選ぶ<small>前後比較は種類・粒度・用語・向きを揃える</small></div>
+<div class="diagram-edge">↓ 図ごとに短い説明を添える</div>
+<div class="diagram-node">文章と図を組み合わせた比較欄</div>
+</div></div>
+<figcaption><p><strong>図1｜生成手順の比較。</strong>新たに「簡潔な文章」と「図を選ぶ基準」を明記しました。この図は生成担当者への指示を表しており、CLIの自動処理ではありません。</p><p class="legend">「追加」＋緑の太枠＝今回追加した指示。矢印＝説明を組み立てる順序。<a href="#evidence">根拠：スキル「変更に応じた図解」</a></p></figcaption>
+</figure>
+<p>同じ変更を、選択基準の対応図でも示します。上の図は「どの順序でまとめるか」、下の図は「何を説明するときにどの図を使うか」を表します。</p>
+<figure class="map" aria-label="説明する関係と図の種類の対応">
+<div class="route"><div class="diagram-node">処理の順序・条件分岐</div><div class="arrow">→</div><div class="diagram-node">フローチャート</div></div>
+<div class="route"><div class="diagram-node">サービス間のやり取り</div><div class="arrow">→</div><div class="diagram-node">シーケンス図</div></div>
+<div class="route"><div class="diagram-node">状態・遷移条件</div><div class="arrow">→</div><div class="diagram-node">状態遷移図</div></div>
+<div class="route"><div class="diagram-node">モジュールの責務・依存</div><div class="arrow">→</div><div class="diagram-node">コンポーネント図・依存関係図</div></div>
+<figcaption><p><strong>図2｜図の選択基準の抜粋。</strong>矢印は説明したい関係と図の候補の対応です。データ構造にはER図、画面の導線には画面遷移図なども選べます。<a href="#evidence">根拠：スキルの選択表</a></p></figcaption>
+</figure>
+</div>
+<div class="topic">
+<h3>02　一つの変更を、必要な数の図で説明する</h3>
+<p>変更が複数ある場合は目的ごとに分けます。一つの変更にも、構成図とシーケンス図のように観点の異なる図を組み合わせられます。図ごとに短い説明を添え、同じ内容の重複は避けます。</p>
+<figure class="comparison" aria-label="レポート構成の前後比較">
+<div><h3>変更前</h3><div class="diagram tree">
+<div class="diagram-node root">変更前後の比較セクション</div>
+<div class="branch wide">↓ テンプレートにある比較欄</div>
+<div class="diagram-node">変更前の箇条書き</div><div class="diagram-node">変更後の箇条書き</div>
+</div><p class="meta">目的ごとにまとめる指定はありましたが、複数の図の使い分けは未指定でした。</p></div>
+<div><h3>変更後</h3><div class="diagram tree">
+<div class="diagram-node root">変更前後の比較セクション</div>
+<div class="branch wide">↓ 目的ごとに説明</div>
+<div class="diagram-node added"><span class="pill">追加</span>変更Aの説明文<small>何をどう変えたか</small></div><div class="diagram-node added"><span class="pill">追加</span>変更Bの説明文<small>何をどう変えたか</small></div>
+<div class="branch">↓ 必要な図を添付</div><div class="branch">↓ 図が不要なら文章で完結</div>
+<div class="diagram-node">構成図 ＋ シーケンス図<small>各図に短い説明</small></div><div class="diagram-node">文章のみ、または表を添付</div>
+</div></div>
+<figcaption><p><strong>図3｜レポートの構成図。</strong>矢印は内容の包含・添付関係です。変更のまとまりを繰り返し、各変更の図の数は理解に必要な観点で決めます。A・Bは構成を説明する例です。</p><p class="legend">「追加」＋緑の太枠＝必須化した文章説明。<a href="#evidence">根拠：スキルとテンプレートの繰り返し指示</a></p></figcaption>
+</figure>
+</div>
+<div class="topic">
+<h3>03　図を使わない場合も、文章で簡潔に伝える</h3>
+<p>文言修正など、図が理解に寄与しない変更は文章だけで説明できます。図の有無にかかわらず各変更の説明文は必須です。また、変更前の根拠が不足する場合は、その不足を明記し、関係を推測で描かないようにしました。</p>
+</div>
+</section>
+<section>
+<h2>主な判断と理由</h2>
+<details open><summary>文章を必須にし、図の数は固定しない</summary><p>利用者から「複数の変更」「一つの変更に複数の図」「簡潔な文章による説明」が必要という要望を受け、文章を土台に、必要な図を組み合わせる指示にしました。</p></details>
+<details><summary>前後の図は同じ条件で比較する</summary><p>変更前後の違いを読み取りやすくするため、比較の組ごとに図の種類・粒度・用語・向きを揃えます。追加・削除・移動は文字や枠線でも区別します。</p></details>
+<details><summary>HTML/CSSだけで読める形式を維持する</summary><p>既存の方針を引き継ぎ、図とスタイルはHTMLに同梱します。外部アセットやJavaScriptを使わず、ファイルを開くだけで読めます。</p></details>
+</section>
+<section>
+<h2>検証とレビュー</h2>
+<table><thead><tr><th>確認項目</th><th>今回の結果</th></tr></thead><tbody>
+<tr><td>差分の整形チェック</td><td>git diff --check：通過</td></tr>
+<tr><td>Codex・Claudeへの配置検証</td><td>apm run verify-flow-deployment：通過。スキル・テンプレートの配置を確認</td></tr>
+<tr><td>Flowの最終レビュー</td><td>未実施。このサンプルは正式な完了証拠ではありません</td></tr>
+<tr><td>残る確認事項</td><td>実際のFlow完了時に生成される図の品質・種類の選び方は未確認</td></tr>
+</tbody></table>
+</section>
+<section id="evidence">
+<h2>参照した変更</h2><p><a href="diagram-samples.html">フローチャート・シーケンス図・ER図・コンポーネント図・依存関係図の表現例</a></p>
+<p>以下はスキルとテンプレートへの参照です。記載した検証結果と判断理由はサンプル作成時点の記録であり、別の実装の証拠としては使えません。</p>
+<ul><li><a href="../SKILL.md">SKILL.md — 内容と出力／変更に応じた図解</a></li>
+<li><a href="session-report.html">session-report.html — 説明文・比較図・凡例のテンプレート</a></li></ul>
+</section>
+<footer>Flow セッションレポートの表示サンプル · 外部アセット・JavaScript不使用</footer>
+</main></body></html>

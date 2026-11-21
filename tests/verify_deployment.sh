@@ -63,6 +63,8 @@ do
   cmp "$flow_source_dir/.apm/skills/flow/scripts/flowctl.js" "$flow_consumer_dir/$skill_root/skills/flow/scripts/flowctl.js"
   test -f "$flow_consumer_dir/$skill_root/skills/flow/references/project-knowledge.md"
   cmp "$flow_source_dir/.apm/skills/flow-session-report/assets/session-report.html" "$flow_consumer_dir/$skill_root/skills/flow-session-report/assets/session-report.html"
+  cmp "$flow_source_dir/.apm/skills/flow-session-report/assets/session-report-example.html" "$flow_consumer_dir/$skill_root/skills/flow-session-report/assets/session-report-example.html"
+  cmp "$flow_source_dir/.apm/skills/flow-session-report/assets/diagram-samples.html" "$flow_consumer_dir/$skill_root/skills/flow-session-report/assets/diagram-samples.html"
   test -f "$flow_consumer_dir/$skill_root/skills/flow-artifact-sync/references/project-knowledge.md"
   cmp "$flow_source_dir/.apm/skills/flow/references/contracts.md" "$flow_consumer_dir/$skill_root/skills/flow/references/contracts.md"
   test ! -e "$flow_consumer_dir/$skill_root/skills/flow/references/contracts.schema.json"

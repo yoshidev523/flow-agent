@@ -1,0 +1,163 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>5種類の図のサンプル</title><style>
+    body { margin: 0; background: #f5f7fa; color: #182230; font: 1rem/1.65 system-ui, sans-serif; }
+    main { max-width: 68rem; margin: auto; padding: clamp(1rem, 4vw, 3rem); }
+    h1, h2, h3 { line-height: 1.3; }
+    section { margin-block: 2rem; }
+    a { color: #17458a; }
+    code { overflow-wrap: anywhere; }
+    .comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin: 0; }
+    .comparison > div, details { background: #fff; border: 1px solid #ccd5e0; border-radius: .5rem; padding: 1rem; }
+    .comparison h3 { margin-top: 0; }
+    .comparison > div { min-width: 0; }
+    .comparison figcaption { grid-column: 1 / -1; }
+    .diagram { overflow-x: auto; padding: .5rem; }
+    .diagram-flow { display: flex; flex-direction: column; align-items: center; gap: .5rem; }
+    .diagram-node { box-sizing: border-box; max-width: 100%; border: 2px solid #526477; border-radius: .5rem; padding: .75rem 1rem; background: #fff; overflow-wrap: anywhere; }
+    .diagram-edge { text-align: center; color: #35495e; }
+    .diagram-node.added { border: 3px solid #176342; background: #edf8f1; }
+    .diagram-node.removed { border: 2px dashed #8a3434; background: #fff2f2; }
+    .diagram-node.moved { border: 3px double #17458a; background: #eff4ff; }
+    .legend { font-size: .9rem; }
+    details + details { margin-top: .75rem; }
+    summary { cursor: pointer; font-weight: 650; }
+    @media (max-width: 42rem) { .comparison { grid-template-columns: 1fr; } }
+
+:root { color-scheme: light; }
+body { background: #f3f5f8; }
+main { max-width: 72rem; }
+header { padding: 2rem 0 1rem; border-bottom: 1px solid #ccd5e0; }
+h1 { font-size: clamp(1.8rem, 4vw, 2.7rem); margin: .6rem 0 1rem; }
+h2 { font-size: 1.5rem; }
+h3 { font-size: 1.12rem; }
+p { max-width: 68ch; }
+.kicker { color: #17458a; font-weight: 700; font-size: .85rem; letter-spacing: .08em; }
+.meta, figcaption { color: #43536a; font-size: .92rem; }
+.notice { background: #fff7e8; border-left: 4px solid #a16614; padding: .8rem 1rem; }
+.lead { font-size: 1.12rem; }
+.topic { border-top: 1px solid #ccd5e0; margin-top: 2rem; padding-top: 1rem; }
+.diagram-node { width: 100%; text-align: center; }
+.diagram-node small { display: block; color: #43536a; margin-top: .25rem; }
+.pill { font-size: .75rem; font-weight: 700; display: inline-block; margin-right: .5rem; }
+.tree { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .75rem; }
+.tree .root { grid-column: 1 / -1; }
+.tree .branch { text-align: center; color: #43536a; }
+.tree .wide { grid-column: 1 / -1; }
+.tree .diagram-node { height: 100%; }
+.map { background: #fff; border: 1px solid #ccd5e0; border-radius: .5rem; padding: 1rem; margin: 0; }
+.route { display: flex; align-items: center; gap: .7rem; margin: .65rem 0; }
+.route .diagram-node { flex: 1; }
+.route .arrow { flex: 0 0 auto; }
+table { width: 100%; border-collapse: collapse; background: #fff; }
+th, td { text-align: left; vertical-align: top; border-bottom: 1px solid #ccd5e0; padding: .85rem; }
+th { background: #e9eef5; }
+footer { border-top: 1px solid #ccd5e0; margin-top: 2rem; padding-top: 1rem; font-size: .9rem; color: #43536a; }
+@media (max-width: 42rem) { header { padding-top: 0; } .tree { grid-template-columns: 1fr; } .route { flex-direction: column; } .route .arrow { transform: rotate(90deg); } .route .diagram-node { flex: auto; } th,td { padding: .5rem; } }
+.gallery-nav { display:flex; flex-wrap:wrap; gap:.6rem 1.2rem; margin:1rem 0; }
+#diagram-gallery .map { margin:1rem 0 2rem; }
+#diagram-gallery h4 { margin:0 0 .8rem; }
+#diagram-gallery .node { border:2px solid #526477; border-radius:.4rem; padding:.8rem 1rem; background:#fff; text-align:center; overflow-wrap:anywhere; }
+#diagram-gallery .node small { display:block; color:#43536a; margin-top:.3rem; }
+#diagram-gallery .connector, #diagram-gallery .branch-label { text-align:center; padding:.4rem; color:#35495e; }
+#diagram-gallery .terminal { border-radius:2rem; }
+#diagram-gallery .flow-example { max-width:36rem; margin:auto; display:grid; grid-template-columns:1fr 1fr; gap:.4rem 1.4rem; align-items:center; }
+#diagram-gallery .flow-span { grid-column:1/-1; justify-self:center; min-width:10rem; }
+#diagram-gallery .decision { clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%); padding:2rem 2.7rem; background:#e2eaf5; text-align:center; }
+#diagram-gallery .diagram-scroll { overflow-x:auto; padding:.3rem; }
+#diagram-gallery .sequence-example { min-width:660px; }
+#diagram-gallery .participants { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; }
+#diagram-gallery .sequence-body { position:relative; display:grid; grid-template-columns:repeat(4,1fr); grid-template-rows:repeat(6,4.3rem); padding-bottom:1rem; }
+#diagram-gallery .lifelines { position:absolute; inset:0; display:grid; grid-template-columns:repeat(4,1fr); pointer-events:none; }
+#diagram-gallery .lifelines i { justify-self:center; border-left:1px dashed #8998aa; }
+#diagram-gallery .message { position:relative; margin-left:calc(100% / 4); margin-right:calc(100% / 4); align-self:center; border-bottom:2px solid #17458a; padding-bottom:.4rem; text-align:center; }
+#diagram-gallery .message[style*="2 / 5"] { margin-left:calc(100% / 6); margin-right:calc(100% / 6); }
+#diagram-gallery .message span { position:relative; background:#fff; padding:.1rem .35rem; }
+#diagram-gallery .message::after { content:''; position:absolute; bottom:-6px; width:9px; height:9px; border-top:2px solid #17458a; border-right:2px solid #17458a; }
+#diagram-gallery .message.right::after { right:0; transform:rotate(45deg); }
+#diagram-gallery .message.left::after { left:0; transform:rotate(-135deg); }
+#diagram-gallery .message.response { border-bottom-style:dashed; }
+#diagram-gallery .er-example { min-width:730px; display:grid; grid-template-columns:1fr 110px 1fr 110px 1fr; align-items:center; gap:.3rem; }
+#diagram-gallery .entity { align-self:start; border:2px solid #526477; border-radius:.4rem; overflow:hidden; }
+#diagram-gallery .entity h4 { padding:.7rem; margin:0; background:#e9eef5; border-bottom:1px solid #526477; text-align:center; }
+#diagram-gallery .entity > div { padding:.4rem .7rem; border-bottom:1px solid #e1e6ed; }
+#diagram-gallery .relation { text-align:center; white-space:nowrap; }
+#diagram-gallery .relation small { display:block; color:#43536a; }
+#diagram-gallery .component-example { max-width:42rem; margin:auto; }
+#diagram-gallery .system-boundary { border:1px solid #8998aa; padding:1.2rem; border-radius:.5rem; }
+#diagram-gallery .component-path { max-width:22rem; margin:auto; }
+#diagram-gallery .component-branches { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+#diagram-gallery .external { border-style:dashed; }
+#diagram-gallery .external-note { color:#43536a; margin-top:.6rem; }
+#diagram-gallery .dependency-example { max-width:25rem; margin:auto; }
+#diagram-gallery .dep-implements { border-left:2px dashed #8998aa; width:fit-content; margin:auto; padding-left:1rem; }
+@media(max-width:42rem) { #diagram-gallery .component-branches { grid-template-columns:1fr; } #diagram-gallery .flow-example { gap:.3rem .7rem; } #diagram-gallery .node { padding:.6rem; } }
+</style></head><body><main><section id="diagram-gallery">
+<h2>図の種類別サンプル</h2>
+<p class="notice">以下は図の表現を確認するための架空の「注文システム」の例です。実際のレポートでは、対象の成果物・差分に基づく内容へ置き換えてください。</p>
+<nav class="gallery-nav" aria-label="図の種類"><a href="#flow-example">フローチャート</a><a href="#sequence-example">シーケンス図</a><a href="#er-example">ER図</a><a href="#component-example">コンポーネント図</a><a href="#dependency-example">依存関係図</a></nav>
+<article class="topic" id="flow-example">
+<h3>01　フローチャート：処理と分岐</h3>
+<p>注文受付時に在庫を確認します。在庫がある場合は注文を確定し、ない場合は在庫不足を通知します。</p>
+<figure class="map"><div class="flow-example">
+<div class="flow-span node terminal">注文受付</div>
+<div class="flow-span connector">↓ 在庫照会</div>
+<div class="flow-span decision">在庫はある？</div>
+<div class="branch-label">↓ はい</div><div class="branch-label">↓ いいえ</div>
+<div class="node">注文を確定する</div><div class="node">在庫不足を通知する</div>
+<div class="connector">↓</div><div class="connector">↓</div>
+<div class="node terminal">受付完了</div><div class="node terminal">受付不可</div>
+</div><figcaption><p>ひし形は条件分岐、四角は処理、丸い枠は開始・終了です。矢印を追うと、条件ごとの処理が分かります。</p></figcaption></figure>
+</article>
+<article class="topic" id="sequence-example">
+<h3>02　シーケンス図：誰が、誰に、どの順番で依頼するか</h3>
+<p>在庫がある場合の注文確定を示します。注文APIが在庫サービスに照会し、注文を保存してから利用者へ結果を返します。</p>
+<figure class="map"><div class="diagram-scroll"><div class="sequence-example">
+<div class="participants"><div class="node">利用者</div><div class="node">注文API</div><div class="node">在庫サービス</div><div class="node">注文DB</div></div>
+<div class="sequence-body">
+<div class="lifelines" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+<div class="message right" style="grid-column:1 / 3;grid-row:1"><span>1. 注文を送信</span></div>
+<div class="message right" style="grid-column:2 / 4;grid-row:2"><span>2. 在庫を照会</span></div>
+<div class="message left response" style="grid-column:2 / 4;grid-row:3"><span>3. 在庫あり</span></div>
+<div class="message right" style="grid-column:2 / 5;grid-row:4"><span>4. 注文を保存</span></div>
+<div class="message left response" style="grid-column:2 / 5;grid-row:5"><span>5. 保存完了</span></div>
+<div class="message left response" style="grid-column:1 / 3;grid-row:6"><span>6. 注文確定を表示</span></div>
+</div></div></div><figcaption><p>時間は上から下へ進みます。縦の破線は各参加者のライフライン、横の実線矢印は依頼、破線矢印は応答です。在庫不足の経路はこの図では省略しています。</p></figcaption></figure>
+</article>
+<article class="topic" id="er-example">
+<h3>03　ER図：データ構造と関連</h3>
+<p>利用者は複数の注文を持てます。一つの注文には1件以上の注文明細があり、明細ごとに商品と数量を保存します。</p>
+<figure class="map"><div class="diagram-scroll"><div class="er-example">
+<div class="entity"><h4>利用者</h4><div>PK　user_id</div><div>name</div></div>
+<div class="relation"><span>1 ─── 0..*</span><small>注文する</small></div>
+<div class="entity"><h4>注文</h4><div>PK　order_id</div><div>FK　user_id</div><div>ordered_at</div></div>
+<div class="relation"><span>1 ─── 1..*</span><small>明細を持つ</small></div>
+<div class="entity"><h4>注文明細</h4><div>PK　order_item_id</div><div>FK　order_id</div><div>product_name</div><div>quantity</div></div>
+</div></div><figcaption><p>PKは主キー、FKは外部キーです。利用者1人に注文0件以上、注文1件に明細1件以上が対応します。この例は商品名を明細に保存する簡略モデルです。</p></figcaption></figure>
+</article>
+<article class="topic" id="component-example">
+<h3>04　コンポーネント図：機能のまとまりと責務</h3>
+<p>画面は利用者の操作を受け付け、注文サービスは在庫確認と保存を調整します。在庫照会の責務は外部の在庫サービスにあります。</p>
+<figure class="map"><div class="component-example">
+<div class="system-boundary"><h4>注文システム</h4>
+<div class="component-path"><div class="node component">«component»<br>注文画面<small>入力・結果表示</small></div><div class="connector">↓ HTTPS / 注文受付</div><div class="node component">«component»<br>注文サービス<small>在庫確認・注文保存の調整</small></div></div>
+<div class="component-path"><div class="connector">↓ SQL / 注文保存</div><div class="node">注文DB<small>注文・明細の永続化</small></div></div>
+</div>
+<div class="connector">↓ 注文サービスから HTTPS / 在庫照会</div>
+<div class="node external">«external component»<br>在庫サービス<small>在庫の照会を受け付ける</small></div>
+<div class="external-note">外側の破線の要素は外部サービス。注文DBからの呼び出しではありません。</div>
+</div><figcaption><p>枠はシステム境界、部品は機能のまとまり、矢印は呼び出し先です。外部サービスは破線で示しています。責務と接続方法を俯瞰するための簡略図です。</p></figcaption></figure>
+</article>
+<article class="topic" id="dependency-example">
+<h3>05　依存関係図：コードが何を参照するか</h3>
+<p>注文の処理は保存用インターフェースを参照します。DB向けアダプターも同じインターフェースを実装し、注文処理からDBの詳細への直接依存を避けます。</p>
+<figure class="map"><div class="dependency-example">
+<div class="node dep-controller">OrderController<small>注文APIの受付</small></div>
+<div class="connector dep-down">↓ 呼び出す</div>
+<div class="node dep-usecase">PlaceOrder<small>注文処理</small></div>
+<div class="connector dep-to-port">↓ 参照する</div>
+<div class="node dep-port">«interface»<br>OrderRepository<small>注文保存の契約</small></div>
+<div class="connector dep-implements">↑ 実装する（破線）</div>
+<div class="node dep-adapter">SqlOrderRepository<small>DB向けアダプター</small></div>
+</div><figcaption><p>矢印はコードの依存先へ向かいます。実行順序を示す図ではありません。上の注文処理と下のDBアダプターの双方が中央の契約を参照します。</p></figcaption></figure>
+</article>
+</section>
+</main></body></html>

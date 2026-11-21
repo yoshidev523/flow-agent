@@ -1,4 +1,4 @@
-# flow-agent 4.10.0
+# flow-agent 4.11.0
 
 Codex / Claude Codeで仕様駆動開発を進めるためのエージェントパッケージです。
 Design、Review、Plan、Implementを順に実行し、判断と成果物を`flow-spec/`配下に保存します。
@@ -41,7 +41,8 @@ Flow起動時に対象projectの`.gitattributes`を確認し、なければ作�
 成果物はGit管理しながら、GitHubのPRでは差分を既定で折りたたみます。
 
 実装レビューを通過してFlowが完了すると、`artifacts/session-report.html` に
-変更前後、主な判断と理由、検証結果を保存します。取得したHTMLはブラウザで開けます。
+変更前後、主な判断と理由、検証結果を保存します。各変更を簡潔な文章で説明し、内容に合う図を必要に応じて組み合わせます。
+図の前後比較や表現には同梱のHTMLサンプルを参照します。取得したHTMLはブラウザで開けます。
 FlowのPRを作るときはメインエージェントが
 [flow-pr-annotations](.apm/skills/flow-pr-annotations/SKILL.md)で差分上の説明を用意します。
 投稿を依頼した場合はPRに行コメントとして追加します。このスキルはPR URLを指定して単独でも使えます。

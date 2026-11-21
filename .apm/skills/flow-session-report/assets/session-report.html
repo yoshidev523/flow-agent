@@ -14,7 +14,16 @@
     .comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin: 0; }
     .comparison > div, details { background: #fff; border: 1px solid #ccd5e0; border-radius: .5rem; padding: 1rem; }
     .comparison h3 { margin-top: 0; }
-    .steps li + li { margin-top: .4rem; }
+    .comparison > div { min-width: 0; }
+    .comparison figcaption { grid-column: 1 / -1; }
+    .diagram { overflow-x: auto; padding: .5rem; }
+    .diagram-flow { display: flex; flex-direction: column; align-items: center; gap: .5rem; }
+    .diagram-node { box-sizing: border-box; max-width: 100%; border: 2px solid #526477; border-radius: .5rem; padding: .75rem 1rem; background: #fff; overflow-wrap: anywhere; }
+    .diagram-edge { text-align: center; color: #35495e; }
+    .diagram-node.added { border: 3px solid #176342; background: #edf8f1; }
+    .diagram-node.removed { border: 2px dashed #8a3434; background: #fff2f2; }
+    .diagram-node.moved { border: 3px double #17458a; background: #eff4ff; }
+    .legend { font-size: .9rem; }
     details + details { margin-top: .75rem; }
     summary { cursor: pointer; font-weight: 650; }
     @media (max-width: 42rem) { .comparison { grid-template-columns: 1fr; } }
@@ -32,15 +41,35 @@
     </section>
     <section>
       <h2>変更前と変更後</h2>
+      <!-- 目的ごとに見出しと簡潔な説明文を必ず置く。変更が複数あればこのまとまりを繰り返す。
+           各変更には必要な数・種類の図を置く。一つの変更を構成図とシーケンス図などで補ってよい。
+           図が理解に寄与しない変更は説明文だけでもよい。各比較の図の種類・粒度・用語・向きを前後で揃える。
+           以下は縦方向の処理フローの構造例。変更内容に応じて構成図、シーケンス図、
+           状態遷移図、ER図などに組み替え、ノード・接続・関係のラベルを描く。 -->
+      <h3><!-- 変更の目的 --></h3>
+      <p><!-- 必須：何をどう変え、どのような効果や影響があるかを簡潔に説明する --></p>
+      <!-- 以下のfigureは必要に応じて複数置き、各図で伝える観点を分ける -->
       <figure class="comparison" aria-label="変更前後の比較">
         <div>
           <h3>変更前</h3>
-          <ol class="steps"><!-- 変更前の処理や責務 --></ol>
+          <div class="diagram diagram-flow">
+            <div class="diagram-node"><!-- 変更前の処理・状態・責務など --></div>
+            <div class="diagram-edge">↓ <!-- 接続の意味や条件 --></div>
+            <div class="diagram-node"><!-- 接続先 --></div>
+          </div>
         </div>
         <div>
           <h3>変更後</h3>
-          <ol class="steps"><!-- 変更後の処理や責務 --></ol>
+          <div class="diagram diagram-flow">
+            <div class="diagram-node"><!-- 変更後の対応する要素 --></div>
+            <div class="diagram-edge">↓ <!-- 接続の意味や条件 --></div>
+            <div class="diagram-node"><!-- 接続先。追加・削除・移動はクラスと文字で示す --></div>
+          </div>
         </div>
+        <figcaption>
+          <p><!-- 必須：図のタイトルと読み取れる変化を短く説明し、根拠へのリンクを添える。新規機能や根拠不足も明示する --></p>
+          <p class="legend"><!-- 使用した表現だけを説明。例：追加＝「追加」＋実線、削除＝「削除」＋破線、移動＝「移動」＋二重線 --></p>
+        </figcaption>
       </figure>
     </section>
     <section>
