@@ -34,7 +34,8 @@ apm run verify-flow-deployment
 
 通常の実行にはNode.js 22以上だけを必要とします。チェックポイントとImplement reviewのコード固定にはGitも必要です。
 `code-snapshot --request`でrepository・base/head commit・コードtree digestを取得します。利用側のnpm install・ビルドは不要です。
-`verify-flow-deployment`は下記の配置検証を自動化し、CLI・Markdown契約・templateの同梱も確認します。
+`verify-flow-deployment`は下記の配置検証を自動化し、CLI・Markdown契約・templateと、
+セッションレポート全体・5種類の図のHTMLサンプルの同梱も確認します。
 
 ```sh
 node .apm/skills/flow/scripts/flowctl.js --root flow-spec/YYYYMMDD_feature validate artifacts/design.md
