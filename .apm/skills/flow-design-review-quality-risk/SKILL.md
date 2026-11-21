@@ -54,7 +54,8 @@ judgmentは質問、背景、2〜3選択肢と影響、推奨、理由、回答�
 入出力形式は`../flow/references/contracts.md`とtemplateを参照する。
 機械検証はCLI内のZod定義に従い、旧schemaを読み替えない。
 `../flow/assets/templates/`の対応templateを使う。
-CLIは`node ../flow/scripts/flowctl.js --root {feature_dir}`。
+CLIは読み込んだこのSKILL.mdのdirectoryを基準に`../flow/scripts/flowctl.js`を絶対pathへ解決し、
+`node "{flowctl}" --root "{feature_dir}"`で実行する。pathの解決は共通CLI文書の「実行環境」に従う。
 Node.js 22以上が必要。依存はCLIへ同梱済みで、利用側のnpm install・ビルドは不要。
 
 各成果物はdraftを作り、`publish`で保存して`validate`で確認する。

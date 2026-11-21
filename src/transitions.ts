@@ -15,6 +15,11 @@ import { STAGES, validateMeta, type Stage } from "./validation/guards.js";
 import { FlowError, requireCondition as check } from "./errors.js";
 
 import { replanTransition } from "./replanning.js";
+import {
+  INTERRUPT_ACTIONS,
+  interruptTransition,
+  pendingInterrupt,
+} from "./interrupts.js";
 
 export function transition(store: Store, request: Fields): FlowState {
   store.consistent(request.request_id);
@@ -35,18 +40,42 @@ export function transition(store: Store, request: Fields): FlowState {
     true,
   );
   check(
-    current.state !== "completed" || request.action === "request_replan",
+    current.state !== "completed" ||
+      request.action === "request_replan" ||
+      INTERRUPT_ACTIONS.includes(request.action),
     "Completed Flow is terminal without replan approval",
     true,
   );
   check(
     !current.replan ||
+      request.action === "enqueue_interrupt" ||
       ["begin_replan", "finish_replan", "cancel_replan"].includes(
         request.action,
       ),
     "Resolve replan before other transitions",
     true,
   );
+  if (
+    pendingInterrupt(current) &&
+    !INTERRUPT_ACTIONS.includes(request.action)
+  ) {
+    check(
+      !current.interrupts?.some(
+        (i) => i.status === "running" || i.status === "result_ready",
+      ) &&
+        (["finish_invocation", "fail_invocation"].includes(request.action) ||
+          (current.pending_feedback !== null &&
+            (["start_invocation", "resume"].includes(request.action) ||
+              (!current.active_invocation &&
+                ["block", "request_replan"].includes(request.action)))) ||
+          (current.replan &&
+            ["begin_replan", "finish_replan", "cancel_replan"].includes(
+              request.action,
+            ))),
+      "Handle pending interruption before ordinary transitions",
+      true,
+    );
+  }
   const state = structuredClone(current),
     action = request.action,
     args = Object.fromEntries(
@@ -103,7 +132,9 @@ export function transition(store: Store, request: Fields): FlowState {
       pending_operation: phase === "implement" ? "execute" : operation,
       pending_feedback: ref,
     });
-  if (
+  if (INTERRUPT_ACTIONS.includes(action)) {
+    interruptTransition(store, state, action, args, evidence);
+  } else if (
     [
       "request_replan",
       "begin_replan",

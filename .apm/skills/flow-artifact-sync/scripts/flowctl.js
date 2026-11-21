@@ -27404,6 +27404,68 @@ var CheckpointRestoreSchema = external_exports.strictObject({
   checkpoint_id: text,
   branch: text
 });
+var InterruptProposalSchema = external_exports.strictObject({
+  id: text,
+  location: text,
+  change: text,
+  reason: text,
+  disposition: external_exports.enum(["pending", "adopt", "exclude"]),
+  response_event_id: text.nullable()
+});
+var InterruptResultSchema = external_exports.strictObject({
+  summary: text,
+  effect: external_exports.enum(["continue", "revise", "replan", "block"]),
+  reason: text,
+  feedback: ReferenceSchema.nullable(),
+  target_phase: external_exports.enum(["design", "plan"]).nullable(),
+  knowledge_update: external_exports.enum([
+    "needed",
+    "not_needed",
+    "updated",
+    "unknown",
+    "not_applicable"
+  ]),
+  document_sync: external_exports.enum([
+    "needed",
+    "not_needed",
+    "updated",
+    "unknown",
+    "not_applicable"
+  ]),
+  knowledge: ProjectKnowledgeSchema.nullable(),
+  proposals: external_exports.array(InterruptProposalSchema),
+  unresolved: external_exports.array(text),
+  evidence: external_exports.array(text)
+});
+var InterruptBasisSchema = external_exports.strictObject({
+  phase: text,
+  state: text,
+  artifacts: external_exports.strictObject({
+    design: ReferenceSchema.nullable(),
+    plan: ReferenceSchema.nullable(),
+    implement: ReferenceSchema.nullable()
+  }),
+  reviews: external_exports.strictObject({
+    design: ReferenceSchema.nullable(),
+    plan_decision: ReferenceSchema.nullable(),
+    plan_final: ReferenceSchema.nullable(),
+    implement: ReferenceSchema.nullable()
+  })
+});
+var InterruptSchema = external_exports.strictObject({
+  id: text,
+  kind: external_exports.enum(["async_feedback", "project_knowledge"]),
+  operation: external_exports.enum(["feedback", "assess", "update"]),
+  origin_event_ids: external_exports.array(text).min(1),
+  reason: text,
+  parent_id: text.nullable(),
+  proposal_id: text.nullable(),
+  status: external_exports.enum(["queued", "running", "result_ready", "completed"]),
+  basis: InterruptBasisSchema.nullable(),
+  result: InterruptResultSchema.nullable(),
+  presentation: text.nullable(),
+  outcome: external_exports.enum(["continue", "revise", "replan", "block"]).nullable()
+});
 var FlowStateSchema = external_exports.strictObject({
   schema_version: external_exports.literal("flow/flow-state-v2"),
   feature_id: text,
@@ -27463,7 +27525,8 @@ var FlowStateSchema = external_exports.strictObject({
     external_exports.literal(null)
   ]),
   pending_feedback: ReferenceSchema.nullable(),
-  replan: ReplanSchema.nullable().optional()
+  replan: ReplanSchema.nullable().optional(),
+  interrupts: external_exports.array(InterruptSchema).optional()
 });
 var AuditEventSchema = external_exports.strictObject({
   event_id: external_exports.string().regex(new RegExp("^E-[0-9]{6,}$")),
@@ -27541,6 +27604,10 @@ var contracts = {
   "verification-plan": VerificationPlanSchema,
   "handoff-check": HandoffCheckSchema,
   replan: ReplanSchema,
+  interrupt: InterruptSchema,
+  "interrupt-basis": InterruptBasisSchema,
+  "interrupt-result": InterruptResultSchema,
+  "interrupt-proposal": InterruptProposalSchema,
   checkpoint: CheckpointSchema,
   "checkpoint-request": CheckpointRequestSchema,
   "checkpoint-recover": CheckpointRecoverSchema,
@@ -27925,13 +27992,44 @@ function auditView(meta3, events) {
       case "flow.transitioned": {
         phase = d.to_phase;
         const prepared = byId.get(d.prepared_event_id)?.data;
+        const args = prepared?.arguments;
+        if (args && [
+          "enqueue_interrupt",
+          "begin_interrupt",
+          "record_interrupt_result",
+          "present_interrupt",
+          "finish_interrupt",
+          "decide_interrupt_proposal"
+        ].includes(d.action)) {
+          const record2 = prepared.after.interrupts.find(
+            (i) => i.id === args.interrupt_id
+          );
+          title = {
+            enqueue_interrupt: "\u5272\u308A\u8FBC\u307F\u53D7\u4ED8",
+            begin_interrupt: "\u5272\u308A\u8FBC\u307F\u958B\u59CB",
+            record_interrupt_result: "\u5272\u308A\u8FBC\u307F\u7D50\u679C",
+            present_interrupt: "\u5272\u308A\u8FBC\u307F\u7D50\u679C\u306E\u63D0\u793A",
+            finish_interrupt: "\u5272\u308A\u8FBC\u307F\u7D42\u4E86",
+            decide_interrupt_proposal: "\u5272\u308A\u8FBC\u307F\u63D0\u6848\u306E\u63A1\u5426"
+          }[d.action];
+          fact = d.action === "record_interrupt_result" ? record2.result.summary : d.action === "present_interrupt" ? args.text : d.action === "finish_interrupt" ? `${args.interrupt_id}: ${record2.outcome}\u3002${args.reason}` : d.action === "decide_interrupt_proposal" ? `${args.interrupt_id}/${args.proposal_id}: ${args.disposition}` : `${args.interrupt_id}: ${record2.kind}\u3002${record2.reason}`;
+          reason = d.action === "record_interrupt_result" ? record2.result.reason : "";
+          references = d.evidence.map(ref);
+          if (record2.origin_event_ids)
+            references.push(...record2.origin_event_ids);
+          if (d.action === "record_interrupt_result")
+            references.push(...record2.result.evidence);
+          if (d.action === "decide_interrupt_proposal")
+            references.push(args.response_event_id);
+          break;
+        }
         if (d.from_phase !== d.to_phase) {
           title = "\u30D5\u30A7\u30FC\u30BA\u79FB\u884C";
           fact = `${d.from_phase} \u2192 ${d.to_phase}`;
         } else if (d.from_state !== d.to_state && [d.from_state, d.to_state].some(
-          (s) => ["blocked", "waiting"].includes(s)
+          (s) => ["blocked", "waiting_for_input"].includes(s)
         )) {
-          title = d.to_state === "blocked" ? "\u505C\u6B62" : d.to_state === "waiting" ? "\u56DE\u7B54\u5F85\u3061" : "\u518D\u958B";
+          title = d.to_state === "blocked" ? "\u505C\u6B62" : d.to_state === "waiting_for_input" ? "\u56DE\u7B54\u5F85\u3061" : "\u518D\u958B";
           fact = `${d.from_state} \u2192 ${d.to_state}`;
         }
         reason = prepared?.arguments?.reason ?? "";
@@ -28290,10 +28388,7 @@ function findingStatus(findings) {
   const gates = findings.filter((x) => x.classification === "gate");
   return gates.some((x) => x.resolution === "human_decision") ? "blocked" : gates.length ? "changes_required" : "passed";
 }
-function validateMeta(meta3, body) {
-  const kind = KINDS[meta3.schema_version];
-  requireCondition(kind, "Unsupported schema_version (no implicit migration)");
-  schemaCheck(kind, meta3);
+function validateKnowledge(meta3, kind) {
   const knowledge = meta3.project_knowledge;
   if (knowledge) {
     if (kind === "review-source")
@@ -28353,6 +28448,12 @@ function validateMeta(meta3, body) {
   }
   if (kind === "review-source" && meta3.source_id === "project-rules" && !meta3.failure)
     requireCondition(knowledge, "Project rules source requires knowledge coverage");
+}
+function validateMeta(meta3, body) {
+  const kind = KINDS[meta3.schema_version];
+  requireCondition(kind, "Unsupported schema_version (no implicit migration)");
+  schemaCheck(kind, meta3);
+  validateKnowledge(meta3, kind);
   if (kind === "phase-artifact") {
     for (const [key, label] of [
       ["questions", "question"],
@@ -28546,6 +28647,66 @@ function validateMeta(meta3, body) {
     );
   }
   if (kind === "flow-state") {
+    const interrupts = meta3.interrupts ?? [];
+    uniqueIds(interrupts, "interruption");
+    requireCondition(
+      interrupts.filter(
+        (i) => ["running", "result_ready"].includes(i.status)
+      ).length <= 1,
+      "Only one interruption may be active"
+    );
+    for (const item of interrupts) {
+      requireCondition(
+        item.status === "queued" === (item.basis === null),
+        "Interruption basis/status mismatch"
+      );
+      requireCondition(
+        ["result_ready", "completed"].includes(item.status) === Boolean(item.result),
+        "Interruption result/status mismatch"
+      );
+      requireCondition(
+        item.status === "completed" === Boolean(item.outcome),
+        "Interruption outcome/status mismatch"
+      );
+      requireCondition(
+        item.presentation === null || Boolean(item.result),
+        "Interruption presentation requires result"
+      );
+      requireCondition(
+        item.status !== "completed" || Boolean(item.presentation),
+        "Completed interruption requires presentation"
+      );
+      requireCondition(
+        item.kind === "async_feedback" === (item.operation === "feedback"),
+        "Interruption kind/operation mismatch"
+      );
+      requireCondition(
+        item.operation === "update" === Boolean(item.proposal_id),
+        "Update interruption requires adopted proposal"
+      );
+      if (item.parent_id !== null)
+        requireCondition(
+          interrupts.some(
+            (p) => p.id === item.parent_id && p.id !== item.id
+          ),
+          "Unknown interruption parent"
+        );
+      if (item.result) {
+        uniqueIds(item.result.proposals, "interruption proposal");
+        if (item.result.knowledge)
+          validateKnowledge(
+            { project_knowledge: item.result.knowledge },
+            "flow-state"
+          );
+      }
+    }
+    if (interrupts.some(
+      (i) => ["running", "result_ready"].includes(i.status)
+    ))
+      requireCondition(
+        meta3.active_invocation === null && !meta3.replan,
+        "Interruption cannot run with invocation or replan"
+      );
     requireCondition(
       meta3.phase === "replanning" === Boolean(meta3.replan),
       "Replanning phase/context mismatch"
@@ -28726,7 +28887,9 @@ function replanTransition(store, state, action, args, evidence) {
       "Missing human cancellation"
     );
     const prepared = events.find(
-      (e) => e.event_type === "flow.transition_prepared" && e.data.action === "request_replan" && e.data.after.replan.prompt_event_id === context2.prompt_event_id
+      (e) => e.event_type === "flow.transition_prepared" && ["request_replan", "finish_interrupt"].includes(
+        e.data.action
+      ) && e.data.after.replan?.prompt_event_id === context2.prompt_event_id
     );
     requireCondition(prepared, "Missing original replan state");
     for (const ref of Object.values(context2.before))
@@ -28734,7 +28897,8 @@ function replanTransition(store, state, action, args, evidence) {
     const revision = state.state_revision;
     Object.assign(state, prepared.data.before, {
       state_revision: revision,
-      replan: null
+      replan: null,
+      ...state.interrupts ? { interrupts: state.interrupts } : {}
     });
   } else {
     fields("artifacts");
@@ -28820,6 +28984,341 @@ function replanTransition(store, state, action, args, evidence) {
   }
 }
 
+// src/interrupts.ts
+var INTERRUPT_ACTIONS = [
+  "enqueue_interrupt",
+  "begin_interrupt",
+  "record_interrupt_result",
+  "present_interrupt",
+  "finish_interrupt",
+  "decide_interrupt_proposal"
+];
+var activeInterrupt = (state) => state.interrupts?.find(
+  (i) => i.status === "running" || i.status === "result_ready"
+);
+var pendingInterrupt = (state) => activeInterrupt(state) ?? state.interrupts?.find((i) => i.status === "queued");
+function interruptTransition(store, state, action, args, evidence) {
+  const fields = (...keys) => requireCondition(
+    equal(Object.keys(args).sort(), keys.sort()),
+    "Invalid fields for action " + action
+  );
+  const records = state.interrupts ??= [];
+  const events = store.events()[1];
+  const origin = (id) => {
+    const event = events.find(
+      (e) => e.event_id === id && e.run_id === state.run_id
+    );
+    requireCondition(event, "Missing interruption origin event");
+    return event;
+  };
+  const record2 = () => {
+    const item2 = records.find((i) => i.id === args.interrupt_id);
+    requireCondition(item2, "Unknown interruption");
+    return item2;
+  };
+  if (action === "enqueue_interrupt") {
+    fields("interrupt_id", "kind", "origin_event_ids", "reason", "parent_id");
+    requireCondition(
+      !records.some((i) => i.id === args.interrupt_id),
+      "Interruption ID already used",
+      true
+    );
+    requireCondition(
+      ["async_feedback", "project_knowledge"].includes(args.kind),
+      "Unknown interruption kind"
+    );
+    requireCondition(
+      Array.isArray(args.origin_event_ids) && args.origin_event_ids.length && new Set(args.origin_event_ids).size === args.origin_event_ids.length,
+      "Invalid interruption origins"
+    );
+    for (const id of args.origin_event_ids) {
+      const event = origin(id);
+      if (args.kind === "async_feedback")
+        requireCondition(
+          event.event_type === "interaction.received" && event.actor === "human" && event.data.prompt_event_id === null,
+          "Async feedback requires unsolicited human feedback"
+        );
+    }
+    requireCondition(
+      args.parent_id === null || records.some((i) => i.id === args.parent_id),
+      "Unknown parent interruption"
+    );
+    requireCondition(
+      !records.some(
+        (i) => i.kind === args.kind && i.operation !== "update" && equal(
+          [...i.origin_event_ids].sort(),
+          [...args.origin_event_ids].sort()
+        )
+      ),
+      "Interruption trigger already registered",
+      true
+    );
+    records.push({
+      id: args.interrupt_id,
+      kind: args.kind,
+      operation: args.kind === "async_feedback" ? "feedback" : "assess",
+      origin_event_ids: args.origin_event_ids,
+      reason: args.reason,
+      parent_id: args.parent_id,
+      proposal_id: null,
+      status: "queued",
+      basis: null,
+      result: null,
+      presentation: null,
+      outcome: null
+    });
+    return;
+  }
+  const item = record2();
+  if (action === "begin_interrupt") {
+    fields("interrupt_id");
+    requireCondition(
+      !activeInterrupt(state) && !state.active_invocation && !state.replan,
+      "Finish active operation or replan before interruption",
+      true
+    );
+    requireCondition(
+      state.pending_feedback === null,
+      "Consume pending feedback before starting interruption",
+      true
+    );
+    requireCondition(
+      item.status === "queued" && records.find((i) => i.status === "queued") === item,
+      "Start queued interruptions in order",
+      true
+    );
+    for (const ref of [
+      ...Object.values(state.artifacts),
+      ...Object.values(state.reviews)
+    ])
+      if (ref) store.reference(ref);
+    item.basis = {
+      phase: state.phase,
+      state: state.state,
+      artifacts: structuredClone(state.artifacts),
+      reviews: structuredClone(state.reviews)
+    };
+    item.status = "running";
+  } else if (action === "record_interrupt_result") {
+    fields("interrupt_id", "result");
+    requireCondition(activeInterrupt(state) === item, "Interruption is not active", true);
+    const parsed = InterruptResultSchema.safeParse(args.result);
+    requireCondition(parsed.success, "Invalid interruption result");
+    const result = parsed.data;
+    requireCondition(
+      result.proposals.every(
+        (p) => p.disposition === "pending" && p.response_event_id === null
+      ),
+      "New proposals cannot contain adopted decisions"
+    );
+    requireCondition(
+      new Set(result.proposals.map((p) => p.id)).size === result.proposals.length,
+      "Duplicate interruption proposal IDs"
+    );
+    requireCondition(
+      result.effect === "revise" === Boolean(result.feedback),
+      "Interruption feedback/effect mismatch"
+    );
+    requireCondition(
+      result.effect === "replan" === Boolean(result.target_phase),
+      "Interruption replan target/effect mismatch"
+    );
+    requireCondition(
+      item.kind !== "project_knowledge" || result.knowledge !== null,
+      "Knowledge interruption requires coverage"
+    );
+    requireCondition(
+      result.knowledge_update !== "updated" && result.document_sync !== "updated" || item.operation === "update",
+      "Knowledge assessment cannot claim adopted updates"
+    );
+    if (result.feedback) {
+      store.reference(result.feedback);
+      evidence.push(result.feedback);
+    }
+    if (result.knowledge)
+      store.checkKnowledgeDocuments({ project_knowledge: result.knowledge });
+    item.result = result;
+    item.presentation = null;
+    item.status = "result_ready";
+  } else if (action === "present_interrupt") {
+    fields("interrupt_id", "text", "proposal_ids");
+    requireCondition(
+      item.status === "result_ready" && activeInterrupt(state) === item,
+      "Record interruption result before presentation",
+      true
+    );
+    requireCondition(
+      typeof args.text === "string" && args.text.trim(),
+      "Missing interruption presentation"
+    );
+    requireCondition(
+      Array.isArray(args.proposal_ids) && equal(
+        [...args.proposal_ids].sort(),
+        item.result.proposals.map((p) => p.id).sort()
+      ),
+      "Presentation must cover all interruption proposals"
+    );
+    item.presentation = args.text;
+  } else if (action === "decide_interrupt_proposal") {
+    fields(
+      "interrupt_id",
+      "proposal_id",
+      "disposition",
+      "response_event_id",
+      "followup_id",
+      ..."approved_scope" in args ? ["approved_scope"] : []
+    );
+    requireCondition(
+      item.status === "completed" && item.presentation && item.result,
+      "Proposal requires a completed presented result",
+      true
+    );
+    const proposal = item.result.proposals.find(
+      (p) => p.id === args.proposal_id
+    );
+    requireCondition(
+      proposal && proposal.disposition === "pending",
+      "Proposal is not pending",
+      true
+    );
+    requireCondition(
+      ["adopt", "exclude"].includes(args.disposition),
+      "Invalid proposal disposition"
+    );
+    const response = origin(args.response_event_id);
+    const scope = args.approved_scope;
+    const existingApproval = scope !== void 0 && scope !== null;
+    if (existingApproval) {
+      requireCondition(
+        args.disposition === "adopt" && typeof scope === "object" && equal(Object.keys(scope).sort(), ["change", "location"]) && scope.location === proposal.location && scope.change === proposal.change && item.origin_event_ids.includes(response.event_id),
+        "Existing approval must match proposal scope and origin"
+      );
+    }
+    requireCondition(
+      response.event_type === "interaction.received" && response.actor === "human" && (existingApproval || response.data.prompt_event_id === null && response.data.interaction_id === `interrupt:${item.id}:${proposal.id}`),
+      "Missing human response for this proposal"
+    );
+    proposal.disposition = args.disposition;
+    proposal.response_event_id = response.event_id;
+    if (args.disposition === "adopt") {
+      requireCondition(
+        typeof args.followup_id === "string" && args.followup_id.trim() && !records.some((i) => i.id === args.followup_id),
+        "Invalid update interruption ID"
+      );
+      records.push({
+        id: args.followup_id,
+        kind: "project_knowledge",
+        operation: "update",
+        origin_event_ids: [response.event_id],
+        reason: proposal.reason,
+        parent_id: item.id,
+        proposal_id: proposal.id,
+        status: "queued",
+        basis: null,
+        result: null,
+        presentation: null,
+        outcome: null
+      });
+    } else
+      requireCondition(
+        args.followup_id === null,
+        "Excluded proposal cannot schedule an update"
+      );
+  } else {
+    fields("interrupt_id", "reason", "replan");
+    requireCondition(
+      item.status === "result_ready" && item.result && item.presentation && activeInterrupt(state) === item,
+      "Record and present interruption result before resuming",
+      true
+    );
+    requireCondition(
+      typeof args.reason === "string" && args.reason.trim(),
+      "Missing resumption assessment"
+    );
+    const result = item.result;
+    const basis = item.basis;
+    requireCondition(
+      state.phase === basis.phase && state.state === basis.state && equal(state.artifacts, basis.artifacts) && equal(state.reviews, basis.reviews),
+      "Interruption basis changed; reassess current state",
+      true
+    );
+    if (result.knowledge)
+      store.checkKnowledgeDocuments({ project_knowledge: result.knowledge });
+    if (result.effect === "continue") {
+      for (const ref of [
+        ...Object.values(state.artifacts),
+        ...Object.values(state.reviews)
+      ])
+        if (ref) {
+          const [meta3] = store.reference(ref);
+          if (meta3.schema_version === "flow/phase-review-v2" && (!equal(
+            meta3.target,
+            state.artifacts[meta3.phase]
+          ) || meta3.design !== null && !equal(meta3.design, state.artifacts.design)))
+            continue;
+          store.checkDocumentInputs(meta3);
+          store.checkKnowledgeDocuments(meta3);
+          evidence.push(ref);
+        }
+    } else if (result.effect === "revise") {
+      requireCondition(
+        state.state !== "completed" && !state.replan,
+        "Completed Flow changes require approved replan",
+        true
+      );
+      requireCondition(
+        state.pending_feedback === null,
+        "Consume pending feedback before interrupt revision",
+        true
+      );
+      const [fm] = store.reference(result.feedback);
+      const phase = state.phase.startsWith("design") ? "design" : state.phase.startsWith("plan") ? "plan" : "implement";
+      requireCondition(
+        fm.schema_version === "flow/phase-feedback-v2" && fm.operation === "revise" && fm.phase === phase && equal(fm.target, state.artifacts[phase]),
+        "Interrupt revision must target current phase with change feedback"
+      );
+      store.checkDocumentInputs(fm, true);
+      requireCondition(
+        !(phase === "design" && state.artifacts.plan) && !(phase === "plan" && state.artifacts.implement),
+        "Existing downstream artifacts require synchronized replanning",
+        true
+      );
+      Object.assign(state, {
+        phase,
+        state: "running",
+        active_review: null,
+        waiting: null,
+        blocker: null,
+        pending_operation: phase === "implement" ? "execute" : "revise",
+        pending_feedback: result.feedback
+      });
+      state.reviews[phase === "plan" ? "plan_final" : phase] = null;
+      if (phase === "plan") state.reviews.plan_decision = null;
+      evidence.push(result.feedback);
+    } else if (result.effect === "block") {
+      requireCondition(
+        state.state !== "completed",
+        "Completed Flow stays completed; use replan for required changes",
+        true
+      );
+      Object.assign(state, {
+        state: "blocked",
+        blocker: result.reason,
+        waiting: null
+      });
+    }
+    if (result.effect === "replan") {
+      requireCondition(
+        args.replan && args.replan.target_phase === result.target_phase,
+        "Missing matching replan request"
+      );
+      replanTransition(store, state, "request_replan", args.replan, evidence);
+    } else requireCondition(args.replan === null, "Unexpected replan request");
+    item.status = "completed";
+    item.outcome = result.effect;
+  }
+}
+
 // src/transitions.ts
 function transition(store, request) {
   store.consistent(request.request_id);
@@ -28839,17 +29338,28 @@ function transition(store, request) {
     true
   );
   requireCondition(
-    current.state !== "completed" || request.action === "request_replan",
+    current.state !== "completed" || request.action === "request_replan" || INTERRUPT_ACTIONS.includes(request.action),
     "Completed Flow is terminal without replan approval",
     true
   );
   requireCondition(
-    !current.replan || ["begin_replan", "finish_replan", "cancel_replan"].includes(
+    !current.replan || request.action === "enqueue_interrupt" || ["begin_replan", "finish_replan", "cancel_replan"].includes(
       request.action
     ),
     "Resolve replan before other transitions",
     true
   );
+  if (pendingInterrupt(current) && !INTERRUPT_ACTIONS.includes(request.action)) {
+    requireCondition(
+      !current.interrupts?.some(
+        (i) => i.status === "running" || i.status === "result_ready"
+      ) && (["finish_invocation", "fail_invocation"].includes(request.action) || current.pending_feedback !== null && (["start_invocation", "resume"].includes(request.action) || !current.active_invocation && ["block", "request_replan"].includes(request.action)) || current.replan && ["begin_replan", "finish_replan", "cancel_replan"].includes(
+        request.action
+      )),
+      "Handle pending interruption before ordinary transitions",
+      true
+    );
+  }
   const state = structuredClone(current), action = request.action, args = Object.fromEntries(
     Object.entries(request).filter(
       ([k]) => !["request_id", "expected_state_revision", "action"].includes(k)
@@ -28892,7 +29402,9 @@ function transition(store, request) {
     pending_operation: phase === "implement" ? "execute" : operation,
     pending_feedback: ref
   });
-  if ([
+  if (INTERRUPT_ACTIONS.includes(action)) {
+    interruptTransition(store, state, action, args, evidence);
+  } else if ([
     "request_replan",
     "begin_replan",
     "finish_replan",
@@ -30111,6 +30623,14 @@ ${dump(event)}\`\`\`
     }
     const p = this.path(name), kind = KINDS[meta3.schema_version];
     const syncing = meta3.producer === "flow-artifact-sync";
+    if (import_node_fs4.default.existsSync(this.path("flow-state.yml"))) {
+      const current = this.state();
+      requireCondition(
+        !activeInterrupt(current) || kind === "phase-feedback",
+        "Cannot publish phase output during active interruption",
+        true
+      );
+    }
     if (syncing && import_node_fs4.default.existsSync(this.path("flow-state.yml"))) {
       requireCondition(
         !this.state().replan || this.state().replan?.approved,
@@ -30590,6 +31110,12 @@ ${dump(event)}\`\`\`
         recovered_events: recovered,
         attention: "Inspect checkpoint commit/tag and use checkpoint-recover; Git operations were not repeated"
       };
+    if (pendingInterrupt(state) && !state.replan && !state.active_invocation)
+      return {
+        state,
+        recovered_events: recovered,
+        attention: state.pending_feedback ? `Complete pending feedback ${state.pending_feedback.path} before starting queued interruption ${pendingInterrupt(state).id}; inspect any prior failure before resuming` : `Inspect interruption ${pendingInterrupt(state).id} (${pendingInterrupt(state).status}); record, present and assess its result before ordinary work; do not repeat external updates automatically`
+      };
     if (state.replan?.approved)
       return {
         state,
@@ -30945,7 +31471,7 @@ function restoreCheckpoint(store, request) {
 }
 
 // src/cli.ts
-var help = `flowctl 4.9.1 \u2014 Flow persistence and contract guards
+var help = `flowctl 4.10.0 \u2014 Flow persistence and contract guards
 Usage: node flowctl.js --root FEATURE COMMAND [OPTIONS]
 Commands: init, publish, transition, audit-append, code-snapshot, review-check --request FILE|-
           validate PATH [--references]
@@ -30956,7 +31482,7 @@ Options: --version, --help
 async function main(argv = process.argv.slice(2)) {
   try {
     if (argv.includes("--version")) {
-      console.log("flowctl 4.9.1");
+      console.log("flowctl 4.10.0");
       return 0;
     }
     if (argv.includes("--help") || argv.includes("-h")) {

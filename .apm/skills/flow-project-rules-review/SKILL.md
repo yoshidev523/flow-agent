@@ -52,5 +52,6 @@ changes_required、gateがなければpassed。推奨・知識更新候補をsta
 最初に[契約](../flow/references/contracts.md)と[CLI](../flow/references/cli.md)を読む。
 [template](../flow/assets/templates/project-rules-source.md)をdraftへ複製し、指定cycleの
 reviews/{design,plan-decision,plan-final,implement}/cycle-{number}/sources/project-rules.mdへ一度publishする。
-CLIはnode ../flow/scripts/flowctl.js --root {feature_dir}。validate後にpath・status・確認概要を返す。
+CLIは読み込んだこのSKILL.mdのdirectoryを基準に`../flow/scripts/flowctl.js`を絶対pathへ解決し、
+`node "{flowctl}" --root "{feature_dir}"`で実行する。pathの解決は共通CLI文書の「実行環境」に従う。validate後にpath・status・確認概要を返す。
 監査は共通CLIを使い、自動保存イベントと通常読取を重複記録しない。

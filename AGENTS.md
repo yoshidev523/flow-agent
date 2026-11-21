@@ -9,7 +9,7 @@
 `apm.lock.yaml`で管理します。
 
 機能ごとの実行成果物は`flow-spec/YYYYMMDD_feature/`へ保存します。
-Flow 4.9.1では`flow-state.yml`、事実履歴の`audit.md`、復旧用の`.flow/journal.md`、固定pathの
+Flow 4.10.0では`flow-state.yml`、事実履歴の`audit.md`、復旧用の`.flow/journal.md`、固定pathの
 `artifacts/design.md`、`artifacts/plan.md`、`artifacts/implement.md`を使います。
 固定Markdown成果物はrevisionと変更履歴を更新し、revision別fileは作りません。
 完了後の説明は派生成果物として固定pathの`artifacts/session-report.html`に保存します。
@@ -197,6 +197,11 @@ phase境界の契約は次の4種類に限定します。
 `scope_candidate`は利用者が採用した場合だけfeedbackへ変換します。
 
 Flow内部状態は`flow-state-v2`として`flow-state.yml`へ保存します。
+非同期feedbackとプロジェクト知識の確認・採用済み更新は、共通割り込みとして管理します。
+phaseと実行状態を保持し、安全な区切りで直列処理します。結果・提示・復帰判断をCLIで保存し、
+必要な確認前に通常処理へ戻りません。任意提案の採否待ちは進行を妨げず、採用済み更新を別の割り込みへ接続します。
+割り込みの正本は既存state/journal内の内部契約とし、中継request/result成果物は増やしません。
+旧stateのinterrupts省略は読取時に書き換えず許容します。詳細HOWは同梱references/interrupts.mdです。
 新しい中継用request/result契約を追加する前に、既存artifactのpathとstatusで
 接続できないかを検討してください。
 
@@ -260,7 +265,7 @@ agent定義はfront matter後を「あなたは〜です。」で始め、「主
 履歴には確立済みのcommit規約がないため、命令形で対象を明確にした短い件名を使います。
 PRには目的、変更file、検証結果または未実施理由を記載し、関連Issueがあればlinkします。
 
-## Flow 4.9.1 の機械処理
+## Flow 4.10.0 の機械処理
 
 HOWは`.apm/skills/flow/references/`、schemaの正本は`src/contracts/`のZod定義です。
 実行処理はTypeScriptで実装し、依存を含む`scripts/flowctl.js`をFlow skillへ同梱します。

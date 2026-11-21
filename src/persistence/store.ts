@@ -34,6 +34,7 @@ import {
 } from "../contracts/index.js";
 import { transition } from "../transitions.js";
 import { JOURNAL, auditView } from "./audit.js";
+import { activeInterrupt, pendingInterrupt } from "../interrupts.js";
 export const eventId = (n: number) => "E-" + String(n).padStart(6, "0");
 export class Store extends Files {
   document(name: string): [Fields, string, ArtifactRef] {
@@ -754,6 +755,14 @@ export class Store extends Files {
     const p = this.path(name),
       kind = KINDS[meta.schema_version];
     const syncing = meta.producer === "flow-artifact-sync";
+    if (fs.existsSync(this.path("flow-state.yml"))) {
+      const current = this.state();
+      check(
+        !activeInterrupt(current) || kind === "phase-feedback",
+        "Cannot publish phase output during active interruption",
+        true,
+      );
+    }
     if (syncing && fs.existsSync(this.path("flow-state.yml"))) {
       check(
         !this.state().replan || this.state().replan?.approved,
@@ -1299,6 +1308,14 @@ export class Store extends Files {
         recovered_events: recovered,
         attention:
           "Inspect checkpoint commit/tag and use checkpoint-recover; Git operations were not repeated",
+      };
+    if (pendingInterrupt(state) && !state.replan && !state.active_invocation)
+      return {
+        state,
+        recovered_events: recovered,
+        attention: state.pending_feedback
+          ? `Complete pending feedback ${state.pending_feedback.path} before starting queued interruption ${pendingInterrupt(state)!.id}; inspect any prior failure before resuming`
+          : `Inspect interruption ${pendingInterrupt(state)!.id} (${pendingInterrupt(state)!.status}); record, present and assess its result before ordinary work; do not repeat external updates automatically`,
       };
     if (state.replan?.approved)
       return {

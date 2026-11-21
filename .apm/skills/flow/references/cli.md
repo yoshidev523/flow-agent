@@ -4,15 +4,25 @@
 
 Node.js 22以上だけを必要とする。ZodとYAML処理は単一のflowctl.jsへ同梱する。
 利用側ではnpm install、ビルド、Python、schema fileの読み込みは不要。
-repositoryでは`.apm/skills/flow/scripts/flowctl.js`、配置後はこのFlow skillのscriptsを使う。
-他leafからは隣接する`../flow/scripts/flowctl.js`へ参照する。
-独立したflow-artifact-syncには同じCLI・契約・templateを同梱し、そのskill内だけで利用できる。
+グローバル配置・project内配置とも、実際に読み込んだSKILL.mdの絶対pathを起点にする。
+その親directoryをskill directoryとし、次の相対pathを絶対pathへ解決した値を`{flowctl}`とする。
+
+- Flowとflow-artifact-sync: skill directoryから`scripts/flowctl.js`。
+- その他のleaf: skill directoryから`../flow/scripts/flowctl.js`。
+
+契約・templateなどの相対参照も、その参照を記載したfileのdirectoryを基準に解決する。
+配置先の固定pathを仮定せず、読み込んだskillと同じ配置のCLIを使う。
+CLIが見つからなければ配置不備として報告する。
+独立したflow-artifact-syncは同梱CLI・契約・templateだけで利用できる。
+
+実行時の作業directoryは対象projectとする。`{feature_dir}`（同期では`{対象directory}`）は
+対象projectから解決した絶対pathを使い、CLIとrootのpathをそれぞれ引用符で囲む。
 同期ownerのpublishはphaseを制限せず、active invocationとの同時更新だけを拒否する。
 同期はstateを更新せず、旧参照がstaleになったことを呼出側へ報告する。
 Flowは人間承認付きreplanning中に同期し、finish_replanで最新参照を登録する。
 
 ```sh
-node {flow-skill-dir}/scripts/flowctl.js --root flow-spec/YYYYMMDD_feature-name init --request /tmp/init.yml
+node "{flowctl}" --root "{feature_dir}" init --request /tmp/init.yml
 ```
 
 全commandはstdoutへJSONを返す。成功は`ok:true,result`。
@@ -29,8 +39,8 @@ request: request_id、feature_id、run_id、text。
 ## validate
 
 ```sh
-node {flowctl} --root {feature_dir} validate artifacts/plan.md --references
-node {flowctl} --root {feature_dir} validate audit.md
+node "{flowctl}" --root "{feature_dir}" validate artifacts/plan.md --references
+node "{flowctl}" --root "{feature_dir}" validate audit.md
 ```
 
 既定は構造検証。--referencesは現在の入力参照も検証する。
@@ -43,7 +53,7 @@ validate audit.mdは内部journalを検証し、欠落・不一致のviewを自�
 ## audit-migrate
 
 ```sh
-node {flowctl} --root {feature_dir} audit-migrate
+node "{flowctl}" --root "{feature_dir}" audit-migrate
 ```
 
 旧audit-log-v1のaudit.mdを検証し、原本を`.flow/journal.md`へ保持して
@@ -118,6 +128,12 @@ feedback.createdでは原文イベントとitem IDの対応を記録する。
 | begin_replan | response_event_id、approval approve |
 | cancel_replan | response_event_id |
 | finish_replan | artifacts（design/plan/implementの参照またはnull） |
+| enqueue_interrupt | interrupt_id、kind async_feedback/project_knowledge、origin_event_ids、reason、parent_id（またはnull） |
+| begin_interrupt | interrupt_id |
+| record_interrupt_result | interrupt_id、result（interrupt-result） |
+| present_interrupt | interrupt_id、text（提示全文）、proposal_ids（提示した全提案ID。なければ空配列） |
+| finish_interrupt | interrupt_id、reason（現状との照合理由）、replan（request_replanの追加field、またはnull） |
+| decide_interrupt_proposal | interrupt_id、proposal_id、disposition adopt/exclude、response_event_id、followup_id（adopt時の新ID、excludeならnull）、approved_scope（省略可。既存承認再利用時のlocation/change） |
 
 start_reviewの返却active_reviewにcycle ID、出力path、対象、modeがある。
 waitのkindはwriter_question/human_review/review_decision/scope_candidate/implement_blocker。
@@ -134,8 +150,8 @@ set_modeの利用者指定は人間回答event ID、上限による自動切替�
 ## resume-check
 
 ```sh
-node {flowctl} --root {feature_dir} resume-check
-node {flowctl} --root {feature_dir} resume-check --recover
+node "{flowctl}" --root "{feature_dir}" resume-check
+node "{flowctl}" --root "{feature_dir}" resume-check --recover
 ```
 
 stateと内部journalのsnapshot、現在の参照、未完了preparedを検査する。
@@ -203,7 +219,7 @@ Implement review用の読取専用command。requestはrepository（Git rootの�
 commitは小文字16進の完全IDを指定し、HEAD等の別名を渡さない。対象feature directoryは--rootで指定する。
 
 ```sh
-node {flowctl} --root {feature_dir} code-snapshot --request /tmp/code-snapshot.yml
+node "{flowctl}" --root "{feature_dir}" code-snapshot --request /tmp/code-snapshot.yml
 ```
 
 返却されたrepository/base_commit/head_commit/tree_sha256をImplementのcodeへ保持する。
@@ -211,3 +227,22 @@ node {flowctl} --root {feature_dir} code-snapshot --request /tmp/code-snapshot.y
 headに実装commitを指定して再実行する。tree_sha256を含め、返却されたsnapshot全体を保存する。
 未commitコード、古いhead、祖先でないbaseは拒否する。Gitや作業treeを書き換えず、監査も追加しない。
 Implementのcompletedは作業完了であり、Flow完了にはstart_review implementとpassed後のadvanceが必要。
+
+## 割り込みの処理
+
+[interrupts.md](interrupts.md)に従う。enqueue→begin→record result→present→finishの順で使う。
+phase/stateはbeginで変更せず、元の回答待ち・review・pending操作を保持する。
+待機中は進行中invocationのfinish/fail、既に受け付けたpending feedbackのwriter起動・障害解消後のresume、
+既存replanの解決を許可する。未消費feedbackがあり進行中invocationがない場合、block/request_replanで継続を止めることもできる。
+pending feedbackを消費するまではbegin_interruptを拒否する。処理中は通常操作を拒否する。
+record_interrupt_resultの再送は同じrequestを使い、内容を再評価した場合だけ新requestで更新する。
+結果を再登録すると提示記録を無効化する。finishのreplanは既存checkpoint・承認質問を検証し、
+承認待ちへ渡す。approveは別のbegin_replanで人間回答を検証する。
+resume-checkのattentionに割り込みがあれば通常作業の前に回収する。外部更新を自動再実行しない。
+決定的に記録・保存するのはCLI、意味判断と実際のチャット提示はFlowが担当する。
+
+既存の明示承認を再利用するadoptでは、response_event_idへ元の人間回答eventを指定し、
+approved_scope: {location, change}を提案と同じ内容で渡す。元eventは対象割り込みのorigin_event_idsに含める。
+専用interaction_idの新規回答や原文の再記録は不要。通常の採否回答ではこのfieldを省略またはnullとする。
+finish_interruptは全effectで結果のknowledge文書を再照合する。continueで履歴reviewを読む場合は構造・digestだけを確認し、
+現在の成果物・Design入力を対象とするreviewだけを再集約する。

@@ -13,7 +13,9 @@ Flowからは`flow-project-knowledge-agent`がこのスキルを使い、判断�
 更新判断・乖離チェックは読み取り専用とし、採用済み更新が指定された場合だけ文書を編集する。
 Flowの状態遷移、review判定、Design・Plan・Implementの編集を行わない。
 把握結果は呼出側へ返し、成果物のownerが自分の成果物へ保存する。
-単独利用では同じ内容をチャットで返す。中継request/result契約やルールの複製台帳を作らない。
+単独利用では同じ内容をチャットで返す。中継request/result成果物やルールの複製台帳を作らない。
+Flowから割り込みID・operation assess/updateを渡された場合は、[割り込み契約](../flow/references/interrupts.md)の
+interrupt-resultを返す。状態・監査への登録と利用者への提示はFlowが行う。単独利用にFlow stateは要求しない。
 
 ## 把握と適用材料
 
@@ -75,7 +77,7 @@ Flowはその検討結果をチャットへ表示し、単独利用ではこの�
 - 現在のDesign・Plan・実装への影響と、更新が未採用であること。
 
 提案は呼出側へ返し、文書のreview・保存手順はprojectの運用に従う。
-Flowはチャットで差分と正本へのlinkを提示し、提案・採否の要点を既存actionイベントへ記録する。
+Flowは結果・差分・正本へのlinkを提示し、共通割り込みの結果・提示・採否としてCLIで記録する。
 成果物作成中に得た候補は、そのownerが本文の「知識の更新候補」へ残せる。
 候補は必須質問・scope_candidateと別に扱い、文書更新の採否待ちだけで進行を止めない。
 乖離チェックはreviewの代替ではなく、review status・retry・human mode切替を変更しない。
@@ -92,3 +94,20 @@ Flowはチャットで差分と正本へのlinkを提示し、提案・採否の
 同じ文書を他の実行主体と同時編集しない。Flow成果物やauditは直接編集しない。
 更新前後の参照、反映内容、未反映事項、現在タスクへの影響を返す。
 現在タスクの要件・Planが変わる場合の再計画はFlowまたは単独利用の呼出側が判断する。
+
+## Flow割り込みへの返却
+
+最初に[共通割り込み](../flow/references/interrupts.md)を読む。
+interrupt-resultの全fieldを返す。summary/reason、knowledge_update/document_sync、knowledge、
+proposals、unresolved、evidenceを根拠と対応させる。該当しないfeedback/target_phaseはnull。
+提案には一意ID、更新先location、具体的なchange、reason、disposition pending、response_event_id nullを指定する。
+提案なしも空配列と理由を返す。確認不能はunknownと未確認事項を返し、not_neededへ読み替えない。
+effectは現在への影響からcontinue/revise/replan/blockを提案し、最終的な接続と参照検証はFlowが行う。
+reviseへの接続が必要な場合は要求変更を返し、Flowがchange feedbackを準備してから結果のfeedback参照を確定する。
+assessは読み取り専用。既に更新が明示承認されている場合も、assessで提案のlocation/changeと元の人間回答の対応を返し、
+Flowがapproved_scope付きadoptで同じ原文eventを再利用できるようにする。新たな確認や原文の複製は要求しない。
+updateでは親の提案と人間の採用回答（再利用した元eventも含む）を確認して採用範囲だけを更新し、
+現在版を再確認したknowledgeと更新前後の根拠を返す。範囲の変更が必要なら更新せず理由を返す。
+中断後は現行文書を照合し、完了済み外部更新を繰り返さない。自分でtransitionや監査追記を行わない。
+
+結果の根拠文書が復帰前に変わった場合は、effectにかかわらずFlowからの再確認依頼に応じて結果を更新する。

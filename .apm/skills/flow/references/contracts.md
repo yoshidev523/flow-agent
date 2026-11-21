@@ -1,4 +1,4 @@
-# Flow 4.9.1 契約
+# Flow 4.10.0 契約
 
 ## 正本
 
@@ -36,6 +36,10 @@ SHA-256は保存完了後の全バイトから計算する。成果物自身のd
 | judgment | id:text; question:text; background:text; options:option[2..3]; recommendation:text; reason:text; answer_format:text |
 | finding/gate | id:text; classification:gate; resolution:revise/human_decision; decision_refs:text[]; target:text; problem:text; evidence:text; instruction:text; completion:text; judgment:judgment\|null |
 | finding/scope_candidate | id:text; classification:scope_candidate; decision_refs:text[]; proposal:text; evidence:text; impact:text; recommendation:text |
+| interrupt-proposal | id:text; location:text; change:text; reason:text; disposition:pending/adopt/exclude; response_event_id:text\|null |
+| interrupt-result | summary:text; effect:continue/revise/replan/block; reason:text; feedback:reference\|null; target_phase:design/plan\|null; knowledge_update:needed/not_needed/updated/unknown/not_applicable; document_sync:needed/not_needed/updated/unknown/not_applicable; knowledge:project-knowledge\|null; proposals:interrupt-proposal[]; unresolved:text[]; evidence:text[] |
+| interrupt-basis | phase:text; state:text; artifacts:artifact参照map; reviews:review参照map |
+| interrupt | id:text; kind:async_feedback/project_knowledge; operation:feedback/assess/update; origin_event_ids:text[1..]; reason:text; parent_id:text\|null; proposal_id:text\|null; status:queued/running/result_ready/completed; basis:interrupt-basis\|null; result:interrupt-result\|null; presentation:text\|null; outcome:continue/revise/replan/block\|null |
 | phase-artifact | schema_version:flow/phase-artifact-v2; artifact:design/plan; revision:integer>=1; status:needs_input/ready; producer:text; invocation_id:text; operation:create/revise/respond; updated_at:timestamp; inputs:reference[]; questions:question[]; feedback_results:feedback-result[]; tasks:task[]; verification_plan:verification-plan[]; handoff_checks:handoff-check[]; project_knowledge:project-knowledge（省略可） |
 | implement-artifact | schema_version:flow/implement-artifact-v2; artifact:implement; revision:integer>=1; status:in_progress/blocked/completed; producer:flow-implement/flow-artifact-sync; invocation_id:text; operation:execute; updated_at:timestamp; plan:reference; code:code-snapshot（省略可）; feedback:reference（省略可）; feedback_results:feedback-result[]（省略可）; tasks:task-progress[]; verifications:verification[]; blocker:text\|null; commit:小文字16進40〜64桁\|null; project_knowledge:project-knowledge（省略可） |
 | review-source | phase:design/plan/implement; review_stage:design/decision/final/implement; review_cycle_id:cycle ID; target:reference; design:reference\|null; code:code-snapshot（Implement以外は省略、Implementは正常評価時必須）; findings:finding[]; failure:failure\|null; schema_version:flow/review-source-v2; revision:1; source_id:text; source_kind:ai/human; status:passed/changes_required/blocked/unable; created_at:timestamp; project_knowledge:project-knowledge（省略可） |
@@ -46,7 +50,7 @@ SHA-256は保存完了後の全バイトから計算する。成果物自身のd
 | active-review | stage:design/plan_decision/plan_final/implement; review_cycle_id:text; mode:ai/human; target:reference; design:reference\|null; path:text; scope_acknowledged:boolean; human_source:reference\|null |
 | invocation | invocation_id:text; component:text; operation:text; inputs:reference[] |
 | waiting | kind:writer_question/human_review/review_decision/scope_candidate/implement_blocker/replan; target:reference; question_ids:text[1..]; prompt_event_id:text |
-| flow-state | schema_version:flow/flow-state-v2; feature_id:text; run_id:text; state_revision:integer>=1; phase:design/design_review/plan/plan_decision_review/plan_review/implement/implement_review/completed/replanning; state:running/waiting_for_input/blocked/completed; artifacts:artifact参照map; reviews:review参照map; review_mode:mode map; counters:counter map; cycle_counters:cycle map; active_review:active-review\|null; active_invocation:invocation\|null; waiting:waiting\|null; blocker:text\|null; last_transition_event_id:text; updated_at:timestamp; pending_operation:create/revise/respond/execute/null; pending_feedback:reference\|null; replan:replan\|null（省略可） |
+| flow-state | schema_version:flow/flow-state-v2; feature_id:text; run_id:text; state_revision:integer>=1; phase:design/design_review/plan/plan_decision_review/plan_review/implement/implement_review/completed/replanning; state:running/waiting_for_input/blocked/completed; artifacts:artifact参照map; reviews:review参照map; review_mode:mode map; counters:counter map; cycle_counters:cycle map; active_review:active-review\|null; active_invocation:invocation\|null; waiting:waiting\|null; blocker:text\|null; last_transition_event_id:text; updated_at:timestamp; pending_operation:create/revise/respond/execute/null; pending_feedback:reference\|null; replan:replan\|null（省略可）; interrupts:interrupt[]（省略可） |
 | audit-event | event_id:E-に続く6桁以上の数字; event_key:text; event_type:イベント一覧の名前; run_id:text; invocation_id:text\|null; occurred_at:timestamp; recorded_at:timestamp; actor:text; caused_by:text[]; data:イベント別object |
 | audit-log | schema_version:flow/audit-log-v1; feature_id:text; created_at:timestamp |
 | audit-view | schema_version:flow/audit-log-v2; feature_id:text; created_at:timestamp |
@@ -384,7 +388,7 @@ resume-check --recoverまたは元のtransition requestの再送で、保存済�
 外部操作の完了は推測しない。active invocationは実態と証拠を確認して登録または停止する。
 履歴は訂正イベントで補正する。暗号学的な改ざん防止や複数fileの完全transactionを保証しない。
 
-## 再計画とチェックポイント（4.9.1）
+## 再計画とチェックポイント（4.10.0）
 
 request_replanは進行中invocationがないこと、現在参照とcheckpointの一致、現在stateより後の
 checkpoint監査地点、kind replanの提示eventを検証し、phase replanningへ移す。
@@ -432,3 +436,26 @@ executorはPlanとfeedbackだけを受け取り、修正・必須検証・新com
 human_decisionは通常answerでは処理せず、人間承認付きDesign/Plan再計画へ接続する。
 追加scopeはstatusへ影響せず、採用済みでもPlan外なら再計画する。
 旧Flow stateに追加keyを暗黙補完しない。旧成果物・旧stateの一括移行はこの変更に含めない。
+
+## 共通割り込み（Flow内部）
+
+[割り込み手順](interrupts.md)に従い、phase/stateを保持してinterruptsを管理する。
+これはflow-state-v2内の内部型で、phase境界のrequest/result契約や独立成果物を追加しない。
+旧v2のinterrupts省略は許容し、読取時は補完保存しない。初回の割り込み操作で明示的に追加する。
+queuedはbasis/result/presentation/outcomeがnull、runningはbasisあり、result_readyはresultあり、
+completedはresult/presentation/outcomeあり。同時にrunning/result_readyとなるのは1件だけ。
+受付順で開始し、処理中は通常transitionとphase成果物のpublishを拒否する。feedbackの準備は許可する。
+進行中invocationはqueued段階でfinish/failする。既存pending feedbackがあれば、そのwriter操作だけを先に起動・完了する。
+begin_interruptはpending feedbackがある間は拒否する。継続が不適切な場合は実行を強制せず、進行中invocationがなければblock/request_replanへ接続する。
+再計画中の受付は同期完了・取り消しまで待機する。
+
+結果・提示・復帰判断はtransitionの引数と前後stateへ保存し、CLIがaudit.mdへ要点を表示する。
+既存actionイベントの自由文だけを結果契約として使わない。提案の採否待ちは通常進行を妨げない。
+採用は人間回答を要求し、update割り込みを自動受付する。通常の質問回答は既存answerを使う。
+知識agentは結果をFlowへ返し、state/journal/auditを編集しない。単独利用ではFlow stateを要求しない。
+
+全effectで結果のknowledge文書の鮮度を検証する。continueのreview入力検証は現在の成果物・Design入力を
+対象としたものだけに行い、旧対象のreviewは構造・digestだけを確認する。旧reviewを現在の承認へ流用しない。
+既存の明示承認はdecide_interrupt_proposalの任意引数approved_scope（location/change）で対応付ける。
+対象割り込みのorigin_event_idsに含まれる人間回答と、提案に一致するscopeを必須とし、原文の再記録は行わない。
+これはtransition内部の引数であり、phase境界の新契約・永続成果物は追加しない。
