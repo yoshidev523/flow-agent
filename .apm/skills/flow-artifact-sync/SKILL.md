@@ -14,7 +14,8 @@ Design/Plan writerやexecutorへ委譲せず、他スキルを読む・起動す
 監査用run ID・同期IDは指定値を使い、指定がなければ重複しないIDを生成して報告する。
 
 最初に同梱の[契約](references/contracts.md)と[CLI操作](references/cli.md)の保存・検証・監査部分を読む。
-CLIは`node {このskillのdirectory}/scripts/flowctl.js --root {対象directory}`。
+CLIは読み込んだこのSKILL.mdのdirectoryを基準に`scripts/flowctl.js`を絶対pathへ解決し、
+`node "{flowctl}" --root "{対象directory}"`で実行する。pathの解決は同梱CLI文書の「実行環境」に従う。
 Node.js 22以上だけが必要。CLI、契約、templateはこのskillに同梱済み。
 他スキル、Flow state、npm install、buildは利用時に不要。
 
@@ -30,7 +31,7 @@ Node.js 22以上だけが必要。CLI、契約、templateはこのskillに同梱
 参照digestだけの付け替えや本文の一括置換で同期済みとしない。
 未作成の成果物は作らず、既存成果物だけを対象にする。欠落した必須入力は報告する。
 Flow stateが存在する場合は、並行操作の有無を確認するためにだけ参照できる。
-phaseやcompletedを同期の禁止条件にしない。active invocationがあれば変更前に停止する。
+phaseやcompletedを同期の禁止条件にしない。active invocationまたは処理中の共通割り込みがあれば変更前に停止する。
 
 ## プロジェクト知識
 
@@ -74,6 +75,7 @@ review source・aggregate・過去feedbackは上書きせず、変更後の承�
 Flow stateがある場合、同期後に旧revisionを参照したstateやreviewはstaleになる。
 呼出側へ更新後の参照と無効になった参照を返し、通常の再開にそのまま流用しないよう明示する。
 Flowからの再計画では、呼出側が人間承認を記録して同期を開始し、返却参照をfinish_replanで登録する。
+割り込み結果が上流変更を要求した場合も、Flowが割り込みを終了して人間承認付き再計画へ接続した後に同期する。
 このskillはその状態遷移を実行せず、単独利用でも同じ入力と出力を使う。
 
 最終報告は同期ID、結果（反映完了／変更不要／部分反映／停止）、更新前後の参照、

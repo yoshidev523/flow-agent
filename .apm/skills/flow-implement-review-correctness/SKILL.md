@@ -43,5 +43,6 @@ human_decision gateがあればblocked、revise gateがあればchanges_required
 実行前に[契約](../flow/references/contracts.md)と[CLI](../flow/references/cli.md)のImplement reviewを読む。
 既存のreview-source-v2 / phase-review-v2を使い、codeは対象Implementのsnapshotをそのまま保持する。
 [template](../flow/assets/templates/implement-review-source.md)を使い、source ID・cycle・対象を指定値へ置き換える。
-CLIは`node ../flow/scripts/flowctl.js --root {feature_dir}`。draftからpublishしvalidate --referencesで確認する。
+CLIは読み込んだこのSKILL.mdのdirectoryを基準に`../flow/scripts/flowctl.js`を絶対pathへ解決し、
+`node "{flowctl}" --root "{feature_dir}"`で実行する。pathの解決は共通CLI文書の「実行環境」に従う。draftからpublishしvalidate --referencesで確認する。
 監査は共通CLIを使い、通常読取や保存の自動イベントを重複記録しない。

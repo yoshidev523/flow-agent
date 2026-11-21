@@ -367,6 +367,70 @@ export const CheckpointRestoreSchema = z.strictObject({
   branch: text,
 });
 
+// Internal interruption records extend Flow state; they are not phase-boundary artifacts.
+export const InterruptProposalSchema = z.strictObject({
+  id: text,
+  location: text,
+  change: text,
+  reason: text,
+  disposition: z.enum(["pending", "adopt", "exclude"]),
+  response_event_id: text.nullable(),
+});
+export const InterruptResultSchema = z.strictObject({
+  summary: text,
+  effect: z.enum(["continue", "revise", "replan", "block"]),
+  reason: text,
+  feedback: ReferenceSchema.nullable(),
+  target_phase: z.enum(["design", "plan"]).nullable(),
+  knowledge_update: z.enum([
+    "needed",
+    "not_needed",
+    "updated",
+    "unknown",
+    "not_applicable",
+  ]),
+  document_sync: z.enum([
+    "needed",
+    "not_needed",
+    "updated",
+    "unknown",
+    "not_applicable",
+  ]),
+  knowledge: ProjectKnowledgeSchema.nullable(),
+  proposals: z.array(InterruptProposalSchema),
+  unresolved: z.array(text),
+  evidence: z.array(text),
+});
+export const InterruptBasisSchema = z.strictObject({
+  phase: text,
+  state: text,
+  artifacts: z.strictObject({
+    design: ReferenceSchema.nullable(),
+    plan: ReferenceSchema.nullable(),
+    implement: ReferenceSchema.nullable(),
+  }),
+  reviews: z.strictObject({
+    design: ReferenceSchema.nullable(),
+    plan_decision: ReferenceSchema.nullable(),
+    plan_final: ReferenceSchema.nullable(),
+    implement: ReferenceSchema.nullable(),
+  }),
+});
+export const InterruptSchema = z.strictObject({
+  id: text,
+  kind: z.enum(["async_feedback", "project_knowledge"]),
+  operation: z.enum(["feedback", "assess", "update"]),
+  origin_event_ids: z.array(text).min(1),
+  reason: text,
+  parent_id: text.nullable(),
+  proposal_id: text.nullable(),
+  status: z.enum(["queued", "running", "result_ready", "completed"]),
+  basis: InterruptBasisSchema.nullable(),
+  result: InterruptResultSchema.nullable(),
+  presentation: text.nullable(),
+  outcome: z.enum(["continue", "revise", "replan", "block"]).nullable(),
+});
+
 export const FlowStateSchema = z.strictObject({
   schema_version: z.literal("flow/flow-state-v2"),
   feature_id: text,
@@ -427,6 +491,7 @@ export const FlowStateSchema = z.strictObject({
   ]),
   pending_feedback: ReferenceSchema.nullable(),
   replan: ReplanSchema.nullable().optional(),
+  interrupts: z.array(InterruptSchema).optional(),
 });
 
 export const AuditEventSchema = z.strictObject({
@@ -508,6 +573,10 @@ export const contracts = {
   "verification-plan": VerificationPlanSchema,
   "handoff-check": HandoffCheckSchema,
   replan: ReplanSchema,
+  interrupt: InterruptSchema,
+  "interrupt-basis": InterruptBasisSchema,
+  "interrupt-result": InterruptResultSchema,
+  "interrupt-proposal": InterruptProposalSchema,
   checkpoint: CheckpointSchema,
   "checkpoint-request": CheckpointRequestSchema,
   "checkpoint-recover": CheckpointRecoverSchema,

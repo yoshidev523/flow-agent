@@ -2911,3 +2911,914 @@ fixture(
     );
   },
 );
+
+const interruptionResult = (overrides = {}) => ({
+  summary: "確認完了",
+  effect: "continue",
+  reason: "現在の作業に影響なし",
+  feedback: null,
+  target_phase: null,
+  knowledge_update: "not_needed",
+  document_sync: "not_needed",
+  knowledge: null,
+  proposals: [],
+  unresolved: [],
+  evidence: [],
+  ...overrides,
+});
+function enqueueInterruption(
+  x,
+  id = "I-001",
+  kind = "async_feedback",
+  parent_id = null,
+) {
+  const event = x.event(
+    "interaction.received",
+    { interaction_id: id, prompt_event_id: null, text: "追加の確認" },
+    randomUUID(),
+    "human",
+  );
+  x.tr("enqueue_interrupt", {
+    interrupt_id: id,
+    kind,
+    origin_event_ids: [event.event_id],
+    reason: "追加指示を確認",
+    parent_id,
+  });
+  return event;
+}
+function finishInterruption(
+  x,
+  id = "I-001",
+  result = interruptionResult(),
+  replan = null,
+) {
+  x.tr("record_interrupt_result", { interrupt_id: id, result });
+  x.tr("present_interrupt", {
+    interrupt_id: id,
+    text: "確認結果と提案を提示した",
+    proposal_ids: result.proposals.map((p) => p.id),
+  });
+  return x.tr("finish_interrupt", {
+    interrupt_id: id,
+    reason: "最新成果物と結果を照合",
+    replan,
+  });
+}
+fixture(
+  "interruptions pause at safe boundaries, queue FIFO and preserve writer output",
+  (x) => {
+    const inv = "writer-before-interrupt";
+    x.tr("start_invocation", {
+      invocation_id: inv,
+      component: "flow-design",
+      operation: "create",
+      inputs: [],
+    });
+    const trigger = enqueueInterruption(x);
+    enqueueInterruption(x, "I-002");
+    assert.throws(
+      () => x.tr("begin_interrupt", { interrupt_id: "I-001" }),
+      /Finish active/,
+    );
+    const [design] = x.pub(
+      "artifacts/design.md",
+      x.artifact("design", "ready", [], "create", inv),
+    );
+    x.tr("finish_invocation", { invocation_id: inv, outputs: [design] });
+    assert.throws(
+      () => x.tr("start_review", { stage: "design" }),
+      /pending interruption/,
+    );
+    assert.throws(
+      () => x.tr("begin_interrupt", { interrupt_id: "I-002" }),
+      /in order/,
+    );
+    x.tr("begin_interrupt", { interrupt_id: "I-001" });
+    const state = x.store.state();
+    assert.equal(state.phase, "design");
+    assert.equal(state.state, "running");
+    assert.throws(() => x.tr("advance"), /pending interruption/);
+    assert.throws(
+      () => x.pub("artifacts/design.md", x.artifact("design")),
+      /active interruption/,
+    );
+    assert.throws(
+      () =>
+        x.tr("finish_interrupt", {
+          interrupt_id: "I-001",
+          reason: "再開",
+          replan: null,
+        }),
+      /Record and present/,
+    );
+    assert.throws(
+      () =>
+        x.tr("enqueue_interrupt", {
+          interrupt_id: "duplicate",
+          kind: "async_feedback",
+          origin_event_ids: [trigger.event_id],
+          reason: "重複",
+          parent_id: null,
+        }),
+      /already registered/,
+    );
+    finishInterruption(x);
+    x.tr("begin_interrupt", { interrupt_id: "I-002" });
+    const done = finishInterruption(x, "I-002");
+    assert.deepEqual(done.artifacts, state.artifacts);
+    assert.deepEqual(done.counters, state.counters);
+    x.tr("start_review", { stage: "design" });
+  },
+);
+fixture(
+  "interruptions preserve question waits and require a recorded presentation",
+  (x) => {
+    const design = x.writer("design", "needs_input");
+    x.interact("writer_question", design, ["Q-001"]);
+    const waiting = x.store.state().waiting;
+    enqueueInterruption(x);
+    x.tr("begin_interrupt", { interrupt_id: "I-001" });
+    x.tr("record_interrupt_result", {
+      interrupt_id: "I-001",
+      result: interruptionResult(),
+    });
+    assert.throws(
+      () =>
+        x.tr("finish_interrupt", {
+          interrupt_id: "I-001",
+          reason: "再開",
+          replan: null,
+        }),
+      /Record and present/,
+    );
+    finishInterruption(x);
+    assert.equal(x.store.state().state, "waiting_for_input");
+    assert.deepEqual(x.store.state().waiting, waiting);
+  },
+);
+fixture(
+  "knowledge proposals survive normal resumption and adopted updates are queued once",
+  (x) => {
+    enqueueInterruption(x, "K-001", "project_knowledge");
+    x.tr("begin_interrupt", { interrupt_id: "K-001" });
+    const knowledge = {
+      discovery: "projectの規約を確認",
+      completeness: "complete",
+      documents: [],
+      checks: [],
+    };
+    finishInterruption(
+      x,
+      "K-001",
+      interruptionResult({
+        knowledge,
+        knowledge_update: "needed",
+        proposals: [
+          {
+            id: "P-001",
+            location: "docs/rules.md",
+            change: "検証結果を明記する",
+            reason: "今後の作業にも適用",
+            disposition: "pending",
+            response_event_id: null,
+          },
+        ],
+      }),
+    );
+    x.tr("start_invocation", {
+      invocation_id: "ordinary",
+      component: "flow-design",
+      operation: "create",
+      inputs: [],
+    });
+    const response = x.event(
+      "interaction.received",
+      {
+        interaction_id: "interrupt:K-001:P-001",
+        prompt_event_id: null,
+        text: "この内容を規約へ反映して",
+      },
+      randomUUID(),
+      "human",
+    );
+    const args = {
+      interrupt_id: "K-001",
+      proposal_id: "P-001",
+      disposition: "adopt",
+      response_event_id: response.event_id,
+      followup_id: "K-002",
+    };
+    x.tr("decide_interrupt_proposal", args);
+    assert.throws(() => x.tr("decide_interrupt_proposal", args), /not pending/);
+    assert.equal(x.store.state().interrupts[1].operation, "update");
+    assert.throws(
+      () => x.tr("begin_interrupt", { interrupt_id: "K-002" }),
+      /Finish active/,
+    );
+    x.tr("fail_invocation", {
+      invocation_id: "ordinary",
+      reason: "安全に停止",
+    });
+    x.tr("begin_interrupt", { interrupt_id: "K-002" });
+    finishInterruption(
+      x,
+      "K-002",
+      interruptionResult({ knowledge, knowledge_update: "updated" }),
+    );
+    assert.equal(x.store.state().state, "blocked");
+  },
+);
+fixture(
+  "async feedback revises current phase without consuming review retries",
+  (x) => {
+    x.writer("design");
+    x.review("design");
+    const counters = x.store.state().counters;
+    enqueueInterruption(x);
+    x.tr("begin_interrupt", { interrupt_id: "I-001" });
+    const feedback = x.feedback("design", "revise", ["要件"]);
+    const updated = finishInterruption(
+      x,
+      "I-001",
+      interruptionResult({ effect: "revise", feedback }),
+    );
+    assert.equal(updated.phase, "design");
+    assert.equal(updated.pending_operation, "revise");
+    assert.equal(updated.active_review, null);
+    assert.deepEqual(updated.counters, counters);
+    assert.deepEqual(updated.pending_feedback, feedback);
+  },
+);
+fixture(
+  "interruption result cannot resume using stale artifacts or local knowledge",
+  (x) => {
+    x.writer("design");
+    enqueueInterruption(x);
+    x.tr("begin_interrupt", { interrupt_id: "I-001" });
+    x.tr("record_interrupt_result", {
+      interrupt_id: "I-001",
+      result: interruptionResult(),
+    });
+    x.tr("present_interrupt", {
+      interrupt_id: "I-001",
+      text: "確認結果",
+      proposal_ids: [],
+    });
+    fs.appendFileSync(x.store.path("artifacts/design.md"), "\n外部変更\n");
+    assert.throws(
+      () =>
+        x.tr("finish_interrupt", {
+          interrupt_id: "I-001",
+          reason: "再開",
+          replan: null,
+        }),
+      /Stale|digest|changed/i,
+    );
+    assert.match(x.store.resumeCheck().attention, /I-001/);
+  },
+);
+fixture(
+  "interruptions hand off to approved replanning and cancellation keeps new events",
+  (x, t) => {
+    x.writer("design");
+    checkpointRepository(x, t);
+    enqueueInterruption(x);
+    x.tr("begin_interrupt", { interrupt_id: "I-001" });
+    x.tr("record_interrupt_result", {
+      interrupt_id: "I-001",
+      result: interruptionResult({ effect: "replan", target_phase: "design" }),
+    });
+    x.tr("present_interrupt", {
+      interrupt_id: "I-001",
+      text: "Design変更の承認が必要",
+      proposal_ids: [],
+    });
+    createFixtureCheckpoint(x);
+    const cp = x.store
+      .events()[1]
+      .find((e) => e.event_key === "before-replan:checkpoint-completed");
+    const prompt = x.event("interaction.presented", {
+      interaction_id: "replan-interruption",
+      kind: "replan",
+      target: x.store.state().artifacts.design,
+      question_ids: ["R-001"],
+      text: "Designの範囲変更を承認しますか",
+    });
+    x.tr("finish_interrupt", {
+      interrupt_id: "I-001",
+      reason: "上流変更が必要",
+      replan: {
+        prompt_event_id: prompt.event_id,
+        target_phase: "design",
+        scope: "要件を更新",
+        reason: "追加要求",
+        checkpoint_event_id: cp.event_id,
+      },
+    });
+    assert.equal(x.store.state().phase, "replanning");
+    enqueueInterruption(x, "I-002");
+    assert.throws(
+      () => x.tr("begin_interrupt", { interrupt_id: "I-002" }),
+      /Resolve replan/,
+    );
+    const response = x.event(
+      "interaction.received",
+      {
+        interaction_id: prompt.data.interaction_id,
+        prompt_event_id: prompt.event_id,
+        text: "見送る",
+      },
+      randomUUID(),
+      "human",
+    );
+    x.tr("cancel_replan", { response_event_id: response.event_id });
+    assert.equal(x.store.state().interrupts[0].status, "completed");
+    assert.equal(x.store.state().interrupts[1].status, "queued");
+    x.tr("begin_interrupt", { interrupt_id: "I-002" });
+  },
+);
+fixture(
+  "interruption recording recovers without repeating handler work and appears in audit",
+  (x) => {
+    enqueueInterruption(x);
+    x.tr("begin_interrupt", { interrupt_id: "I-001" });
+    const request = {
+      request_id: "interrupt-result",
+      expected_state_revision: x.store.state().state_revision,
+      action: "record_interrupt_result",
+      interrupt_id: "I-001",
+      result: interruptionResult(),
+    };
+    const atomic = x.store.atomic.bind(x.store);
+    x.store.atomic = (name, data) => {
+      atomic(name, data);
+      throw new Error("simulated interruption");
+    };
+    assert.throws(() => x.store.transition(request), /simulated interruption/);
+    x.store.atomic = atomic;
+    x.store.resumeCheck(true);
+    assert.equal(x.store.state().interrupts[0].status, "result_ready");
+    assert.match(
+      x.store.resumeCheck().attention,
+      /do not repeat external updates/,
+    );
+    x.tr("present_interrupt", {
+      interrupt_id: "I-001",
+      text: "確認済みの結果を提示",
+      proposal_ids: [],
+    });
+    x.tr("finish_interrupt", {
+      interrupt_id: "I-001",
+      reason: "照合して再開",
+      replan: null,
+    });
+    const audit = fs.readFileSync(x.store.path("audit.md"), "utf8");
+    for (const label of [
+      "割り込み受付",
+      "割り込み開始",
+      "割り込み結果",
+      "割り込み終了",
+    ])
+      assert.match(audit, new RegExp(label));
+  },
+);
+fixture(
+  "legacy states remain unchanged on read and completed Flow handles interruptions",
+  (x) => {
+    assert.equal(x.store.state().interrupts, undefined);
+    const before = fs.readFileSync(x.store.path("flow-state.yml"), "utf8");
+    x.store.resumeCheck();
+    assert.equal(
+      fs.readFileSync(x.store.path("flow-state.yml"), "utf8"),
+      before,
+    );
+    completedImplementation(x);
+    x.review("implement");
+    x.tr("advance");
+    enqueueInterruption(x);
+    x.tr("begin_interrupt", { interrupt_id: "I-001" });
+    finishInterruption(x);
+    assert.equal(x.store.state().phase, "completed");
+    assert.equal(x.store.state().state, "completed");
+  },
+);
+
+fixture(
+  "interruption results invalidate old presentations and verify result document freshness",
+  (x) => {
+    const doc = x.store.path("rule.md");
+    fs.writeFileSync(doc, "current rule");
+    const knowledge = {
+      discovery: "規約を確認",
+      completeness: "complete",
+      documents: [
+        {
+          id: "DOC-1",
+          location: doc,
+          scope: "current",
+          status: "available",
+          sha256: f.digest(fs.readFileSync(doc)),
+          version: null,
+          reason: "確認済み",
+        },
+      ],
+      checks: [],
+    };
+    enqueueInterruption(x, "K-001", "project_knowledge");
+    x.tr("begin_interrupt", { interrupt_id: "K-001" });
+    const result = interruptionResult({
+      knowledge,
+      proposals: [
+        {
+          id: "P-001",
+          location: doc,
+          change: "追加候補",
+          reason: "根拠",
+          disposition: "pending",
+          response_event_id: null,
+        },
+      ],
+    });
+    x.tr("record_interrupt_result", { interrupt_id: "K-001", result });
+    assert.throws(
+      () =>
+        x.tr("present_interrupt", {
+          interrupt_id: "K-001",
+          text: "提案を省略",
+          proposal_ids: [],
+        }),
+      /all interruption proposals/,
+    );
+    x.tr("present_interrupt", {
+      interrupt_id: "K-001",
+      text: "P-001を提案",
+      proposal_ids: ["P-001"],
+    });
+    x.tr("record_interrupt_result", { interrupt_id: "K-001", result });
+    assert.equal(x.store.state().interrupts[0].presentation, null);
+    x.tr("present_interrupt", {
+      interrupt_id: "K-001",
+      text: "P-001を再提示",
+      proposal_ids: ["P-001"],
+    });
+    fs.writeFileSync(doc, "changed after result");
+    assert.throws(
+      () =>
+        x.tr("finish_interrupt", {
+          interrupt_id: "K-001",
+          reason: "再開",
+          replan: null,
+        }),
+      /Stale knowledge document/,
+    );
+  },
+);
+fixture(
+  "knowledge assessment cannot update documents and proposal decisions require matching human responses",
+  (x) => {
+    const knowledge = {
+      discovery: "確認済み",
+      completeness: "complete",
+      documents: [],
+      checks: [],
+    };
+    enqueueInterruption(x, "K-001", "project_knowledge");
+    x.tr("begin_interrupt", { interrupt_id: "K-001" });
+    assert.throws(
+      () =>
+        x.tr("record_interrupt_result", {
+          interrupt_id: "K-001",
+          result: interruptionResult({ knowledge, document_sync: "updated" }),
+        }),
+      /cannot claim adopted updates/,
+    );
+    finishInterruption(
+      x,
+      "K-001",
+      interruptionResult({
+        knowledge,
+        proposals: [
+          {
+            id: "P-001",
+            location: "docs/rules.md",
+            change: "明記",
+            reason: "繰り返し使う",
+            disposition: "pending",
+            response_event_id: null,
+          },
+        ],
+      }),
+    );
+    const wrong = x.event(
+      "interaction.received",
+      { interaction_id: "another-topic", prompt_event_id: null, text: "はい" },
+      randomUUID(),
+      "human",
+    );
+    assert.throws(
+      () =>
+        x.tr("decide_interrupt_proposal", {
+          interrupt_id: "K-001",
+          proposal_id: "P-001",
+          disposition: "adopt",
+          response_event_id: wrong.event_id,
+          followup_id: "K-002",
+        }),
+      /human response for this proposal/,
+    );
+    const response = x.event(
+      "interaction.received",
+      {
+        interaction_id: "interrupt:K-001:P-001",
+        prompt_event_id: null,
+        text: "見送る",
+      },
+      randomUUID(),
+      "human",
+    );
+    x.tr("decide_interrupt_proposal", {
+      interrupt_id: "K-001",
+      proposal_id: "P-001",
+      disposition: "exclude",
+      response_event_id: response.event_id,
+      followup_id: null,
+    });
+    assert.equal(x.store.state().interrupts.length, 1);
+  },
+);
+
+fixture(
+  "interrupt regression: historical review does not prevent resumption after normal revision",
+  (x) => {
+    x.writer("design");
+    x.review("design", [x.gate()]);
+    const historicalReview = x.store.state().reviews.design;
+    const feedback = x.feedback("design", "revise", ["requirements:G-001"]);
+    x.tr("revise", { feedback_path: feedback.path });
+    const meta = x.artifact("design", "ready", [feedback], "revise");
+    meta.feedback_results = [
+      { id: "F-001", result: "applied", location: "要件" },
+    ];
+    x.writer("design", "ready", "revise", [feedback], meta);
+    enqueueInterruption(x);
+    x.tr("begin_interrupt", { interrupt_id: "I-001" });
+    finishInterruption(x);
+    assert.deepEqual(x.store.state().reviews.design, historicalReview);
+    assert.equal(x.store.state().phase, "design");
+    // A new review is still required; the old pass/failure cannot authorize advance.
+    assert.throws(() => x.tr("advance"), /No advance/);
+    x.review("design");
+    x.tr("advance");
+    assert.equal(x.store.state().phase, "plan");
+  },
+);
+
+fixture(
+  "interrupt regression: accepted feedback finishes before queued interruption starts",
+  (x) => {
+    x.writer("design");
+    x.review("design", [x.gate()]);
+    const pending = x.feedback("design", "revise", ["requirements:G-001"]);
+    x.tr("revise", { feedback_path: pending.path });
+    const counters = x.store.state().counters;
+    enqueueInterruption(x);
+    assert.throws(
+      () => x.tr("begin_interrupt", { interrupt_id: "I-001" }),
+      /Consume pending feedback/,
+    );
+    assert.match(x.store.resumeCheck().attention, /Complete pending feedback/);
+    assert.throws(
+      () => x.tr("start_review", { stage: "design" }),
+      /pending interruption/,
+    );
+    const meta = x.artifact("design", "ready", [pending], "revise");
+    meta.feedback_results = [
+      { id: "F-001", result: "applied", location: "要件" },
+    ];
+    x.writer("design", "ready", "revise", [pending], meta);
+    assert.equal(x.store.state().pending_feedback, null);
+    const current = x.store.state().artifacts.design;
+    x.tr("begin_interrupt", { interrupt_id: "I-001" });
+    const extra = x.feedback("design", "revise", ["追加指示"]);
+    const resumed = finishInterruption(
+      x,
+      "I-001",
+      interruptionResult({ effect: "revise", feedback: extra }),
+    );
+    assert.deepEqual(resumed.pending_feedback, extra);
+    assert.deepEqual(x.store.document(extra.path)[0].target, current);
+    assert.deepEqual(resumed.counters, counters);
+    const next = x.artifact("design", "ready", [extra], "revise");
+    next.feedback_results = [
+      { id: "F-001", result: "applied", location: "追加要件" },
+    ];
+    x.writer("design", "ready", "revise", [extra], next);
+    assert.equal(x.store.document(pending.path)[0].target.revision, 1);
+    assert.equal(x.store.state().artifacts.design.revision, 3);
+  },
+);
+
+fixture(
+  "interrupt regression: pending answers can resume after a failed invocation without starting unrelated work",
+  (x) => {
+    const design = x.writer("design", "needs_input");
+    const response = x.interact("writer_question", design, ["Q-001"]);
+    const pending = x.feedback("design", "respond");
+    x.tr("answer", {
+      response_event_id: response.event_id,
+      feedback_path: pending.path,
+      source_path: null,
+      scope_disposition: null,
+    });
+    enqueueInterruption(x);
+    assert.throws(
+      () => x.tr("begin_interrupt", { interrupt_id: "I-001" }),
+      /Consume pending feedback/,
+    );
+    assert.throws(
+      () =>
+        x.tr("start_invocation", {
+          invocation_id: "wrong",
+          component: "flow-design",
+          operation: "revise",
+          inputs: [pending],
+        }),
+      /Wrong operation/,
+    );
+    x.tr("start_invocation", {
+      invocation_id: "failed-response",
+      component: "flow-design",
+      operation: "respond",
+      inputs: [pending],
+    });
+    x.tr("fail_invocation", {
+      invocation_id: "failed-response",
+      reason: "保存前の実行障害",
+    });
+    x.tr("resume", {
+      reason: "保存がないことを確認して再開",
+      evidence: [pending],
+    });
+    const meta = x.artifact("design", "ready", [pending], "respond");
+    meta.feedback_results = [
+      { id: "F-001", result: "applied", location: "回答" },
+    ];
+    meta.questions = [{ ...question(), status: "resolved", answer: "A" }];
+    x.writer("design", "ready", "respond", [pending], meta);
+    x.tr("begin_interrupt", { interrupt_id: "I-001" });
+    finishInterruption(x);
+    assert.equal(x.store.state().pending_feedback, null);
+    assert.equal(
+      x.store.document("artifacts/design.md")[0].questions[0].answer,
+      "A",
+    );
+  },
+);
+
+fixture(
+  "interrupt regression: original explicit authorization schedules one update without another human event",
+  (x) => {
+    const original = x.event(
+      "interaction.received",
+      {
+        interaction_id: "original-request",
+        prompt_event_id: null,
+        text: "今後は検証結果を明記する方針で、docs/rules.mdへ反映して",
+      },
+      "original-approval",
+      "human",
+    );
+    x.tr("enqueue_interrupt", {
+      interrupt_id: "K-001",
+      kind: "project_knowledge",
+      origin_event_ids: [original.event_id],
+      reason: "既存の明示承認を確認",
+      parent_id: null,
+    });
+    x.tr("begin_interrupt", { interrupt_id: "K-001" });
+    const proposal = {
+      id: "P-001",
+      location: "docs/rules.md",
+      change: "検証結果を明記する",
+      reason: "利用者が恒久化を明示",
+      disposition: "pending",
+      response_event_id: null,
+    };
+    const knowledge = {
+      discovery: "更新先を確認",
+      completeness: "complete",
+      documents: [],
+      checks: [],
+    };
+    finishInterruption(
+      x,
+      "K-001",
+      interruptionResult({
+        knowledge,
+        knowledge_update: "needed",
+        proposals: [proposal],
+      }),
+    );
+    const args = {
+      interrupt_id: "K-001",
+      proposal_id: "P-001",
+      disposition: "adopt",
+      response_event_id: original.event_id,
+      followup_id: "U-001",
+      approved_scope: { location: proposal.location, change: proposal.change },
+    };
+    assert.throws(
+      () =>
+        x.tr("decide_interrupt_proposal", {
+          ...args,
+          approved_scope: { ...args.approved_scope, change: "承認範囲外" },
+        }),
+      /match proposal scope and origin/,
+    );
+    const unrelated = x.event(
+      "interaction.received",
+      {
+        interaction_id: "unrelated",
+        prompt_event_id: null,
+        text: "別の質問への回答",
+      },
+      randomUUID(),
+      "human",
+    );
+    assert.throws(
+      () =>
+        x.tr("decide_interrupt_proposal", {
+          ...args,
+          response_event_id: unrelated.event_id,
+        }),
+      /match proposal scope and origin/,
+    );
+    const request = {
+      request_id: "reuse-original-approval",
+      expected_state_revision: x.store.state().state_revision,
+      action: "decide_interrupt_proposal",
+      ...args,
+    };
+    const state = x.store.transition(request);
+    assert.deepEqual(x.store.transition(request), state);
+    assert.equal(state.interrupts.length, 2);
+    assert.equal(state.interrupts[1].operation, "update");
+    assert.deepEqual(state.interrupts[1].origin_event_ids, [original.event_id]);
+    assert.equal(
+      x.store
+        .events()[1]
+        .filter(
+          (e) =>
+            e.event_type === "interaction.received" &&
+            e.event_key === "original-approval",
+        ).length,
+      1,
+    );
+    x.tr("begin_interrupt", { interrupt_id: "U-001" });
+    finishInterruption(
+      x,
+      "U-001",
+      interruptionResult({ knowledge, knowledge_update: "updated" }),
+    );
+  },
+);
+
+for (const effect of ["continue", "revise", "replan", "block"]) {
+  fixture(
+    `interrupt regression: ${effect} rechecks result knowledge before changing state`,
+    (x) => {
+      x.writer("design");
+      enqueueInterruption(x);
+      x.tr("begin_interrupt", { interrupt_id: "I-001" });
+      const location = x.store.path("rules.md");
+      fs.writeFileSync(location, "old rule");
+      const knowledge = {
+        discovery: "根拠文書を確認",
+        completeness: "complete",
+        documents: [
+          {
+            id: "DOC-1",
+            location,
+            scope: "規約",
+            status: "available",
+            sha256: f.digest(fs.readFileSync(location)),
+            version: null,
+            reason: "確認済み",
+          },
+        ],
+        checks: [],
+      };
+      const feedback =
+        effect === "revise"
+          ? x.feedback("design", "revise", ["規約反映"])
+          : null;
+      const result = interruptionResult({
+        effect,
+        feedback,
+        target_phase: effect === "replan" ? "design" : null,
+        knowledge,
+      });
+      x.tr("record_interrupt_result", { interrupt_id: "I-001", result });
+      x.tr("present_interrupt", {
+        interrupt_id: "I-001",
+        text: "結果と根拠を提示",
+        proposal_ids: [],
+      });
+      const before = fs.readFileSync(x.store.path("flow-state.yml"), "utf8");
+      fs.writeFileSync(location, "changed rule");
+      assert.throws(
+        () =>
+          x.tr("finish_interrupt", {
+            interrupt_id: "I-001",
+            reason: "復帰判断",
+            replan: null,
+          }),
+        /Stale knowledge document/,
+      );
+      assert.equal(
+        fs.readFileSync(x.store.path("flow-state.yml"), "utf8"),
+        before,
+      );
+      if (effect !== "replan") {
+        knowledge.documents[0].sha256 = f.digest(fs.readFileSync(location));
+        finishInterruption(x, "I-001", { ...result, knowledge });
+        assert.equal(x.store.state().interrupts[0].status, "completed");
+      }
+    },
+  );
+}
+
+fixture(
+  "interrupt regression: superseded pending feedback can stop and enter approved replanning",
+  (x, t) => {
+    x.writer("design");
+    x.review("design", [x.gate()]);
+    const pending = x.feedback("design", "revise", ["requirements:G-001"]);
+    x.tr("revise", { feedback_path: pending.path });
+    checkpointRepository(x, t);
+    enqueueInterruption(x);
+    x.tr("block", {
+      reason: "追加指示で既存の修正を停止",
+      resume_condition: "修正範囲の再承認",
+    });
+    assert.deepEqual(x.store.state().pending_feedback, pending);
+    approveFixtureReplan(x, "design");
+    assert.equal(x.store.state().phase, "replanning");
+    assert.equal(x.store.state().replan.approved, true);
+    assert.equal(x.store.state().interrupts[0].status, "queued");
+  },
+);
+
+fixture(
+  "interrupt regression: current review still rejects changed rule documents",
+  (x) => {
+    const location = x.store.path("current-rules.md");
+    fs.writeFileSync(location, "current rules");
+    const coverage = {
+      discovery: "適用ルールを確認",
+      completeness: "complete",
+      documents: [
+        {
+          id: "DOC-1",
+          location,
+          scope: "規約",
+          status: "available",
+          sha256: f.digest(fs.readFileSync(location)),
+          version: null,
+          reason: "取得済み",
+        },
+      ],
+      checks: [],
+    };
+    const source = x.source.bind(x);
+    x.source = (...args) => {
+      const meta = source(...args);
+      if (meta.source_id === "project-rules") meta.project_knowledge = coverage;
+      return meta;
+    };
+    x.writer("design");
+    x.review("design");
+    enqueueInterruption(x);
+    x.tr("begin_interrupt", { interrupt_id: "I-001" });
+    x.tr("record_interrupt_result", {
+      interrupt_id: "I-001",
+      result: interruptionResult(),
+    });
+    x.tr("present_interrupt", {
+      interrupt_id: "I-001",
+      text: "変更不要",
+      proposal_ids: [],
+    });
+    fs.writeFileSync(location, "changed current rules");
+    assert.throws(
+      () =>
+        x.tr("finish_interrupt", {
+          interrupt_id: "I-001",
+          reason: "確認",
+          replan: null,
+        }),
+      /Aggregate differs|Stale knowledge/,
+    );
+  },
+);

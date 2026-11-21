@@ -159,8 +159,10 @@ export function replanTransition(
     const prepared = events.find(
       (e) =>
         e.event_type === "flow.transition_prepared" &&
-        e.data.action === "request_replan" &&
-        ((e.data.after as Fields).replan as Fields).prompt_event_id ===
+        ["request_replan", "finish_interrupt"].includes(
+          e.data.action as string,
+        ) &&
+        ((e.data.after as Fields).replan as Fields | null)?.prompt_event_id ===
           context.prompt_event_id,
     );
     check(prepared, "Missing original replan state");
@@ -170,6 +172,7 @@ export function replanTransition(
     Object.assign(state, prepared.data.before, {
       state_revision: revision,
       replan: null,
+      ...(state.interrupts ? { interrupts: state.interrupts } : {}),
     });
   } else {
     fields("artifacts");

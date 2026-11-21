@@ -134,10 +134,7 @@ export function findingStatus(
       ? "changes_required"
       : "passed";
 }
-export function validateMeta(meta: Fields, body?: string): ContractName {
-  const kind = KINDS[meta.schema_version];
-  check(kind, "Unsupported schema_version (no implicit migration)");
-  schemaCheck(kind, meta);
+export function validateKnowledge(meta: Fields, kind: ContractName): void {
   const knowledge = meta.project_knowledge;
   if (knowledge) {
     if (kind === "review-source")
@@ -207,6 +204,13 @@ export function validateMeta(meta: Fields, body?: string): ContractName {
     !meta.failure
   )
     check(knowledge, "Project rules source requires knowledge coverage");
+}
+
+export function validateMeta(meta: Fields, body?: string): ContractName {
+  const kind = KINDS[meta.schema_version];
+  check(kind, "Unsupported schema_version (no implicit migration)");
+  schemaCheck(kind, meta);
+  validateKnowledge(meta, kind);
   if (kind === "phase-artifact") {
     for (const [key, label] of [
       ["questions", "question"],
@@ -417,6 +421,69 @@ export function validateMeta(meta: Fields, body?: string): ContractName {
     );
   }
   if (kind === "flow-state") {
+    const interrupts = meta.interrupts ?? [];
+    uniqueIds(interrupts, "interruption");
+    check(
+      interrupts.filter((i: Fields) =>
+        ["running", "result_ready"].includes(i.status),
+      ).length <= 1,
+      "Only one interruption may be active",
+    );
+    for (const item of interrupts) {
+      check(
+        (item.status === "queued") === (item.basis === null),
+        "Interruption basis/status mismatch",
+      );
+      check(
+        ["result_ready", "completed"].includes(item.status) ===
+          Boolean(item.result),
+        "Interruption result/status mismatch",
+      );
+      check(
+        (item.status === "completed") === Boolean(item.outcome),
+        "Interruption outcome/status mismatch",
+      );
+      check(
+        item.presentation === null || Boolean(item.result),
+        "Interruption presentation requires result",
+      );
+      check(
+        item.status !== "completed" || Boolean(item.presentation),
+        "Completed interruption requires presentation",
+      );
+      check(
+        (item.kind === "async_feedback") === (item.operation === "feedback"),
+        "Interruption kind/operation mismatch",
+      );
+      check(
+        (item.operation === "update") === Boolean(item.proposal_id),
+        "Update interruption requires adopted proposal",
+      );
+      if (item.parent_id !== null)
+        check(
+          interrupts.some(
+            (p: Fields) => p.id === item.parent_id && p.id !== item.id,
+          ),
+          "Unknown interruption parent",
+        );
+      if (item.result) {
+        uniqueIds(item.result.proposals, "interruption proposal");
+        if (item.result.knowledge)
+          validateKnowledge(
+            { project_knowledge: item.result.knowledge },
+            "flow-state",
+          );
+      }
+    }
+    if (
+      interrupts.some((i: Fields) =>
+        ["running", "result_ready"].includes(i.status),
+      )
+    )
+      check(
+        meta.active_invocation === null && !meta.replan,
+        "Interruption cannot run with invocation or replan",
+      );
     check(
       (meta.phase === "replanning") === Boolean(meta.replan),
       "Replanning phase/context mismatch",

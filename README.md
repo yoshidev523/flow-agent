@@ -1,4 +1,4 @@
-# flow-agent 4.9.1
+# flow-agent 4.10.0
 
 Codex / Claude Codeで仕様駆動開発を進めるためのエージェントパッケージです。
 Design、Review、Plan、Implementを順に実行し、判断と成果物を`flow-spec/`配下に保存します。
@@ -30,6 +30,11 @@ Flowの現在地は`flow-state.yml`、フェーズ移行・問題・フィード
 復旧用の詳細イベントは`.flow/journal.md`へ分離し、CLIが簡潔な監査履歴を生成します。
 旧schemaの成果物は自動移行しません。旧形式の監査だけは`audit-migrate`で原本を保持して移行できます。
 既存の`spec/`にあるタスクは元のpathで再開します。
+
+非同期feedbackとプロジェクト知識の確認・更新は、共通の割り込みとして受付順に処理します。
+現在のフェーズを保持し、安全な区切りで一時停止して、結果の保存・提示・現状との照合後に再開します。
+結果はjournal、要点はauditへ残します。任意提案は採否待ちのまま進行でき、採用済み更新は別の割り込みとして追跡します。
+詳細は[共通割り込み](.apm/skills/flow/references/interrupts.md)を参照してください。
 
 Flow起動時に対象projectの`.gitattributes`を確認し、なければ作成します。
 既存の内容を保持し、`flow-spec/** linguist-generated=true`が未設定なら追記します。

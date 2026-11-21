@@ -30,19 +30,65 @@ export function auditView(meta: Fields, events: AuditEvent[]): string {
         phase = d.to_phase;
         const prepared = byId.get(d.prepared_event_id)?.data as
           Fields | undefined;
+        const args = prepared?.arguments as Fields | undefined;
+        if (
+          args &&
+          [
+            "enqueue_interrupt",
+            "begin_interrupt",
+            "record_interrupt_result",
+            "present_interrupt",
+            "finish_interrupt",
+            "decide_interrupt_proposal",
+          ].includes(d.action)
+        ) {
+          const record = prepared!.after.interrupts.find(
+            (i: Fields) => i.id === args.interrupt_id,
+          );
+          title = (
+            {
+              enqueue_interrupt: "割り込み受付",
+              begin_interrupt: "割り込み開始",
+              record_interrupt_result: "割り込み結果",
+              present_interrupt: "割り込み結果の提示",
+              finish_interrupt: "割り込み終了",
+              decide_interrupt_proposal: "割り込み提案の採否",
+            } as Record<string, string>
+          )[d.action];
+          fact =
+            d.action === "record_interrupt_result"
+              ? record.result.summary
+              : d.action === "present_interrupt"
+                ? args.text
+                : d.action === "finish_interrupt"
+                  ? `${args.interrupt_id}: ${record.outcome}。${args.reason}`
+                  : d.action === "decide_interrupt_proposal"
+                    ? `${args.interrupt_id}/${args.proposal_id}: ${args.disposition}`
+                    : `${args.interrupt_id}: ${record.kind}。${record.reason}`;
+          reason =
+            d.action === "record_interrupt_result" ? record.result.reason : "";
+          references = d.evidence.map(ref);
+          if (record.origin_event_ids)
+            references.push(...record.origin_event_ids);
+          if (d.action === "record_interrupt_result")
+            references.push(...record.result.evidence);
+          if (d.action === "decide_interrupt_proposal")
+            references.push(args.response_event_id);
+          break;
+        }
         if (d.from_phase !== d.to_phase) {
           title = "フェーズ移行";
           fact = `${d.from_phase} → ${d.to_phase}`;
         } else if (
           d.from_state !== d.to_state &&
           [d.from_state, d.to_state].some((s) =>
-            ["blocked", "waiting"].includes(s),
+            ["blocked", "waiting_for_input"].includes(s),
           )
         ) {
           title =
             d.to_state === "blocked"
               ? "停止"
-              : d.to_state === "waiting"
+              : d.to_state === "waiting_for_input"
                 ? "回答待ち"
                 : "再開";
           fact = `${d.from_state} → ${d.to_state}`;

@@ -5,7 +5,7 @@ disable-model-invocation: true
 user-invocable: true
 ---
 
-# Flow 4.9.1
+# Flow 4.10.0
 
 ## 起動と責務
 
@@ -20,7 +20,8 @@ writer・review hub・executorは自分の契約だけを扱い、Flowが成果�
 成果物・監査の入力形式は[contracts.md](references/contracts.md)とtemplateを参照する。
 機械検証の正本はrepositoryのZod定義で、CLIへ同梱する。
 [templates](assets/templates/)を使い、旧形式を推測移行しない。
-`node {このskillのdirectory}/scripts/flowctl.js --root {feature_dir}`を使う。
+読み込んだこのSKILL.mdのdirectoryを基準に`scripts/flowctl.js`を絶対pathへ解決し、
+`node "{flowctl}" --root "{feature_dir}"`を使う。pathの解決は共通CLI文書の「実行環境」に従う。
 Node.js 22以上が必要。依存はCLIへ同梱済みで、利用側のnpm install・ビルドは不要。
 
 新規feature directoryは`flow-spec/YYYYMMDD_feature-name/`。initで要求、state、auditを作る。
@@ -65,6 +66,9 @@ phase移行後は検証済みstateから次の操作を取り出し、同じタ�
 利用者の回答待ち、人間承認付き再計画の承認待ち、規定手順での停止、または依頼範囲の完了で応答を終える。
 
 1. 新規はinit、再開はresume-check。未完了invocationは実態確認前に再実行しない。
+   interruptsの未処理分があれば[共通割り込み](references/interrupts.md)を処理し、結果確認後に通常手順へ戻る。
+   未消費pending feedbackがある場合は、既に受け付けたwriter操作だけを先に完了してから割り込みを開始する。
+   追加指示により継続が不適切なら実行を強制せず、安全な区切りでblockまたは人間承認付き再計画へ進む。
 2. pending_operationがnullで現在成果物がある場合はwriterを再起動せず、statusに応じた質問・reviewへ進む。
    作成・修正が必要な場合だけstart_invocationでwriterを予約し、指定操作、自分の入出力、対象project・対象範囲だけを渡して起動する。
    Design/Plan writerへreviewやstateを渡さない。publish結果をfinish_invocationで登録する。
@@ -119,28 +123,34 @@ Implement結果も同じ形式で知らせる。
 phase移行前はローカル文書のCLI検証に加え、外部正本の現在版を対応connectorで照合する。
 変更や必須資料の確認不能があれば旧reviewを使わず、共通手順の再評価・停止・再計画を使う。
 
-新しい人間feedbackは現在成果物への影響を確認する。説明補足、現在工程の修正、Designまたは
-Planへの再計画、将来の文書更新候補を区別する。過去の通知への返信も現在のrevisionと照合する。
-進行中の操作を安全な区切りで保存してから切り替え、上流変更は人間承認付き再計画へ接続する。
-戻り先・修正範囲の明示承認が既にあれば再利用し、単なる感想を承認へ変換しない。
+新しい人間feedbackは[共通割り込み](references/interrupts.md)のasync_feedbackとして受け付ける。
+原文をinteraction.receivedへ一度記録し、enqueue_interruptする。通常の質問への回答は既存answerを使う。
+過去の通知への返信も現在のrevisionと照合し、説明補足、現在工程の修正、上流再計画、知識更新候補へ分ける。
+進行中invocationは安全な区切りで保存・finish/failし、未消費pending feedbackのwriter操作を完了する。
+begin_interrupt後は通常のphase操作を行わない。
 
-決定事項の確定、人間feedbackの受領、AIレビュー指摘の登録ごとに、安全な区切りで
-`flow-project-knowledge-agent`へ更新判断・乖離チェックを明示委譲する。
-Flow自身が更新候補なしと判断して委譲を省略しない。同じ契機の複数指摘はまとめて渡せる。
-対象project・範囲、契機と根拠、現在の成果物参照、関連する実装差分・文書参照を渡す。
-専用agentは[flow-project-knowledge](../flow-project-knowledge/SKILL.md)で判断し、Flow stateや
-review判定を変更しない。Human modeでもこの委譲は行い、reviewerの起動とは分ける。
-修正・判断が未確定なら暫定結果を表示し、確定後は変更範囲を再委譲して最終案を提示する。
-工程完了・全体完了時も未確認の候補・実装変更があれば追加確認を委譲し、未報告の結果を補う。
-Flowは返却されたルール・ナレッジへの反映要否と理由、実装・文書の乖離と同期要否、
-未確認事項をチャットへ表示する。更新不要・提案なしでも理由を表示し、報告済みの内容は繰り返さない。
-子agent起動不能・確認不能は理由と未確認範囲を表示し、更新不要と扱わない。
-任意の文書更新候補だけで進行を止めず、必須要件への影響は通常修正・再評価・人間承認付き再計画へ接続する。
-正本への具体的な差分と採用範囲をチャットへ示し、提案・採否の要点を既存actionイベントで記録する。
-文書更新の採否待ちだけで通常進行を止めない。今回の修正への同意を恒久ルールの採用と扱わない。
-恒久化・文書同期の内容と範囲が承認済みなら、専用agentへ採用済み更新を委譲する。
-専用agentは知識スキルでprojectの文書運用に従って更新し、現在タスクへの影響を返す。
-必要な再計画・再reviewを行い、旧reviewや完了証拠を新しい正本への適合証拠にしない。
+決定事項の確定、人間feedbackの受領、AIレビュー指摘の登録ごとに、project_knowledge割り込みを登録する。
+Flow自身が候補なしと判断して省略しない。同じ契機の複数指摘はまとめ、元event集合の二重登録を避ける。
+feedbackに伴う知識確認はそのasync_feedbackのIDをparent_idへ指定し、待機列で順番に処理する。
+既存の更新承認を再利用する場合は、その原文の人間回答eventもorigin_event_idsへ含める。
+対象project・範囲、契機と根拠、現在成果物・実装差分・文書参照をflow-project-knowledge-agentへ渡す。
+Human modeでもこの委譲は行い、reviewの収集・判定と分ける。
+
+専用agentの結果はrecord_interrupt_resultで構造化して保存する。Flowは反映要否と理由、
+実装・文書の乖離と同期要否、未確認事項、全提案のID・正本への具体的な差分・採用範囲と既存承認の照合状況をチャットへ示し、
+present_interruptで提示全文を記録する。更新不要・確認不能も理由を示し、結果を破棄しない。
+修正・判断が未確定なら暫定結果とし、確定後の新しい根拠を別の割り込みとして再評価する。
+工程完了・全体完了時も未確認の候補・実装変更があれば登録し、未処理の結果を回収する。
+
+finish_interrupt前に現在の状態・成果物・文書と結果を照合し、継続、現在工程の修正、再計画、停止を判断する。
+結果の根拠文書は全復帰経路で再照合し、古い結果は再評価・再登録・再提示する。
+履歴reviewは現在の対象で再集約しない。戻り先・修正範囲の明示承認は再利用し、感想を承認へ変換しない。採否待ちだけで通常進行を止めない。
+任意提案は提示・割り込み完了後もpendingとして保持し、利用者の回答をdecide_interrupt_proposalで登録する。
+adoptで追加されたupdate割り込みを専用agentへ委譲し、採用内容・範囲だけを更新する。
+今回の実装修正への同意を恒久化へ読み替えない。既に明示された採用は元の人間回答eventと提案の範囲を照合し、
+そのeventをoriginに保持してapproved_scope付きadoptで再利用する。原文の再記録や再確認は行わない。
+更新後も結果を登録・提示・照合し、必要な再計画・再reviewを行う。旧reviewを新しい正本への適合証拠にしない。
+割り込みの受付・結果・提示・採否・復帰判断はtransitionから自動監査し、同じactionイベントを追加しない。
 
 ## Human modeと追加scope
 
@@ -178,8 +188,10 @@ Plan/Implementで上流の変更が必要なら作業を停止し、下記の人
    approval:approveは人間が提示された戻り先・範囲を承認した場合だけ指定する。
    変更付きの回答なら一度cancelし、新しい範囲を提示する。回答を勝手に承認へ写像しない。
 4. 承認された範囲を独立同期skillへ渡す。旧完了証拠を無効化し、最新成果物参照を受け取る。
-5. finish_replanで最新参照を登録する。Designへ戻る場合はDesign reviewから、Planへ戻る場合は
-   questionsに応じたdecision/final reviewから再開する。needs_inputの人間回答も通常手順を使う。
+5. finish_replanで最新参照を登録し、戻り先成果物のstatusに応じて通常手順を再開する。
+   Designがneeds_inputなら質問を提示してwaitし、回答をanswerで登録してrespondを起動する。
+   Designがreadyならstart_review designへ進む。
+   Planがneeds_inputならstart_review plan_decision、readyならstart_review plan_finalへ進む。
    retry上限・cycle番号をリセットせず、旧review・feedbackを新承認に流用しない。
 
 replanning中は通常の実装・review・resumeを開始しない。中断時はresume-checkのattentionと
